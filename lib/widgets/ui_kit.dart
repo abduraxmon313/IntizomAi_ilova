@@ -124,8 +124,9 @@ class SegmentTabs<T> extends StatelessWidget {
       height: 38,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHigh,
+        color: dark ? AppPalette.darkPaper2 : scheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(AppRadius.md),
+        border: dark ? Border.all(color: AppPalette.darkLine) : null,
       ),
       child: LayoutBuilder(
         builder: (_, box) {
@@ -141,7 +142,7 @@ class SegmentTabs<T> extends StatelessWidget {
                 width: w,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: dark ? AppPalette.darkPaper3 : scheme.surfaceContainerLowest,
+                    color: dark ? scheme.surfaceContainerHighest : scheme.surfaceContainerLowest,
                     borderRadius: BorderRadius.circular(AppRadius.sm + 1),
                     boxShadow: dark ? null : AppShadows.raised,
                   ),
