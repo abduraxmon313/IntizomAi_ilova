@@ -29,12 +29,14 @@ Flutter ilova ──HTTPS──▶ Railway (IntizomAi_Bot_Pro_Copy, webapp/app.p
 
 `codemagic.yaml` → `android-apk` workflow. `main`ga har push bo'lganda APK avtomatik yig'iladi.
 
-Codemagic → IntizomAi_ilova → **Environment variables**, guruh nomi **`intizomai`**:
+Codemagic → IntizomAi_ilova → **Environment variables**, guruh nomi **`IntizomAi`**:
 
 | O'zgaruvchi | Qiymat |
 |---|---|
-| `API_BASE_URL` | Railway server manzili, masalan `https://xxx.up.railway.app` |
 | `ANDROID_KEYSTORE_PASSWORD` | Imzo kaliti paroli (Secure) |
+
+Server manzili (`API_BASE_URL`) `codemagic.yaml` ichida yozilgan:
+`https://intizom-aibot-production.up.railway.app`.
 
 ### Yangilash (qayta o'rnatmasdan)
 
