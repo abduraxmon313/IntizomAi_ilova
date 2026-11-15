@@ -155,11 +155,11 @@ class _CoachPageState extends State<CoachPage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(LucideIcons.infinity, size: 15, color: scheme.primary),
+                    Icon(LucideIcons.infinity, size: 15, color: scheme.tertiary),
                     const SizedBox(width: 6),
                     Text(
                       _remaining == 0 ? 'Bugungi bepul xabarlar tugadi · Premium' : '1 ta bepul xabar qoldi · Premium',
-                      style: TextStyle(fontSize: 12.5, color: scheme.primary, fontWeight: FontWeight.w600),
+                      style: TextStyle(fontSize: 12.5, color: scheme.tertiary, fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
@@ -273,7 +273,7 @@ class _Welcome extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
                   child: Row(
                     children: [
-                      Icon(_icons[i % _icons.length], size: 18, color: scheme.primary),
+                      Icon(_icons[i % _icons.length], size: 18, color: scheme.tertiary),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Text(

@@ -565,7 +565,7 @@ class FriendsPageState extends State<FriendsPage> {
         children: [
           PageHeader(
             title: m.name,
-            subtitle: '${m.streak} kun streak · ${m.totalScore} ball',
+            subtitle: '${m.streak} kunlik seriya · ${m.totalScore} ball',
             leading: IconButton(onPressed: handleBack, icon: const Icon(LucideIcons.chevronLeft)),
           ),
           Padding(

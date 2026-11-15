@@ -24,9 +24,9 @@ class AchievementMilestone {
 const kAchievementCount = 6;
 
 List<AchievementMilestone> achievementMilestones(int streak, int score, int goalsDone) => [
-  AchievementMilestone(LucideIcons.flame, AppPalette.ember, '3 kun', 'Streak', streak, 3),
-  AchievementMilestone(LucideIcons.zap, AppPalette.accentAmber, '7 kun', 'Streak', streak, 7),
-  AchievementMilestone(LucideIcons.gem, AppPalette.accentViolet, '30 kun', 'Streak', streak, 30),
+  AchievementMilestone(LucideIcons.flame, AppPalette.ember, '3 kun', 'Seriya', streak, 3),
+  AchievementMilestone(LucideIcons.zap, AppPalette.accentAmber, '7 kun', 'Seriya', streak, 7),
+  AchievementMilestone(LucideIcons.gem, AppPalette.accentViolet, '30 kun', 'Seriya', streak, 30),
   AchievementMilestone(LucideIcons.target, AppPalette.accentTeal, '10 ta', 'Maqsad', goalsDone, 10),
   AchievementMilestone(LucideIcons.trophy, AppPalette.accentBlue, '100', 'Ball', score, 100),
   AchievementMilestone(LucideIcons.crown, AppPalette.accentRose, '500', 'Ball', score, 500),
@@ -101,37 +101,40 @@ class AchievementsPage extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.only(bottom: 32),
             children: [
-              PageHeader(title: 'Yutuqlar', subtitle: '$unlocked / ${items.length} bosqich ochildi'),
+              const PageHeader(title: 'Yutuqlar', subtitle: 'Seriya, maqsad va ball bosqichlari'),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     AppCard(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const AppIconTile.tinted(icon: LucideIcons.award, accent: AppPalette.accentBlue, size: 46),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${st.level}-daraja · ${st.rankTitle}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, letterSpacing: -.2),
-                                ),
-                                const SizedBox(height: 8),
-                                AppProgressBar(value: st.xpPercent / 100, height: 6),
-                                const SizedBox(height: 6),
-                                Text(
-                                  '${st.xpInLevel} / ${st.xpNeeded} XP · ${st.perfectDays} mukammal kun',
-                                  style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
-                                ),
-                              ],
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                '$unlocked',
+                                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -.8, fontFeatures: tabularFigures),
+                              ),
+                              Text(
+                                ' / ${items.length} bosqich',
+                                style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
+                              ),
+                              const Spacer(),
+                              Text(
+                                '${st.perfectDays} mukammal kun',
+                                style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          AppProgressBar(value: unlocked / items.length, height: 6),
+                          const SizedBox(height: 8),
+                          Text(
+                            _nextHint(items),
+                            style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant, height: 1.35),
                           ),
                         ],
                       ),
@@ -175,6 +178,14 @@ class AchievementsPage extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// Eng yaqin ochilmagan bosqich haqida izoh.
+  static String _nextHint(List<AchievementMilestone> items) {
+    final locked = items.where((a) => !a.unlocked).toList()..sort((a, b) => b.progress.compareTo(a.progress));
+    if (locked.isEmpty) return 'Barcha bosqichlar ochildi. Ajoyib natija!';
+    final n = locked.first;
+    return 'Keyingisi: ${n.value} ${n.label.toLowerCase()} — yana ${n.target - n.current} qoldi.';
   }
 
   static Color _rarityColor(String r) => switch (r) {

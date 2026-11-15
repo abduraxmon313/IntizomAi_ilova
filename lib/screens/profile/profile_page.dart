@@ -13,7 +13,6 @@ import '../../utils/dates.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/feedback.dart';
 import '../../widgets/ui_kit.dart';
-import '../achievements/achievements_page.dart';
 
 const _referralText = "Siz intizomlimisiz?\n\n"
     "Ko'pchilik maqsad qo'yadi, reja tuzadi, lekin oxirigacha yetib bormaydi.\n\n"
@@ -266,23 +265,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
             ),
-            AppCard(
-              padding: EdgeInsets.zero,
-              child: IntrinsicHeight(
-                child: Row(
-                  children: [
-                    _HeroStat(value: '${st.level}', label: st.rankTitle),
-                    VerticalDivider(width: 1, color: scheme.outlineVariant),
-                    _HeroStat(value: '${st.streak}', label: 'seriya'),
-                    VerticalDivider(width: 1, color: scheme.outlineVariant),
-                    _HeroStat(value: '${st.longestStreak}', label: 'rekord'),
-                    VerticalDivider(width: 1, color: scheme.outlineVariant),
-                    _HeroStat(value: '${st.totalScore}', label: 'ball'),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
             _SubscriptionCard(sub: _sub, isPremium: st.isPremium),
 
             // ── Bugungi holat ──────────────────────
@@ -361,10 +343,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
             ),
-
-            // ── Yutuqlar ───────────────────────────
-            const SectionBar(title: 'Yutuqlar'),
-            AchievementGrid(items: achievementMilestones(st.streak, st.totalScore, s.goals.where((g) => g.completed).length)),
 
             // ── Hisob ──────────────────────────────
             const SectionBar(title: 'Hisob'),
@@ -464,31 +442,6 @@ const _moods = [
   ('😞', LucideIcons.frown, 'Past'),
 ];
 
-class _HeroStat extends StatelessWidget {
-  const _HeroStat({required this.value, required this.label});
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
-      child: Column(
-        children: [
-          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -.5, fontFeatures: tabularFigures)),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 11.5, color: Theme.of(context).colorScheme.onSurfaceVariant),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
 class _SubscriptionCard extends StatelessWidget {
   const _SubscriptionCard({required this.sub, required this.isPremium});
 
@@ -535,7 +488,7 @@ class _SubscriptionCard extends StatelessWidget {
               ),
               Text(
                 premium ? 'Uzaytirish' : 'Ochish',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: scheme.primary),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: scheme.tertiary),
               ),
             ],
           ),
