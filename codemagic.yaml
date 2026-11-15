@@ -4,7 +4,6 @@ workflows:
   # shuning uchun yangi APK eskisining ustiga "Yangilash" sifatida o'rnatiladi.
   #
   # Codemagic → IntizomAi_ilova → Environment variables → guruh nomi: intizomai
-  #   API_BASE_URL               — Railway server manzili (masalan https://xxx.up.railway.app)
   #   ANDROID_KEYSTORE_PASSWORD  — imzo kaliti paroli (Secure belgilang)
   android-apk:
     name: Android APK
@@ -14,6 +13,9 @@ workflows:
       flutter: stable
       groups:
         - intizomai
+      vars:
+        # Railway server (bot + Mini App). Maxfiy emas.
+        API_BASE_URL: https://intizom-aibot-production.up.railway.app
     triggering:
       events:
         - push
@@ -26,7 +28,7 @@ workflows:
       - name: Sozlamalarni tekshirish
         script: |
           if [ -z "$API_BASE_URL" ]; then
-            echo "XATO: 'intizomai' guruhida API_BASE_URL yo'q (Railway server manzili)."
+            echo "XATO: API_BASE_URL bo'sh (codemagic.yaml → vars)."
             exit 1
           fi
           if [ -z "$ANDROID_KEYSTORE_PASSWORD" ]; then
