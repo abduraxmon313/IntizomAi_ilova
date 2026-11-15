@@ -11,6 +11,9 @@ workflows:
     max_build_duration: 40
     environment:
       flutter: stable
+      # Android Gradle Plugin 9.x lint vositasi Java 21 talab qiladi
+      # (Java 17'da `List.removeLast()` topilmay build yiqiladi).
+      java: 21
       groups:
         - IntizomAi
       vars:
