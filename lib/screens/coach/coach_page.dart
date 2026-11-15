@@ -273,7 +273,7 @@ class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _ctrl,
-      builder: (_, __) => Container(
+      builder: (_, child) => Container(
         width: 7,
         height: 7,
         decoration: BoxDecoration(

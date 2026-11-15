@@ -1,7 +1,9 @@
 /// IntizomAI ilova konfiguratsiyasi.
 ///
-/// Railway backend API bazaviy URL'i. Ishlab chiqishda localhost,
-/// production'da Railway URL ishlatiladi.
+/// API bazaviy URL — Railway'dagi mavjud webapp serverga ulanadi.
+/// Bot va ilova BIR XUL server, BIR XUL DB ishlatadi.
+///
+/// Build vaqtida: flutter run --dart-define=API_BASE_URL=https://sizning-app.up.railway.app
 library;
 
 const kApiBaseUrl = String.fromEnvironment(
@@ -15,8 +17,5 @@ const kBotUsername = 'intizomAi_bot';
 /// Telegram bot URL.
 const kBotUrl = 'https://t.me/$kBotUsername';
 
-/// API versiyasi.
-const kApiVersion = 'v1';
-
-/// API to'liq yo'li.
-String apiUrl(String path) => '$kApiBaseUrl/api/$kApiVersion$path';
+/// API to'liq yo'li — /api/v1 prefiksi (webapp/app.py'dagi route prefix).
+String apiUrl(String path) => '$kApiBaseUrl/api/v1$path';
