@@ -203,7 +203,7 @@ class _Feature extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, size: 17, color: scheme.primary),
+            child: Icon(icon, size: 17, color: scheme.tertiary),
           ),
           const SizedBox(width: 14),
           Expanded(child: Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, letterSpacing: -.15))),

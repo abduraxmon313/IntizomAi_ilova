@@ -33,11 +33,11 @@ DateTime? parseYmd(String? s) {
 
 bool sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
 
-/// "Dushanba, 15 noyabr"
-String longDate(DateTime d) => '${uzWeekdays[d.weekday - 1]}, ${d.day} ${uzMonths[d.month - 1].toLowerCase()}';
+/// "15-noyabr, dushanba"
+String longDate(DateTime d) => '${d.day}-${uzMonths[d.month - 1].toLowerCase()}, ${uzWeekdays[d.weekday - 1].toLowerCase()}';
 
-/// "15 noy"
-String shortDate(DateTime d) => '${d.day} ${uzMonthsShort[d.month - 1].toLowerCase()}';
+/// "15-noy"
+String shortDate(DateTime d) => '${d.day}-${uzMonthsShort[d.month - 1].toLowerCase()}';
 
 /// Haftaning dushanbasi.
 DateTime weekStart(DateTime d) => dateOnly(d).subtract(Duration(days: d.weekday - 1));

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../models/habit.dart';
 import '../../models/plan.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
@@ -11,7 +10,7 @@ import '../../widgets/feedback.dart';
 import '../../widgets/ui_kit.dart';
 import '../forms.dart';
 
-/// Rejalar: kun tasmasi, tanlangan kunning rejalari va odatlari.
+/// Rejalar: kun tasmasi va tanlangan kunning rejalari. (Odatlar — o'z bo'limida.)
 class PlansPage extends StatefulWidget {
   const PlansPage({super.key, required this.state});
 
@@ -96,28 +95,6 @@ class _PlansPageState extends State<PlansPage> {
     }
   }
 
-  Future<void> _toggleHabit(Habit h) async {
-    final today = tashkentToday();
-    if (_day.isAfter(today)) {
-      toast(context, "Kelajakdagi kunni belgilab bo'lmaydi");
-      return;
-    }
-    try {
-      final isToday = sameDay(_day, today);
-      final updated = isToday
-          ? await s.api.toggleHabit(h.id)
-          : await s.api.toggleHabit(h.id, done: !h.doneOn(_day), day: _day);
-      s.replaceHabit(updated);
-      if (!mounted) return;
-      if (updated.doneOn(_day) || (isToday && updated.doneToday)) {
-        toast(context, 'Odat belgilandi · ${updated.streak} kunlik seriya');
-      }
-      s.refreshStats();
-    } catch (e) {
-      if (mounted) showApiError(context, e);
-    }
-  }
-
   Future<void> _editPlan(Plan p) async {
     if (await showPlanForm(context, api: s.api, plan: p)) s.plansChanged();
   }
@@ -144,12 +121,8 @@ class _PlansPageState extends State<PlansPage> {
   Widget build(BuildContext context) {
     final today = tashkentToday();
     final isToday = sameDay(_day, today);
-    final dayHabits = s.habits.where((h) => !h.finished || h.doneOn(_day)).where((h) => h.dueOn(_day)).toList()
-      ..sort((a, b) => (a.reminderTime ?? '99:99').compareTo(b.reminderTime ?? '99:99'));
     final plans = [..._plans]..sort((a, b) => (a.scheduledTime ?? '99:99').compareTo(b.scheduledTime ?? '99:99'));
-    bool habitDone(Habit h) => h.doneOn(_day) || (isToday && h.doneToday);
     final plansDone = plans.where((p) => p.isDone).length;
-    final habitsDone = dayHabits.where(habitDone).length;
 
     return RefreshIndicator(
       onRefresh: _refresh,
@@ -205,16 +178,6 @@ class _PlansPageState extends State<PlansPage> {
                               ],
                             ),
                 ),
-                if (dayHabits.isNotEmpty) ...[
-                  SectionBar(title: 'Odatlar', count: '$habitsDone/${dayHabits.length}'),
-                  GroupCard(
-                    indent: 64,
-                    children: [
-                      for (final h in dayHabits)
-                        _HabitRow(habit: h, done: habitDone(h), onToggle: () => _toggleHabit(h)),
-                    ],
-                  ),
-                ],
               ],
             ),
           ),
@@ -335,7 +298,7 @@ class _WeekStripState extends State<_WeekStrip> {
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w500,
-                        color: isToday ? scheme.primary : scheme.onSurfaceVariant,
+                        color: isToday ? scheme.tertiary : scheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -357,7 +320,7 @@ class _WeekStripState extends State<_WeekStrip> {
                           color: isSel
                               ? (isToday ? scheme.onPrimary : scheme.surface)
                               : isToday
-                                  ? scheme.primary
+                                  ? scheme.tertiary
                                   : past
                                       ? scheme.onSurfaceVariant
                                       : scheme.onSurface,
@@ -449,60 +412,6 @@ class _PlanRow extends StatelessWidget {
                 PopupMenuItem(value: 'delete', child: Text("O'chirish", style: TextStyle(color: AppPalette.danger))),
               ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HabitRow extends StatelessWidget {
-  const _HabitRow({required this.habit, required this.done, required this.onToggle});
-
-  final Habit habit;
-  final bool done;
-  final VoidCallback onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onToggle,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-        child: Row(
-          children: [
-            HabitGlyph(icon: habit.icon, size: 36, done: done),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    habit.title,
-                    style: TextStyle(
-                      fontSize: 15,
-                      letterSpacing: -.15,
-                      fontWeight: FontWeight.w500,
-                      color: done ? scheme.onSurfaceVariant : scheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Wrap(
-                    spacing: 12,
-                    children: [
-                      if (habit.reminderTime != null) MetaTag(icon: LucideIcons.bell, text: habit.reminderTime!),
-                      MetaTag(
-                        icon: LucideIcons.flame,
-                        text: '${habit.streak} kun',
-                        color: habit.streak > 0 ? AppPalette.ember : null,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            CheckCircle(checked: done, onTap: onToggle),
           ],
         ),
       ),

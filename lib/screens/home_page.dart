@@ -109,6 +109,7 @@ class _HomePageState extends State<HomePage> {
                       onAppearanceChanged: widget.onAppearanceChanged,
                       onLanguageChanged: widget.onLanguageChanged,
                       onOpenPlans: () => _select(1),
+                      onOpenHabits: () => _select(2),
                       onOpenStats: () => _select(3),
                     ),
                   ),

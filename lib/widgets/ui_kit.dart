@@ -257,12 +257,12 @@ class SectionBar extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (actionIcon != null) Icon(actionIcon, size: 16, color: scheme.primary),
+                    if (actionIcon != null) Icon(actionIcon, size: 16, color: scheme.tertiary),
                     if (actionLabel != null) ...[
                       if (actionIcon != null) const SizedBox(width: 4),
                       Text(
                         actionLabel!,
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: scheme.primary, letterSpacing: -.1),
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: scheme.tertiary, letterSpacing: -.1),
                       ),
                     ],
                   ],
@@ -364,7 +364,7 @@ class Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final c = color ?? scheme.primary;
+    final c = color ?? scheme.tertiary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
@@ -763,7 +763,7 @@ class PickerField extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           child: Row(
             children: [
-              Icon(icon, size: 18, color: placeholder ? scheme.onSurfaceVariant : scheme.primary),
+              Icon(icon, size: 18, color: placeholder ? scheme.onSurfaceVariant : scheme.tertiary),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -827,7 +827,7 @@ class ChoiceChipBox extends StatelessWidget {
             color: selected ? scheme.onPrimaryContainer : scheme.onSurface,
           ),
           child: IconTheme.merge(
-            data: IconThemeData(color: selected ? scheme.primary : scheme.onSurfaceVariant),
+            data: IconThemeData(color: selected ? scheme.tertiary : scheme.onSurfaceVariant),
             child: child,
           ),
         ),

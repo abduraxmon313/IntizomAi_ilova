@@ -192,7 +192,7 @@ class _GoalsPageState extends State<GoalsPage> {
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 fontFeatures: tabularFigures,
-                color: selected ? scheme.surface : (current ? scheme.primary : scheme.onSurface),
+                color: selected ? scheme.surface : (current ? scheme.tertiary : scheme.onSurface),
               ),
             ),
             if (sub != null) ...[
@@ -256,7 +256,7 @@ class _GoalsPageState extends State<GoalsPage> {
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     fontFeatures: tabularFigures,
-                    color: _year == today.year ? scheme.primary : scheme.onSurface,
+                    color: _year == today.year ? scheme.tertiary : scheme.onSurface,
                   ),
                 ),
               ),

@@ -218,7 +218,7 @@ class _HabitsPageState extends State<HabitsPage> {
                   if (!thisWeek)
                     GestureDetector(
                       onTap: () => setState(() => _week = weekStart(today)),
-                      child: Text('Joriy haftaga qaytish', style: TextStyle(fontSize: 12, color: scheme.primary)),
+                      child: Text('Joriy haftaga qaytish', style: TextStyle(fontSize: 12, color: scheme.tertiary)),
                     ),
                 ],
               ),
@@ -250,7 +250,7 @@ class _HabitsPageState extends State<HabitsPage> {
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                               fontFeatures: tabularFigures,
-                              color: sameDay(d, today) ? scheme.primary : scheme.onSurface,
+                              color: sameDay(d, today) ? scheme.tertiary : scheme.onSurface,
                             ),
                           ),
                         ],

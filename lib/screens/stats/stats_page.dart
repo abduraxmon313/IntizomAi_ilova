@@ -181,19 +181,9 @@ class _StatsPageState extends State<StatsPage> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(AppSpace.page, 8, AppSpace.page, 40),
         children: [
-          _Hero(
-            discipline: st.disciplineScore,
-            level: st.level,
-            rank: st.rankTitle,
-            xpInLevel: st.xpInLevel,
-            xpNeeded: st.xpNeeded,
-            xpPercent: st.xpPercent,
-            perfectDays: st.perfectDays,
-          ),
-          const SizedBox(height: 12),
           _MetricGrid(
             items: [
-              _Metric(LucideIcons.flame, '${st.streak}', 'Joriy streak', 'Eng uzuni: ${st.longestStreak} kun', AppPalette.ember),
+              _Metric(LucideIcons.flame, '${st.streak}', 'Joriy seriya', 'Eng uzuni: ${st.longestStreak} kun', AppPalette.ember),
               _Metric(LucideIcons.star, '${st.totalScore}', 'Jami ball', '+$weekScore bu hafta', AppPalette.accentAmber),
               _Metric(LucideIcons.circleCheck, '$doneThisMonth', 'Bajarilgan', 'Bu oy', AppPalette.accentBlue),
               _Metric(LucideIcons.target, '${goals.where((g) => !g.completed).length}', 'Maqsadlar', 'Faol', AppPalette.accentTeal),
@@ -219,7 +209,7 @@ class _StatsPageState extends State<StatsPage> {
             _MetricGrid(
               items: [
                 _Metric(LucideIcons.squareCheck, '$habitsDoneToday/${dueToday.length}', 'Bugun', 'bajarildi', AppPalette.accentBlue),
-                _Metric(LucideIcons.flame, '$bestStreak', 'Eng uzun streak', 'kun', AppPalette.ember),
+                _Metric(LucideIcons.flame, '$bestStreak', 'Eng uzun seriya', 'kun', AppPalette.ember),
                 _Metric(LucideIcons.repeat, '${habits.length}', 'Faol odatlar', 'ta', AppPalette.accentTeal),
                 _Metric(LucideIcons.listChecks, '$habitTotal', 'Jami bajarilgan', 'marta', AppPalette.accentViolet),
               ],
@@ -303,7 +293,7 @@ class _StatsPageState extends State<StatsPage> {
       children: [
         SegmentTabs<String>(
           value: _lbPeriod,
-          items: const [('all', 'Umumiy', null), ('week', 'Haftalik', null), ('streak', 'Streak', null)],
+          items: const [('all', 'Umumiy', null), ('week', 'Haftalik', null), ('streak', 'Seriya', null)],
           onChanged: (v) {
             setState(() => _lbPeriod = v);
             _loadLb();
@@ -662,68 +652,6 @@ class _LeaderTile extends StatelessWidget {
               ],
             ),
             style: const TextStyle(fontSize: 14.5, fontFeatures: tabularFigures),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Yuqori xulosa: intizom halqasi, daraja, XP.
-class _Hero extends StatelessWidget {
-  const _Hero({
-    required this.discipline,
-    required this.level,
-    required this.rank,
-    required this.xpInLevel,
-    required this.xpNeeded,
-    required this.xpPercent,
-    required this.perfectDays,
-  });
-
-  final int discipline;
-  final int level;
-  final String rank;
-  final int xpInLevel;
-  final int xpNeeded;
-  final int xpPercent;
-  final int perfectDays;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final muted = TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant);
-    return AppCard(
-      padding: const EdgeInsets.all(18),
-      child: Row(
-        children: [
-          ScoreRing(value: discipline.clamp(0, 100), size: 92, label: 'intizom'),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('$level-daraja', style: muted),
-                const SizedBox(height: 2),
-                Text(
-                  rank,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, letterSpacing: -.5),
-                ),
-                const SizedBox(height: 12),
-                AppProgressBar(value: xpPercent / 100, height: 5),
-                const SizedBox(height: 7),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text('$xpInLevel / $xpNeeded XP', style: muted.copyWith(fontFeatures: tabularFigures)),
-                    ),
-                    Text('$perfectDays mukammal kun', style: muted.copyWith(fontFeatures: tabularFigures)),
-                  ],
-                ),
-              ],
-            ),
           ),
         ],
       ),

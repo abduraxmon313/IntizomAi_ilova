@@ -39,7 +39,7 @@ Future<void> showPremiumDialog(BuildContext context, String message) {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 19, color: scheme.primary),
+            Icon(icon, size: 19, color: scheme.tertiary),
             const SizedBox(width: 14),
             Expanded(
               child: Column(

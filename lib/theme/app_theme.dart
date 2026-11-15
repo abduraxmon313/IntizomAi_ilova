@@ -1,61 +1,64 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// IntizomAI dizayn tizimi — MyFit uslubida.
+/// IntizomAI dizayn tizimi — "Quyosh" (Sun).
 ///
-/// Neytral yuzalar, to'q ko'k-qora matn va bitta ko'k aksent (#2F5BEA).
-/// Bajarilgan holat, tanlangan element, grafik va halqalar — shu ko'k rangda.
-/// Boshqa ranglar faqat kichik ikonka plitalarida va ma'no tashiganda.
+/// Oq va iliq krem yuzalar, deyarli qora siyoh matn, bitta brend rangi —
+/// quyosh sarig'i. Sariq faqat to'ldirish uchun (tugma, belgi, halqa,
+/// progress); matn va havolalar uchun o'qiladigan chuqur oltin tus.
+/// Ma'no ranglari (muvaffaqiyat, ogohlantirish, xato) faqat ma'no tashiganda.
 abstract final class AppPalette {
-  // ── Brend (MyFit ko'ki) ──────────────────────────────
-  static const brand = Color(0xFF2F5BEA);
-  static const brandBright = Color(0xFF2F5BEA);
-  static const brandDeep = Color(0xFF1B3A9A);
-  static const brandTint = Color(0xFFEEF3FF);
-  static const brandOnDark = Color(0xFF7FA2FF);
+  // ── Brend ────────────────────────────────────────────
+  static const brand = Color(0xFFF5B800); // asosiy to'ldirish: tugma, belgi, halqa
+  static const brandBright = Color(0xFFFFC933); // qorong'i rejimdagi brend
+  static const brandInk = Color(0xFF8A6100); // sariq ustidagi emas — krem ustidagi matn/havola
+  static const brandDeep = Color(0xFF5C4100);
+  static const brandTint = Color(0xFFFFF3C4); // tanlangan holat foni
+  static const brandOnDark = Color(0xFFFFC933);
+  static const gold = Color(0xFFB8860B); // Premium, nishonlar
 
-  /// Asosiy kartochka gradienti (Mini App "hero" kartasi kabi).
-  static const heroStart = Color(0xFF2F5BEA);
-  static const heroEnd = Color(0xFF4F7BFF);
-
-  // ── Neytral (yorug') ─────────────────────────────────
-  static const ink = Color(0xFF0B1324);
-  static const ink2 = Color(0xFF5B6475);
-  static const ink3 = Color(0xFF8A93A3);
-  static const line = Color(0xFFE5E7EB);
-  static const lineStrong = Color(0xFFD1D5DB);
-  static const canvas = Color(0xFFF7F8FA);
+  // ── Neytral (yorug') — iliq krem ─────────────────────
+  static const ink = Color(0xFF1A1814);
+  static const ink2 = Color(0xFF68625A);
+  static const ink3 = Color(0xFF9A948A);
+  static const line = Color(0xFFEDE7DB);
+  static const lineStrong = Color(0xFFDAD2C2);
+  static const canvas = Color(0xFFFAF7F0);
   static const paper = Color(0xFFFFFFFF);
-  static const paper2 = Color(0xFFF3F4F6);
-  static const paper3 = Color(0xFFEDEFF3);
+  static const paper2 = Color(0xFFF5F1E8);
+  static const paper3 = Color(0xFFEEE8DC);
 
-  // ── Neytral (qorong'i) ───────────────────────────────
-  static const darkCanvas = Color(0xFF0A0D14);
-  static const darkPaper = Color(0xFF11151E);
-  static const darkPaper2 = Color(0xFF171C27);
-  static const darkPaper3 = Color(0xFF1D2330);
-  static const darkLine = Color(0xFF242B38);
-  static const darkLineStrong = Color(0xFF3A4253);
-  static const darkInk = Color(0xFFEEF1F6);
-  static const darkInk2 = Color(0xFF9AA3B2);
-  static const darkInk3 = Color(0xFF6B7485);
+  // ── Neytral (qorong'i) — iliq grafit ─────────────────
+  static const darkCanvas = Color(0xFF0E0E0C);
+  static const darkPaper = Color(0xFF171614);
+  static const darkPaper2 = Color(0xFF1F1E1B);
+  static const darkPaper3 = Color(0xFF282623);
+  static const darkLine = Color(0xFF2B2926);
+  static const darkLineStrong = Color(0xFF3D3A35);
+  static const darkInk = Color(0xFFF5F2EB);
+  static const darkInk2 = Color(0xFFAAA498);
+  static const darkInk3 = Color(0xFF77726A);
 
   // ── Ma'no ranglari ───────────────────────────────────
-  static const success = Color(0xFF16804B);
-  static const warning = Color(0xFFB7791F);
+  static const success = Color(0xFF1E8A4C);
+  static const warning = Color(0xFFD97706);
   static const danger = Color(0xFFD14343);
-  static const ember = Color(0xFFE0692B); // streak
-  static const gold = Color(0xFFC07A12); // Premium
+  static const info = Color(0xFF2F6FDB);
+  static const ember = Color(0xFFE8590C); // seriya (olov)
 
-  // ── Ikonka plitalari uchun bosiq aksentlar (MyFit) ───
-  static const accentBlue = Color(0xFF2F5BEA);
+  /// "Bugun" kartasi — siyoh yuza (yorug' rejimda ham).
+  static const heroStart = Color(0xFF1A1814);
+  static const heroEnd = Color(0xFF26231D);
+
+  // ── Ikonka plitalari uchun bosiq aksentlar ───────────
+  static const accentBlue = Color(0xFF2F6FDB);
   static const accentTeal = Color(0xFF0F8A7E);
-  static const accentAmber = Color(0xFFC07A12);
+  static const accentAmber = Color(0xFFC98A00);
   static const accentViolet = Color(0xFF6D5BD0);
   static const accentRose = Color(0xFFC94B65);
   static const accentGreen = Color(0xFF2E8B57);
   static const accentIndigo = Color(0xFF4A5BC9);
-  static const accentSlate = Color(0xFF5B6475);
+  static const accentSlate = Color(0xFF68625A);
 
   // ── Eski nomlar (mavjud kod uchun) ───────────────────
   static const primary = brand;
@@ -153,20 +156,21 @@ abstract final class AppTheme {
     final ink = dark ? AppPalette.darkInk : AppPalette.ink;
     final ink2 = dark ? AppPalette.darkInk2 : AppPalette.ink2;
     final line = dark ? AppPalette.darkLine : AppPalette.line;
-    final brand = dark ? AppPalette.brandOnDark : AppPalette.brand;
+    final brand = dark ? AppPalette.brandBright : AppPalette.brand;
+    final brandText = dark ? AppPalette.brandBright : AppPalette.brandInk;
 
     final scheme = ColorScheme(
       brightness: brightness,
       primary: brand,
-      onPrimary: dark ? AppPalette.ink : Colors.white,
-      primaryContainer: dark ? const Color(0xFF1A2440) : AppPalette.brandTint,
-      onPrimaryContainer: dark ? const Color(0xFFC9D7FF) : AppPalette.brandDeep,
+      onPrimary: AppPalette.ink,
+      primaryContainer: dark ? const Color(0xFF3A3018) : AppPalette.brandTint,
+      onPrimaryContainer: dark ? const Color(0xFFFFE7A3) : AppPalette.brandDeep,
       secondary: ink2,
       onSecondary: paper,
       secondaryContainer: dark ? AppPalette.darkPaper2 : AppPalette.paper2,
       onSecondaryContainer: ink,
-      tertiary: AppPalette.success,
-      onTertiary: Colors.white,
+      tertiary: brandText,
+      onTertiary: dark ? AppPalette.ink : Colors.white,
       error: dark ? const Color(0xFFF07A7A) : AppPalette.danger,
       onError: Colors.white,
       errorContainer: dark ? const Color(0xFF3A1A1C) : const Color(0xFFFCEBEB),
@@ -178,12 +182,12 @@ abstract final class AppTheme {
       surfaceContainerLow: dark ? AppPalette.darkPaper2 : AppPalette.paper2,
       surfaceContainer: dark ? AppPalette.darkPaper2 : AppPalette.paper2,
       surfaceContainerHigh: dark ? AppPalette.darkPaper3 : AppPalette.paper3,
-      surfaceContainerHighest: dark ? const Color(0xFF252C3B) : const Color(0xFFE6E9EE),
+      surfaceContainerHighest: dark ? const Color(0xFF33302B) : const Color(0xFFE6DFD0),
       outline: dark ? AppPalette.darkLineStrong : AppPalette.lineStrong,
       outlineVariant: line,
       inverseSurface: dark ? AppPalette.darkInk : AppPalette.ink,
       onInverseSurface: dark ? AppPalette.ink : Colors.white,
-      inversePrimary: dark ? AppPalette.brand : AppPalette.brandOnDark,
+      inversePrimary: AppPalette.brandInk,
       surfaceTint: Colors.transparent,
       shadow: Colors.black,
       scrim: Colors.black,
@@ -201,7 +205,7 @@ abstract final class AppTheme {
       dividerColor: line,
       splashFactory: InkSparkle.splashFactory,
       highlightColor: ink.withValues(alpha: .04),
-      splashColor: brand.withValues(alpha: .06),
+      splashColor: brand.withValues(alpha: .10),
       hoverColor: ink.withValues(alpha: .03),
       iconTheme: IconThemeData(color: ink2, size: 20),
       dividerTheme: DividerThemeData(color: line, thickness: 1, space: 1),
@@ -242,7 +246,7 @@ abstract final class AppTheme {
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md), borderSide: BorderSide(color: line)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide(color: brand, width: 1.5),
+          borderSide: BorderSide(color: brandText, width: 1.5),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -278,7 +282,7 @@ abstract final class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: brand,
+          foregroundColor: brandText,
           shape: shape,
           textStyle: buttonText.copyWith(fontSize: 14),
         ),
@@ -300,7 +304,7 @@ abstract final class AppTheme {
         height: 68,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         iconTheme: WidgetStateProperty.resolveWith(
-          (s) => IconThemeData(size: 21, color: s.contains(WidgetState.selected) ? brand : ink2),
+          (s) => IconThemeData(size: 21, color: s.contains(WidgetState.selected) ? (dark ? brand : ink) : ink2),
         ),
         labelTextStyle: WidgetStateProperty.resolveWith((s) {
           final sel = s.contains(WidgetState.selected);
@@ -343,6 +347,11 @@ abstract final class AppTheme {
         contentTextStyle: TextStyle(fontFamily: fontFamily, fontSize: 14, color: dark ? AppPalette.darkInk : Colors.white),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
         insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: brandText,
+        selectionColor: brand.withValues(alpha: .35),
+        selectionHandleColor: brandText,
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: brand,
