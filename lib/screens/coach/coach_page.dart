@@ -6,6 +6,7 @@ import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/feedback.dart';
+import '../../widgets/ui_kit.dart';
 
 /// AI Coach — faqat suhbat. Coach foydalanuvchining maqsad, reja, odat va
 /// streakini server tomonda ko'radi (webapp/routes/ai.py).
@@ -89,50 +90,28 @@ class _CoachPageState extends State<CoachPage> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final name = widget.state.profile?.fullName.split(' ').first ?? '';
+    final name = widget.state.profile?.fullName.trim().split(' ').first ?? '';
     return Column(
       children: [
-        // Sarlavha
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 10),
+          padding: const EdgeInsets.fromLTRB(AppSpace.page, 12, 10, 12),
           child: Row(
             children: [
-              AppIconTile.tinted(icon: LucideIcons.sparkles, accent: scheme.primary, size: 40),
+              const BrandMark(size: 34),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Intizom AI', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -.3)),
-                    Row(
-                      children: [
-                        Container(
-                          width: 7,
-                          height: 7,
-                          decoration: const BoxDecoration(color: AppPalette.disciplineGreen, shape: BoxShape.circle),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Rejalaringizni ko\'rib turibdi',
-                          style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-                        ),
-                      ],
+                    const Text('Intizom AI', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: -.3)),
+                    Text(
+                      _sending ? 'Yozmoqda…' : 'Shaxsiy murabbiy',
+                      style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
                     ),
                   ],
                 ),
               ),
-              if (_remaining >= 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                  ),
-                  child: Text(
-                    _limit > 0 ? '$_remaining/$_limit' : '$_remaining',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant),
-                  ),
-                ),
+              if (_remaining >= 0) Pill(_limit > 0 ? '$_remaining/$_limit bugun' : '$_remaining', muted: true),
               if (_messages.isNotEmpty)
                 IconButton(
                   tooltip: 'Yangi suhbat',
@@ -144,70 +123,104 @@ class _CoachPageState extends State<CoachPage> {
         ),
         Divider(height: 1, color: scheme.outlineVariant),
         Expanded(
-          child: _messages.isEmpty
-              ? _Welcome(name: name, onPick: _send, suggestions: _suggestions)
-              : ListView.builder(
-                  controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  itemCount: _messages.length + (_sending ? 1 : 0),
-                  itemBuilder: (_, i) => i == _messages.length
-                      ? const _Typing()
-                      : _Bubble(text: _messages[i].content, fromUser: _messages[i].role == 'user'),
-                ),
+          child: AnimatedSwitcher(
+            duration: AppMotion.base,
+            child: _messages.isEmpty
+                ? _Welcome(key: const ValueKey('w'), name: name, onPick: _send, suggestions: _suggestions)
+                : ListView.builder(
+                    key: const ValueKey('c'),
+                    controller: _scroll,
+                    padding: const EdgeInsets.fromLTRB(AppSpace.page, 20, AppSpace.page, 12),
+                    itemCount: _messages.length + (_sending ? 1 : 0),
+                    itemBuilder: (_, i) => i == _messages.length
+                        ? const _Typing()
+                        : _Message(text: _messages[i].content, fromUser: _messages[i].role == 'user'),
+                  ),
+          ),
         ),
         if (_remaining >= 0 && _remaining <= 1)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-            child: GestureDetector(
+            padding: const EdgeInsets.fromLTRB(AppSpace.page, 0, AppSpace.page, 8),
+            child: InkWell(
               onTap: openPremiumInBot,
-              child: Text(
-                _remaining == 0
-                    ? 'Bugungi bepul xabarlar tugadi · Premium bilan cheksiz'
-                    : 'Bugun 1 ta bepul xabar qoldi · Premium bilan cheksiz',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: scheme.primary, fontWeight: FontWeight.w500),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(LucideIcons.infinity, size: 15, color: scheme.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      _remaining == 0 ? 'Bugungi bepul xabarlar tugadi · Premium' : '1 ta bepul xabar qoldi · Premium',
+                      style: TextStyle(fontSize: 12.5, color: scheme.primary, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        Container(
-          padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerLowest,
-            border: Border(top: BorderSide(color: scheme.outlineVariant)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _input,
-                    minLines: 1,
-                    maxLines: 5,
-                    textCapitalization: TextCapitalization.sentences,
-                    textInputAction: TextInputAction.newline,
-                    decoration: InputDecoration(
-                      hintText: 'Savol yozing…',
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(22),
-                        borderSide: BorderSide(color: scheme.outlineVariant),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(22),
-                        borderSide: BorderSide(color: scheme.outlineVariant),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, 12),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 4, 6, 4),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(color: scheme.outlineVariant),
+                boxShadow: Theme.of(context).brightness == Brightness.dark ? null : AppShadows.raised,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _input,
+                      minLines: 1,
+                      maxLines: 5,
+                      textCapitalization: TextCapitalization.sentences,
+                      style: const TextStyle(fontSize: 15.5, letterSpacing: -.15),
+                      decoration: const InputDecoration(
+                        hintText: 'Murabbiyga yozing…',
+                        filled: false,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                IconButton.filled(
-                  onPressed: _sending ? null : () => _send(),
-                  icon: const Icon(LucideIcons.arrowUp, size: 20),
-                ),
-              ],
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _input,
+                      builder: (_, v, _) {
+                        final ready = v.text.trim().isNotEmpty && !_sending;
+                        return AnimatedContainer(
+                          duration: AppMotion.fast,
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: ready ? scheme.primary : scheme.surfaceContainerHigh,
+                          ),
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            onPressed: ready ? () => _send() : null,
+                            icon: Icon(
+                              LucideIcons.arrowUp,
+                              size: 19,
+                              color: ready ? scheme.onPrimary : scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -217,62 +230,66 @@ class _CoachPageState extends State<CoachPage> {
 }
 
 class _Welcome extends StatelessWidget {
-  const _Welcome({required this.name, required this.onPick, required this.suggestions});
+  const _Welcome({super.key, required this.name, required this.onPick, required this.suggestions});
 
   final String name;
   final ValueChanged<String> onPick;
   final List<(String, String)> suggestions;
 
+  static const _icons = [LucideIcons.sunrise, LucideIcons.target, LucideIcons.zap, LucideIcons.chartColumn];
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 36, 20, 20),
+      padding: const EdgeInsets.fromLTRB(AppSpace.page, 40, AppSpace.page, 20),
       children: [
         Text(
-          name.isEmpty ? 'Salom!' : 'Salom, $name!',
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -.5),
+          name.isEmpty ? 'Bugun nimaga\nyordam beray?' : '$name, bugun nimaga\nyordam beray?',
+          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -1, height: 1.15),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 10),
         Text(
-          "Men sizning shaxsiy murabbiyingizman. Maqsad, reja va odatlaringizni bilaman — "
-          "nimadan boshlash, qanday davom etish yoki qayerda to'xtab qolganingiz haqida so'rang.",
-          style: TextStyle(fontSize: 14, height: 1.5, color: scheme.onSurfaceVariant),
+          "Maqsad, reja va odatlaringizni ko'rib turaman. Qayerdan boshlashni, qanday davom etishni yoki nima to'xtatayotganini so'rang.",
+          style: TextStyle(fontSize: 15, height: 1.5, color: scheme.onSurfaceVariant, letterSpacing: -.1),
         ),
-        const SizedBox(height: 24),
-        for (final (label, query) in suggestions)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Material(
-              color: scheme.surfaceContainerLowest,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                side: BorderSide(color: scheme.outlineVariant),
-              ),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                onTap: () => onPick(query),
+        const SizedBox(height: 28),
+        GroupCard(
+          indent: 48,
+          children: [
+            for (var i = 0; i < suggestions.length; i++)
+              InkWell(
+                onTap: () {
+                  tapFeedback();
+                  onPick(suggestions[i].$2);
+                },
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
                   child: Row(
                     children: [
-                      Icon(LucideIcons.messageCircle, size: 17, color: scheme.primary),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
-                      Icon(LucideIcons.arrowUpRight, size: 16, color: scheme.onSurfaceVariant),
+                      Icon(_icons[i % _icons.length], size: 18, color: scheme.primary),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          suggestions[i].$1,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, letterSpacing: -.15),
+                        ),
+                      ),
+                      Icon(LucideIcons.arrowUpRight, size: 16, color: scheme.outline),
                     ],
                   ),
                 ),
               ),
-            ),
-          ),
+          ],
+        ),
       ],
     );
   }
 }
 
-class _Bubble extends StatelessWidget {
-  const _Bubble({required this.text, required this.fromUser});
+/// Foydalanuvchi — neytral pufakcha o'ngda; murabbiy — pufakchasiz matn, chapda belgi.
+class _Message extends StatelessWidget {
+  const _Message({required this.text, required this.fromUser});
 
   final String text;
   final bool fromUser;
@@ -280,55 +297,93 @@ class _Bubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Align(
-      alignment: fromUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * .82),
-        decoration: BoxDecoration(
-          color: fromUser ? scheme.primary : scheme.surfaceContainerLowest,
-          border: fromUser ? null : Border.all(color: scheme.outlineVariant),
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(fromUser ? 16 : 4),
-            bottomRight: Radius.circular(fromUser ? 4 : 16),
-          ),
-        ),
-        child: SelectableText(
-          text,
-          style: TextStyle(fontSize: 14.5, height: 1.45, color: fromUser ? scheme.onPrimary : scheme.onSurface),
-        ),
+    final appear = TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: AppMotion.base,
+      curve: AppMotion.curve,
+      builder: (_, v, child) => Opacity(
+        opacity: v,
+        child: Transform.translate(offset: Offset(0, (1 - v) * 8), child: child),
       ),
+      child: fromUser
+          ? Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 18, left: 48),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: SelectableText(text, style: const TextStyle(fontSize: 15, height: 1.45, letterSpacing: -.1)),
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 22, right: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(padding: EdgeInsets.only(top: 2), child: BrandMark(size: 24)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SelectableText(
+                      text,
+                      style: TextStyle(fontSize: 15, height: 1.55, letterSpacing: -.1, color: scheme.onSurface),
+                    ),
+                  ),
+                ],
+              ),
+            ),
     );
+    return appear;
   }
 }
 
-class _Typing extends StatelessWidget {
+class _Typing extends StatefulWidget {
   const _Typing();
+
+  @override
+  State<_Typing> createState() => _TypingState();
+}
+
+class _TypingState extends State<_Typing> with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLowest,
-          border: Border.all(color: scheme.outlineVariant),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
-            const SizedBox(width: 10),
-            Text('Yozmoqda…', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 22),
+      child: Row(
+        children: [
+          const BrandMark(size: 24),
+          const SizedBox(width: 14),
+          AnimatedBuilder(
+            animation: _c,
+            builder: (_, _) => Row(
+              children: [
+                for (var i = 0; i < 3; i++)
+                  Container(
+                    width: 6,
+                    height: 6,
+                    margin: const EdgeInsets.only(right: 5),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: scheme.onSurfaceVariant.withValues(
+                        alpha: .25 + .6 * (1 - ((_c.value * 3 - i) % 3).clamp(0, 1)),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -4,7 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_theme.dart';
 import 'app_ui.dart';
 
-/// Sahifa sarlavhasi: katta nom + ixtiyoriy izoh + o'ng tomonda amallar.
+/// Katta sarlavha (iOS large title uslubi) + izoh + o'ng tomonda amallar.
 class PageHeader extends StatelessWidget {
   const PageHeader({
     super.key,
@@ -23,10 +23,11 @@ class PageHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
+      padding: EdgeInsets.fromLTRB(leading == null ? AppSpace.page : 8, 14, 12, 14),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          if (leading != null) ...[leading!, const SizedBox(width: 4)],
+          ?leading,
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,19 +36,15 @@ class PageHeader extends StatelessWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -.6,
-                  ),
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -.9, height: 1.15),
                 ),
                 if (subtitle != null) ...[
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     subtitle!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+                    style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant, letterSpacing: -.1),
                   ),
                 ],
               ],
@@ -60,18 +57,22 @@ class PageHeader extends StatelessWidget {
   }
 }
 
-/// Sarlavhadagi kvadrat ikonka tugmasi (MyFit uslubi).
+/// Sarlavhadagi yumaloq ikonka tugmasi.
 class HeaderIconButton extends StatelessWidget {
   const HeaderIconButton({
     super.key,
     required this.icon,
     required this.onTap,
     this.tooltip,
+    this.filled = false,
   });
 
   final IconData icon;
   final VoidCallback onTap;
   final String? tooltip;
+
+  /// Asosiy amal (masalan "qo'shish") — brend rangda.
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
@@ -81,18 +82,18 @@ class HeaderIconButton extends StatelessWidget {
       child: Tooltip(
         message: tooltip ?? '',
         child: Material(
-          color: scheme.surfaceContainerLowest,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            side: BorderSide(color: scheme.outlineVariant),
-          ),
+          color: filled ? scheme.primary : scheme.surfaceContainerLowest,
+          shape: CircleBorder(side: filled ? BorderSide.none : BorderSide(color: scheme.outlineVariant)),
           child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            onTap: onTap,
+            customBorder: const CircleBorder(),
+            onTap: () {
+              tapFeedback();
+              onTap();
+            },
             child: SizedBox(
               width: 40,
               height: 40,
-              child: Icon(icon, size: 19, color: scheme.onSurface),
+              child: Icon(icon, size: 19, color: filled ? scheme.onPrimary : scheme.onSurface),
             ),
           ),
         ),
@@ -101,7 +102,7 @@ class HeaderIconButton extends StatelessWidget {
   }
 }
 
-/// Segmentli tanlagich (Bugun/Tracker, Yillik/Oylik ...).
+/// Segmentli tanlagich. Tanlangan bo'lak siljib boradi.
 class SegmentTabs<T> extends StatelessWidget {
   const SegmentTabs({
     super.key,
@@ -117,62 +118,80 @@ class SegmentTabs<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final index = items.indexWhere((e) => e.$1 == value).clamp(0, items.length - 1);
     return Container(
+      height: 38,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHigh,
+        color: dark ? AppPalette.darkPaper2 : scheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(AppRadius.md),
+        border: dark ? Border.all(color: AppPalette.darkLine) : null,
       ),
-      child: Row(
-        children: [
-          for (final (v, label, icon) in items)
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onChanged(v),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+      child: LayoutBuilder(
+        builder: (_, box) {
+          final w = box.maxWidth / items.length;
+          return Stack(
+            children: [
+              AnimatedPositioned(
+                duration: AppMotion.base,
+                curve: AppMotion.curve,
+                left: w * index,
+                top: 0,
+                bottom: 0,
+                width: w,
+                child: Container(
                   decoration: BoxDecoration(
-                    color: v == value ? scheme.surfaceContainerLowest : Colors.transparent,
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                    boxShadow: v == value ? AppShadows.card : null,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (icon != null) ...[
-                        Icon(
-                          icon,
-                          size: 15,
-                          color: v == value ? scheme.onSurface : scheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 6),
-                      ],
-                      Flexible(
-                        child: Text(
-                          label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: v == value ? FontWeight.w600 : FontWeight.w500,
-                            color: v == value ? scheme.onSurface : scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
+                    color: dark ? scheme.surfaceContainerHighest : scheme.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(AppRadius.sm + 1),
+                    boxShadow: dark ? null : AppShadows.raised,
                   ),
                 ),
               ),
-            ),
-        ],
+              Row(
+                children: [
+                  for (final (v, label, icon) in items)
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          if (v == value) return;
+                          tapFeedback();
+                          onChanged(v);
+                        },
+                        child: AnimatedDefaultTextStyle(
+                          duration: AppMotion.fast,
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 13.5,
+                            letterSpacing: -.1,
+                            fontWeight: v == value ? FontWeight.w600 : FontWeight.w500,
+                            color: v == value ? scheme.onSurface : scheme.onSurfaceVariant,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (icon != null) ...[
+                                Icon(icon, size: 15, color: v == value ? scheme.onSurface : scheme.onSurfaceVariant),
+                                const SizedBox(width: 6),
+                              ],
+                              Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
-/// Bo'lim sarlavhasi + ixtiyoriy "qo'shish" tugmasi.
+/// Bo'lim sarlavhasi: nom, hisob, o'ngda ixtiyoriy amal.
 class SectionBar extends StatelessWidget {
   const SectionBar({
     super.key,
@@ -180,18 +199,20 @@ class SectionBar extends StatelessWidget {
     this.count,
     this.actionLabel,
     this.onAction,
+    this.top = 28,
   });
 
   final String title;
   final String? count;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final double top;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 20, 0, 8),
+      padding: EdgeInsets.fromLTRB(2, top, 0, 10),
       child: Row(
         children: [
           Flexible(
@@ -199,26 +220,38 @@ class SectionBar extends StatelessWidget {
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -.2),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, letterSpacing: -.35),
             ),
           ),
           if (count != null) ...[
             const SizedBox(width: 8),
-            Text(count!, style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+            Text(
+              count!,
+              style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
+            ),
           ],
-          const SizedBox(width: 8),
           const Spacer(),
           if (onAction != null)
-            TextButton.icon(
-              onPressed: onAction,
-              icon: const Icon(LucideIcons.plus, size: 16),
-              label: Text(actionLabel ?? ''),
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                textStyle: const TextStyle(
-                  fontFamily: AppTheme.fontFamily,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
+            InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              onTap: () {
+                tapFeedback();
+                onAction!();
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.plus, size: 16, color: scheme.primary),
+                    if (actionLabel != null) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        actionLabel!,
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: scheme.primary, letterSpacing: -.1),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
@@ -228,14 +261,14 @@ class SectionBar extends StatelessWidget {
   }
 }
 
-/// Yumaloq belgilash katagi (Todoist uslubi).
+/// Yumaloq belgilash katagi. Belgilanganda yumshoq "pop" va tebranish.
 class CheckCircle extends StatelessWidget {
   const CheckCircle({
     super.key,
     required this.checked,
     this.onTap,
     this.color,
-    this.size = 24,
+    this.size = 22,
     this.disabled = false,
   });
 
@@ -248,32 +281,44 @@ class CheckCircle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final c = color ?? AppPalette.disciplineGreen;
+    final c = color ?? AppPalette.success;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: disabled ? null : onTap,
+      onTap: disabled || onTap == null
+          ? null
+          : () {
+              if (!checked) successFeedback();
+              onTap!();
+            },
       child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: checked ? c : Colors.transparent,
-            border: Border.all(
-              color: checked ? c : (disabled ? scheme.outlineVariant : scheme.outline),
-              width: 1.8,
+        padding: const EdgeInsets.all(8),
+        child: TweenAnimationBuilder<double>(
+          key: ValueKey(checked),
+          tween: Tween(begin: checked ? .7 : 1, end: 1),
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutBack,
+          builder: (_, s, child) => Transform.scale(scale: s, child: child),
+          child: AnimatedContainer(
+            duration: AppMotion.fast,
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: checked ? c : Colors.transparent,
+              border: Border.all(
+                color: checked ? c : (disabled ? scheme.outlineVariant : scheme.outline),
+                width: 1.6,
+              ),
             ),
+            child: checked ? Icon(LucideIcons.check, size: size * .6, color: Colors.white) : null,
           ),
-          child: checked ? Icon(LucideIcons.check, size: size * .62, color: Colors.white) : null,
         ),
       ),
     );
   }
 }
 
-/// Kichik metadata yorlig'i: ikonka + matn.
+/// Kichik metadata: ikonka + matn.
 class MetaTag extends StatelessWidget {
   const MetaTag({super.key, required this.icon, required this.text, this.color});
 
@@ -287,15 +332,45 @@ class MetaTag extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 12.5, color: c),
-        const SizedBox(width: 3),
-        Text(text, style: TextStyle(fontSize: 12, color: c, fontWeight: FontWeight.w500)),
+        Icon(icon, size: 13, color: c),
+        const SizedBox(width: 4),
+        Text(text, style: TextStyle(fontSize: 12.5, color: c, fontFeatures: tabularFigures, letterSpacing: -.05)),
       ],
     );
   }
 }
 
-/// Bo'sh holat.
+/// Kichik yorliq (Ega, Premium, Pauza ...).
+class Pill extends StatelessWidget {
+  const Pill(this.text, {super.key, this.color, this.muted = false});
+  final String text;
+  final Color? color;
+  final bool muted;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final c = color ?? scheme.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: muted ? scheme.surfaceContainerHigh : c.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(AppRadius.xs),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: .1,
+          color: muted ? scheme.onSurfaceVariant : c,
+        ),
+      ),
+    );
+  }
+}
+
+/// Bo'sh holat: ingichka chegarali ikonka, sarlavha, izoh, amal.
 class EmptyView extends StatelessWidget {
   const EmptyView({
     super.key,
@@ -315,25 +390,39 @@ class EmptyView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
       child: Column(
         children: [
-          AppIconTile(icon: icon, size: 52),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(color: scheme.surfaceContainerLow, shape: BoxShape.circle),
+            child: Icon(icon, size: 20, color: scheme.onSurfaceVariant),
+          ),
           const SizedBox(height: 14),
-          Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, letterSpacing: -.2),
+          ),
           if (message != null) ...[
             const SizedBox(height: 4),
             Text(
               message!,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant, height: 1.4),
+              style: TextStyle(fontSize: 13.5, color: scheme.onSurfaceVariant, height: 1.45),
             ),
           ],
           if (onAction != null) ...[
-            const SizedBox(height: 16),
-            FilledButton.tonalIcon(
+            const SizedBox(height: 18),
+            FilledButton.icon(
               onPressed: onAction,
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 42)),
               icon: const Icon(LucideIcons.plus, size: 17),
               label: Text(actionLabel ?? ''),
             ),
@@ -344,19 +433,22 @@ class EmptyView extends StatelessWidget {
   }
 }
 
-/// Bir nechta qatorni bitta chegarali kartaga birlashtiradi (iOS Settings / Notion).
+/// Qatorlarni bitta chegarali yuzaga birlashtiradi (guruhlangan ro'yxat).
 class GroupCard extends StatelessWidget {
-  const GroupCard({super.key, required this.children, this.padding});
+  const GroupCard({super.key, required this.children, this.padding, this.indent = 52});
 
   final List<Widget> children;
   final EdgeInsetsGeometry? padding;
+
+  /// Ajratuvchi chiziq chapdan qancha ichkarida boshlanadi.
+  final double indent;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final items = <Widget>[];
     for (var i = 0; i < children.length; i++) {
-      if (i > 0) items.add(Divider(height: 1, indent: 56, color: scheme.outlineVariant));
+      if (i > 0) items.add(Divider(height: 1, indent: indent, color: scheme.outlineVariant));
       items.add(children[i]);
     }
     return Container(
@@ -367,12 +459,12 @@ class GroupCard extends StatelessWidget {
         border: Border.all(color: scheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(children: items),
+      child: Material(type: MaterialType.transparency, child: Column(children: items)),
     );
   }
 }
 
-/// Sozlamalar qatori.
+/// Sozlamalar qatori: bir rangli ikonka, nom, izoh, o'ngda boshqaruv.
 class SettingTile extends StatelessWidget {
   const SettingTile({
     super.key,
@@ -390,52 +482,58 @@ class SettingTile extends StatelessWidget {
   final String? subtitle;
   final Widget? trailing;
   final VoidCallback? onTap;
+
+  /// Ikonka rangi (ixtiyoriy). Berilmasa — neytral.
   final Color? accent;
   final bool danger;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = danger ? AppPalette.danger : (accent ?? scheme.primary);
+    final iconColor = danger ? AppPalette.danger : (accent ?? scheme.onSurfaceVariant);
     return InkWell(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            AppIconTile.tinted(icon: icon, accent: color, size: 32),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w500,
-                      color: danger ? AppPalette.danger : scheme.onSurface,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 52),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: iconColor),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        letterSpacing: -.15,
+                        color: danger ? AppPalette.danger : scheme.onSurface,
+                      ),
                     ),
-                  ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 1),
-                    Text(subtitle!, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(subtitle!, style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant, height: 1.35)),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            if (trailing != null)
-              trailing!
-            else if (onTap != null)
-              Icon(LucideIcons.chevronRight, size: 18, color: scheme.onSurfaceVariant),
-          ],
+              if (trailing != null)
+                trailing!
+              else if (onTap != null)
+                Icon(LucideIcons.chevronRight, size: 18, color: scheme.outline),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Statistika kartasi: ikonka, qiymat, nom, izoh.
+/// Raqamli ko'rsatkich (statistika).
 class StatTile extends StatelessWidget {
   const StatTile({
     super.key,
@@ -456,7 +554,7 @@ class StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -467,14 +565,14 @@ class StatTile extends StatelessWidget {
         children: [
           Row(
             children: [
-              AppIconTile.tinted(icon: icon, accent: accent, size: 30),
-              const SizedBox(width: 8),
+              Icon(icon, size: 15, color: accent),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant, fontWeight: FontWeight.w500),
+                  style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant, fontWeight: FontWeight.w500),
                 ),
               ),
             ],
@@ -484,17 +582,24 @@ class StatTile extends StatelessWidget {
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -.4),
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -.8, fontFeatures: tabularFigures),
           ),
-          if (hint != null)
-            Text(hint!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant)),
+          if (hint != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              hint!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-/// 2 ustunli grid (StatTile'lar uchun).
+/// 2 ustunli panjara.
 class TwoColumnGrid extends StatelessWidget {
   const TwoColumnGrid({super.key, required this.children, this.gap = 10});
 
@@ -523,7 +628,7 @@ class TwoColumnGrid extends StatelessWidget {
   }
 }
 
-/// Pastdan chiqadigan forma oynasi (bir xil sarlavha, tugmalar, klaviatura joyi).
+/// Pastdan chiqadigan forma: sarlavha + yopish, maydonlar, bitta asosiy tugma.
 Future<T?> showFormSheet<T>(
   BuildContext context, {
   required String title,
@@ -534,7 +639,6 @@ Future<T?> showFormSheet<T>(
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
-    showDragHandle: true,
     useSafeArea: true,
     builder: (ctx) {
       var saving = false;
@@ -542,48 +646,58 @@ Future<T?> showFormSheet<T>(
         builder: (ctx, setSheet) => Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            padding: const EdgeInsets.fromLTRB(AppSpace.page, 8, AppSpace.page, 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -.3)),
-                const SizedBox(height: 16),
-                builder(ctx, setSheet),
-                const SizedBox(height: 20),
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(ctx).colorScheme.outline,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Bekor qilish'),
+                      child: Text(
+                        title,
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -.5),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
-                        ),
-                        onPressed: saving
-                            ? null
-                            : () async {
-                                final nav = Navigator.of(ctx);
-                                setSheet(() => saving = true);
-                                final ok = await onSave();
-                                if (ok && nav.mounted) {
-                                  nav.pop();
-                                } else if (ctx.mounted) {
-                                  setSheet(() => saving = false);
-                                }
-                              },
-                        child: saving
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                            : Text(saveLabel),
-                      ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: IconButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.surfaceContainerLow),
+                      icon: const Icon(LucideIcons.x, size: 18),
                     ),
                   ],
+                ),
+                const SizedBox(height: 14),
+                builder(ctx, setSheet),
+                const SizedBox(height: 22),
+                FilledButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          final nav = Navigator.of(ctx);
+                          setSheet(() => saving = true);
+                          final ok = await onSave();
+                          if (ok) {
+                            successFeedback();
+                            if (nav.mounted) nav.pop();
+                          } else if (ctx.mounted) {
+                            setSheet(() => saving = false);
+                          }
+                        },
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                  child: saving
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text(saveLabel),
                 ),
               ],
             ),
@@ -594,26 +708,22 @@ Future<T?> showFormSheet<T>(
   );
 }
 
-/// Forma maydoni uchun kichik yorliq.
+/// Forma maydoni yorlig'i.
 class FieldLabel extends StatelessWidget {
   const FieldLabel(this.text, {super.key});
   final String text;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 6, top: 4),
+    padding: const EdgeInsets.only(bottom: 8, top: 18),
     child: Text(
       text,
-      style: TextStyle(
-        fontSize: 12.5,
-        fontWeight: FontWeight.w600,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
+      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurfaceVariant),
     ),
   );
 }
 
-/// Formadagi bosiladigan qiymat maydoni (vaqt, sana tanlash).
+/// Formadagi tanlash maydoni (vaqt, sana).
 class PickerField extends StatelessWidget {
   const PickerField({
     super.key,
@@ -633,10 +743,7 @@ class PickerField extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Material(
       color: scheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        side: BorderSide(color: scheme.outlineVariant),
-      ),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.md),
         onTap: onTap,
@@ -644,18 +751,21 @@ class PickerField extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           child: Row(
             children: [
-              Icon(icon, size: 18, color: scheme.onSurfaceVariant),
+              Icon(icon, size: 18, color: placeholder ? scheme.onSurfaceVariant : scheme.primary),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 14.5,
+                    fontSize: 15,
+                    fontFeatures: tabularFigures,
                     color: placeholder ? scheme.onSurfaceVariant : scheme.onSurface,
+                    fontWeight: placeholder ? FontWeight.w400 : FontWeight.w500,
                   ),
                 ),
               ),
-              Icon(LucideIcons.chevronDown, size: 16, color: scheme.onSurfaceVariant),
             ],
           ),
         ),
@@ -664,7 +774,7 @@ class PickerField extends StatelessWidget {
   }
 }
 
-/// Tanlanadigan "chip" (hafta kunlari, emoji, kayfiyat ...).
+/// Tanlanadigan katak (hafta kuni, belgi, kayfiyat ...).
 class ChoiceChipBox extends StatelessWidget {
   const ChoiceChipBox({
     super.key,
@@ -683,20 +793,20 @@ class ChoiceChipBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        tapFeedback();
+        onTap();
+      },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: AppMotion.fast,
         width: size,
         height: size,
-        padding: size == null ? const EdgeInsets.symmetric(horizontal: 12, vertical: 9) : null,
+        padding: size == null ? const EdgeInsets.symmetric(horizontal: 10, vertical: 10) : null,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? scheme.primaryContainer : scheme.surfaceContainerLowest,
+          color: selected ? scheme.primaryContainer : scheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-            color: selected ? scheme.primary : scheme.outlineVariant,
-            width: selected ? 1.5 : 1,
-          ),
+          border: Border.all(color: selected ? scheme.primary : Colors.transparent, width: 1.4),
         ),
         child: DefaultTextStyle.merge(
           style: TextStyle(
@@ -704,11 +814,34 @@ class ChoiceChipBox extends StatelessWidget {
             fontWeight: FontWeight.w600,
             color: selected ? scheme.onPrimaryContainer : scheme.onSurface,
           ),
-          child: child,
+          child: IconTheme.merge(
+            data: IconThemeData(color: selected ? scheme.primary : scheme.onSurfaceVariant),
+            child: child,
+          ),
         ),
       ),
     );
   }
+}
+
+/// Bo'lim faol bo'lganda yumshoq paydo bo'lish (IndexedStack ichida).
+class TabFade extends StatelessWidget {
+  const TabFade({super.key, required this.active, required this.child});
+  final bool active;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedOpacity(
+    opacity: active ? 1 : 0,
+    duration: AppMotion.base,
+    curve: AppMotion.curve,
+    child: AnimatedSlide(
+      offset: active ? Offset.zero : const Offset(0, .012),
+      duration: AppMotion.base,
+      curve: AppMotion.curve,
+      child: child,
+    ),
+  );
 }
 
 /// Tasdiqlash oynasi.
@@ -724,10 +857,18 @@ Future<bool> confirmAction(
     builder: (ctx) => AlertDialog(
       title: Text(title),
       content: message == null ? null : Text(message),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Bekor qilish')),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.onSurfaceVariant),
+          child: const Text('Bekor qilish'),
+        ),
         FilledButton(
-          style: danger ? FilledButton.styleFrom(backgroundColor: AppPalette.danger) : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: danger ? AppPalette.danger : null,
+            minimumSize: const Size(0, 40),
+          ),
           onPressed: () => Navigator.pop(ctx, true),
           child: Text(confirmLabel),
         ),
@@ -737,10 +878,10 @@ Future<bool> confirmAction(
   return ok ?? false;
 }
 
-/// Qisqa xabar (pastda).
+/// Qisqa xabar.
 void toast(BuildContext context, String message) {
   if (!context.mounted) return;
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 2)));
+    ..showSnackBar(SnackBar(content: Text(message), duration: const Duration(milliseconds: 1800)));
 }

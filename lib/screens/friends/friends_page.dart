@@ -212,7 +212,7 @@ class FriendsPageState extends State<FriendsPage> {
             shrinkWrap: true,
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
             children: [
-              const Text('Ruxsatlar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              const Text('Ruxsatlar', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -.5)),
               const SizedBox(height: 16),
               const Text('Kim men uchun reja va odat yarata oladi', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
@@ -252,7 +252,7 @@ class FriendsPageState extends State<FriendsPage> {
                   children: [
                     for (final p in incoming)
                       ListTile(
-                        leading: Icon(LucideIcons.userCheck, color: scheme.primary),
+                        leading: Icon(LucideIcons.userCheck, size: 20, color: scheme.onSurfaceVariant),
                         title: Text(p.name),
                         subtitle: const Text('Uning uchun reja va odat yarata olasiz'),
                       ),
@@ -308,11 +308,11 @@ class FriendsPageState extends State<FriendsPage> {
             subtitle: "Jamoa bo'lib intizom yig'ing",
             actions: [
               if (_premiumMessage == null)
-                HeaderIconButton(icon: LucideIcons.plus, tooltip: 'Yangi guruh', onTap: _createGroup),
+                HeaderIconButton(icon: LucideIcons.plus, tooltip: 'Yangi guruh', filled: true, onTap: _createGroup),
             ],
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
             child: Builder(
               builder: (_) {
                 if (_loading) {
@@ -322,23 +322,34 @@ class FriendsPageState extends State<FriendsPage> {
                   return Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: AppCard(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
                       child: Column(
                         children: [
-                          const AppIconTile.tinted(icon: LucideIcons.users, accent: AppPalette.levelGold, size: 52),
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppPalette.gold.withValues(alpha: .5)),
+                            ),
+                            child: const Icon(LucideIcons.users, size: 20, color: AppPalette.gold),
+                          ),
                           const SizedBox(height: 14),
-                          const Text('Do\'stlar — Premium imkoniyat', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                          const Text(
+                            "Do'stlar Premium bilan ochiladi",
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: -.3),
+                          ),
                           const SizedBox(height: 6),
                           Text(
                             "Oila, do'stlar yoki jamoa bilan guruh tuzing, bir-biringizning kunini kuzating va Telegram guruhga kunlik hisobot yuboring.",
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 13, height: 1.45, color: scheme.onSurfaceVariant),
+                            style: TextStyle(fontSize: 13.5, height: 1.45, color: scheme.onSurfaceVariant),
                           ),
-                          const SizedBox(height: 16),
-                          FilledButton.icon(
+                          const SizedBox(height: 18),
+                          FilledButton(
                             onPressed: openPremiumInBot,
-                            icon: const Icon(LucideIcons.gem, size: 17),
-                            label: const Text('Bot orqali Premium olish'),
+                            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(46)),
+                            child: const Text('Premium olish'),
                           ),
                         ],
                       ),
@@ -360,15 +371,16 @@ class FriendsPageState extends State<FriendsPage> {
                   children: [
                     const SizedBox(height: 8),
                     GroupCard(
+                      indent: 68,
                       children: [
                         for (final g in groups)
                           InkWell(
                             onTap: () => _openGroup(g.id),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
                               child: Row(
                                 children: [
-                                  AppIconTile.tinted(icon: LucideIcons.users, accent: scheme.primary, size: 40),
+                                  _GroupMonogram(name: g.name),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
@@ -381,12 +393,13 @@ class FriendsPageState extends State<FriendsPage> {
                                                 g.name,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                                                style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, letterSpacing: -.2),
                                               ),
                                             ),
-                                            if (g.isOwner) ...[const SizedBox(width: 6), const _Badge('Ega')],
+                                            if (g.isOwner) ...[const SizedBox(width: 6), const Pill('Ega')],
                                           ],
                                         ),
+                                        const SizedBox(height: 2),
                                         Text(
                                           "${g.memberCount} a'zo${g.description?.isNotEmpty == true ? ' · ${g.description}' : ''}",
                                           maxLines: 1,
@@ -396,7 +409,7 @@ class FriendsPageState extends State<FriendsPage> {
                                       ],
                                     ),
                                   ),
-                                  Icon(LucideIcons.chevronRight, size: 18, color: scheme.onSurfaceVariant),
+                                  Icon(LucideIcons.chevronRight, size: 18, color: scheme.outline),
                                 ],
                               ),
                             ),
@@ -430,7 +443,7 @@ class FriendsPageState extends State<FriendsPage> {
             ],
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -454,14 +467,15 @@ class FriendsPageState extends State<FriendsPage> {
                     ),
                   ],
                 ),
-                const SectionBar(title: "A'zolar"),
+                SectionBar(title: "A'zolar", count: '${g.members.length}'),
                 GroupCard(
+                  indent: 66,
                   children: [
                     for (final m in g.members)
                       InkWell(
                         onTap: () => _openMember(m.userId),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 14, 12),
                           child: Row(
                             children: [
                               ProfileAvatar(url: null, telegramId: m.telegramId, name: m.name, size: 38),
@@ -474,34 +488,35 @@ class FriendsPageState extends State<FriendsPage> {
                                       children: [
                                         Flexible(
                                           child: Text(
-                                            m.isMe ? '${m.name} (siz)' : m.name,
+                                            m.name,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+                                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -.15),
                                           ),
                                         ),
-                                        if (m.isOwner) ...[const SizedBox(width: 6), const _Badge('Ega')],
-                                        if (!m.isActive) ...[const SizedBox(width: 6), const _Badge('Pauza', muted: true)],
+                                        if (m.isMe) ...[const SizedBox(width: 6), const Pill('Siz')],
+                                        if (m.isOwner) ...[const SizedBox(width: 6), const Pill('Ega')],
+                                        if (!m.isActive) ...[const SizedBox(width: 6), const Pill('Pauza', muted: true)],
                                       ],
                                     ),
-                                    const SizedBox(height: 3),
+                                    const SizedBox(height: 4),
                                     Wrap(
-                                      spacing: 10,
+                                      spacing: 12,
                                       children: m.isMe || m.visible
                                           ? [
                                               MetaTag(icon: LucideIcons.calendarCheck, text: '${m.plansDone}/${m.plansTotal}'),
                                               MetaTag(icon: LucideIcons.repeat, text: '${m.habitsDone}/${m.habitsTotal}'),
-                                              MetaTag(icon: LucideIcons.flame, text: '${m.streak}', color: AppPalette.streakOrange),
+                                              MetaTag(icon: LucideIcons.flame, text: '${m.streak}', color: AppPalette.ember),
                                             ]
                                           : [
                                               const MetaTag(icon: LucideIcons.lock, text: 'Yashirin'),
-                                              MetaTag(icon: LucideIcons.flame, text: '${m.streak}', color: AppPalette.streakOrange),
+                                              MetaTag(icon: LucideIcons.flame, text: '${m.streak}', color: AppPalette.ember),
                                             ],
                                     ),
                                   ],
                                 ),
                               ),
-                              Icon(LucideIcons.chevronRight, size: 18, color: scheme.onSurfaceVariant),
+                              Icon(LucideIcons.chevronRight, size: 18, color: scheme.outline),
                             ],
                           ),
                         ),
@@ -549,12 +564,12 @@ class FriendsPageState extends State<FriendsPage> {
         padding: const EdgeInsets.only(bottom: 28),
         children: [
           PageHeader(
-            title: m.isMe ? '${m.name} (siz)' : m.name,
+            title: m.name,
             subtitle: '${m.streak} kun streak · ${m.totalScore} ball',
             leading: IconButton(onPressed: handleBack, icon: const Icon(LucideIcons.chevronLeft)),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -599,7 +614,7 @@ class FriendsPageState extends State<FriendsPage> {
                       child: Text(
                         m.isPast ? "O'tgan kun ko'rinishi" : "Kelajakdagi kun ko'rinishi",
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12.5, color: scheme.primary, fontWeight: FontWeight.w500),
+                        style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant, fontWeight: FontWeight.w500),
                       ),
                     ),
                   SectionBar(
@@ -671,19 +686,25 @@ class FriendsPageState extends State<FriendsPage> {
       );
     }
     return GroupCard(
+      indent: 50,
       children: [
         for (final it in items)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 6, 14, 6),
             child: Row(
               children: [
-                CheckCircle(checked: it.done, disabled: true, color: it.icon == null ? scheme.primary : null),
-                const SizedBox(width: 8),
+                CheckCircle(checked: it.done, disabled: true),
+                const SizedBox(width: 6),
+                if (it.icon != null) ...[
+                  _ItemGlyph(icon: it.icon!),
+                  const SizedBox(width: 10),
+                ],
                 Expanded(
                   child: Text(
-                    it.icon == null ? it.title : '${it.icon}  ${it.title}',
+                    it.title,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 14.5,
+                      letterSpacing: -.1,
                       decoration: it.done ? TextDecoration.lineThrough : null,
                       color: it.done ? scheme.onSurfaceVariant : scheme.onSurface,
                     ),
@@ -694,32 +715,6 @@ class FriendsPageState extends State<FriendsPage> {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge(this.text, {this.muted = false});
-  final String text;
-  final bool muted;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-      decoration: BoxDecoration(
-        color: muted ? scheme.surfaceContainerHigh : scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(AppRadius.xs),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w600,
-          color: muted ? scheme.onSurfaceVariant : scheme.onPrimaryContainer,
-        ),
-      ),
     );
   }
 }
@@ -794,7 +789,7 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
         shrinkWrap: true,
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
         children: [
-          const Text('Telegram guruhni tanlang', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+          const Text('Telegram guruhni tanlang', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -.5)),
           const SizedBox(height: 6),
           Text(
             "Bot va siz a'zo bo'lgan guruhlar. Ro'yxatda bo'lmasa — botni guruhga qo'shing va u yerda bir marta xabar yozing.",
@@ -806,7 +801,7 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
           else
             for (final c in chats)
               ListTile(
-                leading: const Icon(LucideIcons.send),
+                leading: Icon(LucideIcons.send, size: 20, color: scheme.onSurfaceVariant),
                 title: Text(c.title),
                 subtitle: c.canSend ? null : const Text("Bot xabar yubora olmaydi — botni admin qiling"),
                 onTap: () => Navigator.pop(ctx, c),
@@ -832,7 +827,7 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
         shrinkWrap: true,
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
         children: [
-          const Text('Guruh sozlamalari', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          const Text('Guruh sozlamalari', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -.5)),
           const SizedBox(height: 14),
           if (!owner) ...[
             Text(_g.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
@@ -1066,5 +1061,45 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
         ],
       ),
     ];
+  }
+}
+
+/// Guruh nomining bosh harfi — neytral kvadrat.
+class _GroupMonogram extends StatelessWidget {
+  const _GroupMonogram({required this.name});
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final t = name.trim();
+    return Container(
+      width: 40,
+      height: 40,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Text(
+        t.isEmpty ? '#' : t.characters.first.toUpperCase(),
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
+      ),
+    );
+  }
+}
+
+/// A'zo odati belgisi: ma'lum emoji → Lucide ikonka.
+class _ItemGlyph extends StatelessWidget {
+  const _ItemGlyph({required this.icon});
+  final String icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = habitGlyphs[icon.trim()];
+    return g != null
+        ? Icon(g, size: 17, color: Theme.of(context).colorScheme.onSurfaceVariant)
+        : Text(icon, style: const TextStyle(fontSize: 15));
   }
 }

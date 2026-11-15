@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -114,7 +112,7 @@ class _DashboardPageState extends State<DashboardPage> {
       final updated = await s.api.setPlanStatus(p.id, p.isDone ? 'pending' : 'done');
       if (!mounted) return;
       setState(() => _plans = [for (final x in _plans) x.id == p.id ? updated : x]);
-      if (updated.isDone) toast(context, '+${updated.scoreValue} ball');
+      if (updated.isDone) toast(context, 'Bajarildi · +${updated.scoreValue} ball');
       s.plansChanged();
     } catch (e) {
       if (mounted) showApiError(context, e);
@@ -135,7 +133,7 @@ class _DashboardPageState extends State<DashboardPage> {
       s.replaceHabit(updated);
       if (!mounted) return;
       if (updated.doneOn(_day) || (isToday && updated.doneToday)) {
-        toast(context, '${updated.streak} kunlik streak');
+        toast(context, 'Odat belgilandi · ${updated.streak} kunlik seriya');
       }
       s.refreshStats();
     } catch (e) {
@@ -182,16 +180,19 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final profile = s.profile!;
+    final today = tashkentToday();
+    final isToday = sameDay(_day, today);
     final dayHabits = s.habits.where((h) => !h.finished || h.doneOn(_day)).where((h) => h.dueOn(_day)).toList()
       ..sort((a, b) => (a.reminderTime ?? '99:99').compareTo(b.reminderTime ?? '99:99'));
     final plans = [..._plans]..sort((a, b) => (a.scheduledTime ?? '99:99').compareTo(b.scheduledTime ?? '99:99'));
-    final doneCount = plans.where((p) => p.isDone).length + dayHabits.where((h) => h.doneOn(_day)).length;
-    final total = plans.length + dayHabits.length;
+    bool habitDone(Habit h) => h.doneOn(_day) || (isToday && h.doneToday);
+    final plansDone = plans.where((p) => p.isDone).length;
+    final habitsDone = dayHabits.where(habitDone).length;
 
     return RefreshIndicator(
       onRefresh: _refresh,
       child: ListView(
-        padding: const EdgeInsets.only(bottom: 28),
+        padding: const EdgeInsets.only(bottom: 32),
         children: [
           _Header(
             name: profile.fullName,
@@ -201,60 +202,65 @@ class _DashboardPageState extends State<DashboardPage> {
             onStats: _openStats,
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 4),
-                _SummaryCard(stats: s.stats, onTap: _openStats),
-                ..._insights(),
-                const SizedBox(height: 18),
-              ],
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+            child: _Overview(stats: s.stats, onTap: _openStats),
           ),
-          _DayStrip(selected: _day, onSelect: _selectDay),
+          ..._insights(),
+          const SizedBox(height: 24),
+          _WeekStrip(selected: _day, onSelect: _selectDay),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SectionBar(
                   title: _dayTitle(),
-                  count: total > 0 ? '$doneCount/$total' : null,
-                  actionLabel: "Reja qo'shish",
+                  count: plans.isEmpty ? null : '$plansDone/${plans.length}',
+                  actionLabel: 'Reja',
                   onAction: _addPlan,
+                  top: 20,
                 ),
-                if (_loadingPlans)
-                  const Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
-                  )
-                else if (total == 0)
-                  EmptyView(
-                    icon: LucideIcons.calendarCheck,
-                    title: "Bu kunga reja yo'q",
-                    message: "Reja qo'shing — vaqtida bot eslatadi.",
-                    actionLabel: "Reja qo'shish",
-                    onAction: _addPlan,
-                  )
-                else
+                AnimatedSwitcher(
+                  duration: AppMotion.base,
+                  child: _loadingPlans
+                      ? const Padding(
+                          key: ValueKey('loading'),
+                          padding: EdgeInsets.all(28),
+                          child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
+                        )
+                      : plans.isEmpty
+                          ? EmptyView(
+                              key: ValueKey('empty${ymd(_day)}'),
+                              icon: LucideIcons.calendarPlus,
+                              title: isToday ? "Bugunga reja yo'q" : "Bu kunga reja yo'q",
+                              message: 'Vaqtini belgilang — bot o\'z vaqtida eslatadi.',
+                              actionLabel: "Reja qo'shish",
+                              onAction: _addPlan,
+                            )
+                          : GroupCard(
+                              key: ValueKey('plans${ymd(_day)}'),
+                              indent: 92,
+                              children: [
+                                for (final p in plans)
+                                  _PlanRow(
+                                    plan: p,
+                                    onToggle: () => _togglePlan(p),
+                                    onEdit: () => _editPlan(p),
+                                    onDelete: () => _deletePlan(p),
+                                  ),
+                              ],
+                            ),
+                ),
+                if (dayHabits.isNotEmpty) ...[
+                  SectionBar(title: 'Odatlar', count: '$habitsDone/${dayHabits.length}'),
                   GroupCard(
+                    indent: 64,
                     children: [
-                      for (final p in plans)
-                        _PlanRow(
-                          plan: p,
-                          onToggle: () => _togglePlan(p),
-                          onEdit: () => _editPlan(p),
-                          onDelete: () => _deletePlan(p),
-                        ),
                       for (final h in dayHabits)
-                        _HabitRow(
-                          habit: h,
-                          done: h.doneOn(_day) || (sameDay(_day, tashkentToday()) && h.doneToday),
-                          onToggle: () => _toggleHabit(h),
-                        ),
+                        _HabitRow(habit: h, done: habitDone(h), onToggle: () => _toggleHabit(h)),
                     ],
                   ),
+                ],
               ],
             ),
           ),
@@ -271,7 +277,7 @@ class _DashboardPageState extends State<DashboardPage> {
     return '${shortDate(_day)} rejalari';
   }
 
-  /// Mini App'dagi "Smart insights" qoidalari.
+  /// Mini App'dagi "Smart insights" qoidalari — ixcham ko'rinishda.
   List<Widget> _insights() {
     final st = s.stats;
     final done7 = _week.where((p) => p.isDone).length;
@@ -279,54 +285,66 @@ class _DashboardPageState extends State<DashboardPage> {
     final rate = total7 == 0 ? 0 : (done7 * 100 / total7).round();
     final items = <(IconData, Color, String, String)>[];
     if (st.streak >= 7) {
-      items.add((LucideIcons.flame, AppPalette.streakOrange, 'Zo\'r ketyapsiz', '${st.streak} kunlik streak — davom eting.'));
+      items.add((LucideIcons.flame, AppPalette.ember, '${st.streak} kunlik seriya', "Ritmni saqlang — bugun ham bitta ishni yoping."));
     }
     if (st.disciplineScore >= 75) {
-      items.add((LucideIcons.gem, AppPalette.accentViolet, 'Intizom yuqori darajada', 'Siz rejani bajaradigan insonsiz.'));
+      items.add((LucideIcons.badgeCheck, AppPalette.success, 'Intizom yuqori', 'Reja tuzasiz va bajarasiz. Shu sur\'atda davom eting.'));
     }
     if (rate >= 80 && total7 >= 5) {
-      items.add((LucideIcons.trendingUp, AppPalette.disciplineGreen, 'Hafta yaxshi o\'tdi', '$done7/$total7 reja bajarildi.'));
+      items.add((LucideIcons.trendingUp, AppPalette.success, 'Kuchli hafta', '$done7/$total7 reja bajarildi.'));
     }
     if (rate < 40 && total7 >= 5) {
-      items.add((LucideIcons.trendingDown, AppPalette.warning, 'Bu hafta sustroq', "Bitta yengil reja qo'shing — maromga qaytasiz."));
+      items.add((LucideIcons.trendingDown, AppPalette.warning, 'Hafta sustroq', "Bitta yengil reja qo'shing — ritm tiklanadi."));
     }
     if (st.disciplineScore < 40) {
-      items.add((LucideIcons.target, AppPalette.danger, 'Intizom pasaymoqda', 'Bugun bitta kichik ishni bajaring.'));
+      items.add((LucideIcons.target, AppPalette.warning, 'Kichik qadamdan boshlang', 'Bugun bitta ishni bajarish kifoya.'));
     }
     if (st.streak == 0 && total7 > 0) {
       items.add((LucideIcons.sprout, AppPalette.accentGreen, 'Yangi boshlanish', 'Birinchi qadam eng qiyini, lekin eng muhimi.'));
     }
     if (items.isEmpty) return const [];
+    final scheme = Theme.of(context).colorScheme;
     return [
-      const SectionBar(title: 'Tavsiyalar'),
-      GroupCard(
-        children: [
-          for (final (icon, color, title, text) in items)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
-                children: [
-                  AppIconTile.tinted(icon: icon, accent: color, size: 32),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+      const SizedBox(height: 12),
+      for (final (icon, color, title, text) in items.take(2))
+        Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, 8),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: color),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
                       children: [
-                        Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                        Text(
-                          text,
-                          style: TextStyle(fontSize: 12.5, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                        ),
+                        TextSpan(text: '$title. ', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        TextSpan(text: text, style: TextStyle(color: scheme.onSurfaceVariant)),
                       ],
                     ),
+                    style: const TextStyle(fontSize: 13.5, height: 1.4, letterSpacing: -.1),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-        ],
-      ),
+          ),
+        ),
     ];
   }
+}
+
+String _greeting() {
+  final h = DateTime.now().toUtc().add(const Duration(hours: 5)).hour;
+  if (h >= 5 && h < 12) return 'Xayrli tong';
+  if (h >= 12 && h < 18) return 'Xayrli kun';
+  if (h >= 18 && h < 23) return 'Xayrli kech';
+  return 'Xayrli tun';
 }
 
 class _Header extends StatelessWidget {
@@ -347,44 +365,44 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final first = name.trim().split(' ').first;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+      padding: const EdgeInsets.fromLTRB(AppSpace.page, 14, 14, 18),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: onProfile,
-            child: ProfileAvatar(url: avatar, telegramId: telegramId, name: name, size: 42),
-          ),
-          const SizedBox(width: 12),
           Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onProfile,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -.3),
-                  ),
-                  Text(longDate(tashkentToday()), style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant)),
-                ],
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  longDate(tashkentToday()),
+                  style: TextStyle(fontSize: 13.5, color: scheme.onSurfaceVariant, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${_greeting()}, $first',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -.9, height: 1.2),
+                ),
+              ],
             ),
           ),
           HeaderIconButton(icon: LucideIcons.chartColumn, tooltip: 'Statistika', onTap: onStats),
-          HeaderIconButton(icon: LucideIcons.settings, tooltip: 'Sozlamalar', onTap: onProfile),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onProfile,
+            child: ProfileAvatar(url: avatar, telegramId: telegramId, name: name, size: 40),
+          ),
         ],
       ),
     );
   }
 }
 
-/// Intizom balli halqasi + daraja + XP + streak.
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.stats, required this.onTap});
+/// Kunning umumiy holati: intizom halqasi, bugungi bajarilish, seriya, daraja.
+class _Overview extends StatelessWidget {
+  const _Overview({required this.stats, required this.onTap});
 
   final UserStats stats;
   final VoidCallback onTap;
@@ -393,70 +411,79 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final risk = stats.streakAtRisk && stats.streak > 0;
+    final ratio = stats.todayTotal == 0 ? 0.0 : stats.todayDone / stats.todayTotal;
     return AppCard(
       onTap: onTap,
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.zero,
       child: Column(
         children: [
-          Row(
-            children: [
-              ScoreRing(value: stats.disciplineScore, size: 84, label: 'Intizom'),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      stats.rankTitle,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: -.2),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${stats.level}-daraja · ${stats.xpInLevel}/${stats.xpNeeded} XP',
-                      style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 10),
-                    AppProgressBar(value: stats.xpPercent / 100, height: 6),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Jami ${stats.xp} XP',
-                      style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant),
-                    ),
-                  ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+            child: Row(
+              children: [
+                ScoreRing(value: stats.disciplineScore, size: 92, label: 'intizom'),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Bugun', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 2),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: '${stats.todayDone}'),
+                            TextSpan(
+                              text: ' / ${stats.todayTotal}',
+                              style: TextStyle(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                        style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -1, fontFeatures: tabularFigures),
+                      ),
+                      const SizedBox(height: 10),
+                      AppProgressBar(value: ratio, color: ratio >= 1 ? AppPalette.success : null),
+                      const SizedBox(height: 8),
+                      Text(
+                        stats.todayTotal == 0
+                            ? "Rejalar va odatlar hali yo'q"
+                            : ratio >= 1
+                                ? 'Hammasi bajarildi'
+                                : '${stats.todayTotal - stats.todayDone} ta ish qoldi',
+                        style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 14),
           Divider(height: 1, color: scheme.outlineVariant),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _Metric(
-                  icon: LucideIcons.flame,
-                  color: AppPalette.streakOrange,
-                  value: '${stats.streak} kun',
-                  label: 'Streak',
+          IntrinsicHeight(
+            child: Row(
+              children: [
+                _Metric(
+                  icon: risk ? LucideIcons.triangleAlert : LucideIcons.flame,
+                  color: risk ? AppPalette.warning : AppPalette.ember,
+                  value: '${stats.streak}',
+                  label: risk ? 'Seriya xavfda' : 'kunlik seriya',
                 ),
-              ),
-              Expanded(
-                child: _Metric(
-                  icon: risk ? LucideIcons.triangleAlert : LucideIcons.circleCheck,
-                  color: risk ? AppPalette.warning : AppPalette.disciplineGreen,
-                  value: '${stats.todayDone}/${stats.todayTotal}',
-                  label: risk ? 'Streak xavf ostida' : 'Bugun',
+                VerticalDivider(width: 1, color: scheme.outlineVariant),
+                _Metric(
+                  icon: LucideIcons.chartNoAxesColumn,
+                  color: scheme.primary,
+                  value: '${stats.level}',
+                  label: '${stats.rankTitle} · ${stats.xpPercent}%',
                 ),
-              ),
-              Expanded(
-                child: _Metric(
+                VerticalDivider(width: 1, color: scheme.outlineVariant),
+                _Metric(
                   icon: LucideIcons.star,
-                  color: AppPalette.levelGold,
+                  color: AppPalette.gold,
                   value: '${stats.totalScore}',
-                  label: 'Ball',
+                  label: 'ball',
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -474,111 +501,51 @@ class _Metric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 17, color: color),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(value, maxLines: 1, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Ingichka halqali ko'rsatkich (0..100).
-class ScoreRing extends StatelessWidget {
-  const ScoreRing({super.key, required this.value, this.size = 80, this.label, this.color});
-
-  final int value;
-  final double size;
-  final String? label;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final c = color ??
-        (value >= 70
-            ? AppPalette.disciplineGreen
-            : value >= 40
-                ? scheme.primary
-                : AppPalette.warning);
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(
-        painter: _RingPainter(value / 100, c, scheme.surfaceContainerHigh),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('$value', style: TextStyle(fontSize: size * .28, fontWeight: FontWeight.w700, letterSpacing: -.5)),
-              if (label != null)
-                Text(label!, style: TextStyle(fontSize: size * .125, color: scheme.onSurfaceVariant)),
-            ],
-          ),
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 14, color: color),
+                const SizedBox(width: 5),
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFeatures: tabularFigures, letterSpacing: -.3),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11.5, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _RingPainter extends CustomPainter {
-  _RingPainter(this.progress, this.color, this.track);
-
-  final double progress;
-  final Color color;
-  final Color track;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final stroke = size.width * .08;
-    final rect = Offset(stroke / 2, stroke / 2) & Size(size.width - stroke, size.height - stroke);
-    final base = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..color = track;
-    canvas.drawArc(rect, 0, math.pi * 2, false, base);
-    final fg = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round
-      ..color = color;
-    canvas.drawArc(rect, -math.pi / 2, math.pi * 2 * progress.clamp(0, 1), false, fg);
-  }
-
-  @override
-  bool shouldRepaint(_RingPainter old) => old.progress != progress || old.color != color || old.track != track;
-}
-
-/// Gorizontal kun tasmasi: 14 kun oldin … bugun … 30 kun keyin.
-class _DayStrip extends StatefulWidget {
-  const _DayStrip({required this.selected, required this.onSelect});
+/// Kun tanlagich: 14 kun oldin … bugun … 30 kun keyin. Kalendar uslubida.
+class _WeekStrip extends StatefulWidget {
+  const _WeekStrip({required this.selected, required this.onSelect});
 
   final DateTime selected;
   final ValueChanged<DateTime> onSelect;
 
   @override
-  State<_DayStrip> createState() => _DayStripState();
+  State<_WeekStrip> createState() => _WeekStripState();
 }
 
-class _DayStripState extends State<_DayStrip> {
+class _WeekStripState extends State<_WeekStrip> {
   static const _before = 14;
   static const _after = 30;
-  static const _itemW = 52.0;
-  static const _gap = 6.0;
+  static const _itemW = 46.0;
   final _ctrl = ScrollController();
 
   @override
@@ -597,18 +564,16 @@ class _DayStripState extends State<_DayStrip> {
     if (!_ctrl.hasClients) return;
     final idx = widget.selected.difference(tashkentToday()).inDays + _before;
     final w = _ctrl.position.viewportDimension;
-    final target = (16 + idx * (_itemW + _gap) - w / 2 + _itemW / 2).clamp(0.0, _ctrl.position.maxScrollExtent);
-    if (animate) {
-      _ctrl.animateTo(target, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
-    } else {
-      _ctrl.jumpTo(target);
-    }
+    final target = (12 + idx * _itemW - w / 2 + _itemW / 2).clamp(0.0, _ctrl.position.maxScrollExtent);
+    animate
+        ? _ctrl.animateTo(target, duration: AppMotion.base, curve: AppMotion.curve)
+        : _ctrl.jumpTo(target);
   }
 
   @override
-  void didUpdateWidget(covariant _DayStrip old) {
-    super.didUpdateWidget(old);
-    if (!sameDay(old.selected, widget.selected)) {
+  void didUpdateWidget(covariant _WeekStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!sameDay(oldWidget.selected, widget.selected)) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _center());
     }
   }
@@ -617,65 +582,98 @@ class _DayStripState extends State<_DayStrip> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final today = tashkentToday();
-    return SizedBox(
-      height: 72,
-      child: ListView.separated(
-        controller: _ctrl,
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _before + _after + 1,
-        separatorBuilder: (_, _) => const SizedBox(width: _gap),
-        itemBuilder: (context, i) {
-          final d = today.add(Duration(days: i - _before));
-          final sel = sameDay(d, widget.selected);
-          final isToday = sameDay(d, today);
-          return GestureDetector(
-            onTap: () => widget.onSelect(d),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              width: _itemW,
-              decoration: BoxDecoration(
-                color: sel ? scheme.primary : scheme.surfaceContainerLowest,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(color: sel ? scheme.primary : scheme.outlineVariant),
+    final sel = widget.selected;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpace.page, 0, 12, 4),
+          child: Row(
+            children: [
+              Text(
+                '${uzMonths[sel.month - 1]} ${sel.year}',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -.2),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    isToday ? 'Bugun' : uzWeekdaysShort[d.weekday - 1],
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: sel ? scheme.onPrimary.withValues(alpha: .85) : scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${d.day}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: sel ? scheme.onPrimary : (isToday ? scheme.primary : scheme.onSurface),
-                    ),
-                  ),
-                  Text(
-                    uzMonthsShort[d.month - 1],
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: sel ? scheme.onPrimary.withValues(alpha: .85) : scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+              const Spacer(),
+              AnimatedOpacity(
+                opacity: sameDay(sel, today) ? 0 : 1,
+                duration: AppMotion.fast,
+                child: TextButton(
+                  onPressed: sameDay(sel, today) ? null : () => widget.onSelect(today),
+                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                  child: const Text('Bugun'),
+                ),
               ),
-            ),
-          );
-        },
-      ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 66,
+          child: ListView.builder(
+            controller: _ctrl,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemExtent: _itemW,
+            itemCount: _before + _after + 1,
+            itemBuilder: (context, i) {
+              final d = today.add(Duration(days: i - _before));
+              final isSel = sameDay(d, sel);
+              final isToday = sameDay(d, today);
+              final past = d.isBefore(today);
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  tapFeedback();
+                  widget.onSelect(d);
+                },
+                child: Column(
+                  children: [
+                    Text(
+                      uzWeekdaysShort[d.weekday - 1],
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        color: isToday ? scheme.primary : scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    AnimatedContainer(
+                      duration: AppMotion.fast,
+                      width: 36,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isSel ? (isToday ? scheme.primary : scheme.onSurface) : Colors.transparent,
+                      ),
+                      child: Text(
+                        '${d.day}',
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: isSel || isToday ? FontWeight.w700 : FontWeight.w500,
+                          fontFeatures: tabularFigures,
+                          color: isSel
+                              ? (isToday ? scheme.onPrimary : scheme.surface)
+                              : isToday
+                                  ? scheme.primary
+                                  : past
+                                      ? scheme.onSurfaceVariant
+                                      : scheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
 
+/// Reja qatori: chapda vaqt ustuni, keyin belgilash va matn.
 class _PlanRow extends StatelessWidget {
   const _PlanRow({required this.plan, required this.onToggle, required this.onEdit, required this.onDelete});
 
@@ -687,57 +685,62 @@ class _PlanRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final time = plan.scheduledTime?.isNotEmpty == true ? plan.scheduledTime! : '—';
     return InkWell(
       onTap: onEdit,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
+        padding: const EdgeInsets.fromLTRB(16, 6, 4, 6),
         child: Row(
           children: [
-            CheckCircle(checked: plan.isDone, color: scheme.primary, onTap: onToggle),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    plan.title,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w500,
-                      color: plan.isDone ? scheme.onSurfaceVariant : scheme.onSurface,
-                      decoration: plan.isDone ? TextDecoration.lineThrough : null,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 2,
-                    children: [
-                      MetaTag(
-                        icon: LucideIcons.clock,
-                        text: plan.scheduledTime?.isNotEmpty == true ? plan.scheduledTime! : 'Vaqtsiz',
-                      ),
-                      if (plan.description?.isNotEmpty == true)
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 200),
-                          child: Text(
-                            plan.description!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
+            SizedBox(
+              width: 42,
+              child: Text(
+                time,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: tabularFigures,
+                  color: plan.isDone ? scheme.outline : scheme.onSurfaceVariant,
+                ),
               ),
             ),
-            Text(
-              '+${plan.scoreValue}',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant),
+            CheckCircle(checked: plan.isDone, color: scheme.primary, onTap: onToggle),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AnimatedDefaultTextStyle(
+                      duration: AppMotion.fast,
+                      style: TextStyle(
+                        fontFamily: AppTheme.fontFamily,
+                        fontSize: 15,
+                        letterSpacing: -.15,
+                        fontWeight: FontWeight.w500,
+                        color: plan.isDone ? scheme.onSurfaceVariant : scheme.onSurface,
+                        decoration: plan.isDone ? TextDecoration.lineThrough : null,
+                        decorationColor: scheme.onSurfaceVariant,
+                      ),
+                      child: Text(plan.title),
+                    ),
+                    if (plan.description?.isNotEmpty == true) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        plan.description!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
             PopupMenuButton<String>(
-              icon: Icon(LucideIcons.ellipsisVertical, size: 18, color: scheme.onSurfaceVariant),
+              tooltip: 'Amallar',
+              icon: Icon(LucideIcons.ellipsis, size: 18, color: scheme.outline),
               onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'edit', child: Text('Tahrirlash')),
@@ -764,37 +767,40 @@ class _HabitRow extends StatelessWidget {
     return InkWell(
       onTap: onToggle,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+        padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
         child: Row(
           children: [
-            CheckCircle(checked: done, onTap: onToggle),
-            const SizedBox(width: 8),
+            HabitGlyph(icon: habit.icon, size: 36, done: done),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${habit.icon}  ${habit.title}',
+                    habit.title,
                     style: TextStyle(
-                      fontSize: 14.5,
+                      fontSize: 15,
+                      letterSpacing: -.15,
                       fontWeight: FontWeight.w500,
                       color: done ? scheme.onSurfaceVariant : scheme.onSurface,
-                      decoration: done ? TextDecoration.lineThrough : null,
                     ),
                   ),
                   const SizedBox(height: 3),
                   Wrap(
-                    spacing: 10,
+                    spacing: 12,
                     children: [
-                      const MetaTag(icon: LucideIcons.repeat, text: 'Odat'),
                       if (habit.reminderTime != null) MetaTag(icon: LucideIcons.bell, text: habit.reminderTime!),
-                      MetaTag(icon: LucideIcons.flame, text: '${habit.streak} kun', color: AppPalette.streakOrange),
+                      MetaTag(
+                        icon: LucideIcons.flame,
+                        text: '${habit.streak} kun',
+                        color: habit.streak > 0 ? AppPalette.ember : null,
+                      ),
                     ],
                   ),
                 ],
               ),
             ),
-            Text('+5', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant)),
+            CheckCircle(checked: done, onTap: onToggle),
           ],
         ),
       ),

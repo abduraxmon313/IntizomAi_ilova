@@ -1,16 +1,22 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 import '../theme/app_theme.dart';
 
-/// Universal karta — MyFit uslubidagi hover/press animatsiyali.
+/// Yuza: oq fon + ingichka chegara. Bosilganda yengil kichrayadi.
 class AppCard extends StatefulWidget {
   const AppCard({
     super.key,
     required this.child,
     this.onTap,
-    this.padding = const EdgeInsets.all(16),
+    this.padding = const EdgeInsets.all(AppSpace.lg),
     this.radius = AppRadius.lg,
     this.color,
     this.elevated = false,
+    this.border = true,
   });
 
   final Widget child;
@@ -19,48 +25,38 @@ class AppCard extends StatefulWidget {
   final double radius;
   final Color? color;
   final bool elevated;
+  final bool border;
 
   @override
   State<AppCard> createState() => _AppCardState();
 }
 
 class _AppCardState extends State<AppCard> {
-  bool _hovered = false;
+  bool _down = false;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final bg = widget.color ?? scheme.surfaceContainerLowest;
-    final raised = widget.elevated || _hovered;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        curve: Curves.easeOut,
+    final r = BorderRadius.circular(widget.radius);
+    return AnimatedScale(
+      scale: _down ? .985 : 1,
+      duration: AppMotion.fast,
+      curve: AppMotion.curve,
+      child: DecoratedBox(
         decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(widget.radius),
-          border: Border.all(
-            color: _hovered ? scheme.outline : scheme.outlineVariant,
-          ),
-          boxShadow: dark
-              ? null
-              : raised
-                  ? AppShadows.raised
-                  : AppShadows.card,
+          color: widget.color ?? scheme.surfaceContainerLowest,
+          borderRadius: r,
+          border: widget.border ? Border.all(color: scheme.outlineVariant) : null,
+          boxShadow: dark ? null : (widget.elevated ? AppShadows.raised : AppShadows.card),
         ),
         child: Material(
-          color: Colors.transparent,
+          type: MaterialType.transparency,
           child: InkWell(
+            borderRadius: r,
             onTap: widget.onTap,
-            borderRadius: BorderRadius.circular(widget.radius),
-            child: Padding(
-              padding: widget.padding,
-              child: widget.child,
-            ),
+            onHighlightChanged: widget.onTap == null ? null : (v) => setState(() => _down = v),
+            child: Padding(padding: widget.padding, child: widget.child),
           ),
         ),
       ),
@@ -68,7 +64,7 @@ class _AppCardState extends State<AppCard> {
   }
 }
 
-/// Ikonka uchun rangli yoki neytral fon.
+/// Ikonka plitasi. `tinted` — aksent rangning juda yengil foni.
 class AppIconTile extends StatelessWidget {
   const AppIconTile({
     super.key,
@@ -77,8 +73,7 @@ class AppIconTile extends StatelessWidget {
     this.background,
     this.size = 40,
     this.iconSize,
-  }) : _tinted = false,
-       _accent = null;
+  }) : _accent = null;
 
   const AppIconTile.tinted({
     super.key,
@@ -86,8 +81,7 @@ class AppIconTile extends StatelessWidget {
     required Color accent,
     this.size = 40,
     this.iconSize,
-  }) : _tinted = true,
-       _accent = accent, // ignore: prefer_initializing_formals
+  }) : _accent = accent, // ignore: prefer_initializing_formals
        color = null,
        background = null;
 
@@ -96,128 +90,37 @@ class AppIconTile extends StatelessWidget {
   final Color? background;
   final double size;
   final double? iconSize;
-  final bool _tinted;
   final Color? _accent;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final iSize = iconSize ?? size * .46;
-    final radius = size >= 44 ? AppRadius.md : AppRadius.sm;
-
     final accent = _accent;
-    Color bg;
-    Color fg;
-    if (_tinted && accent != null) {
-      bg = accent.withValues(alpha: dark ? .16 : .09);
-      fg = dark ? Color.lerp(accent, Colors.white, .35)! : accent;
-    } else {
-      bg = background ?? scheme.surfaceContainerLow;
-      fg = color ?? scheme.onSurfaceVariant;
-    }
-
+    final bg = accent != null ? accent.withValues(alpha: dark ? .18 : .1) : (background ?? scheme.surfaceContainerLow);
+    final fg = accent != null
+        ? (dark ? Color.lerp(accent, Colors.white, .3)! : accent)
+        : (color ?? scheme.onSurfaceVariant);
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(
-          color: _tinted
-              ? (_accent ?? scheme.outlineVariant).withValues(alpha: dark ? .2 : .15)
-              : scheme.outlineVariant,
-        ),
-      ),
-      child: Icon(icon, size: iSize, color: fg),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(size * .3)),
+      child: Icon(icon, size: iconSize ?? size * .48, color: fg),
     );
   }
 }
 
-/// Bo'lim sarlavhasi.
-class AppSectionHeader extends StatelessWidget {
-  const AppSectionHeader(
-    this.title, {
-    super.key,
-    this.subtitle,
-    this.trailing,
-  });
-
-  final String title;
-  final String? subtitle;
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -.2,
-                  color: scheme.onSurface,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 2),
-                Text(
-                  subtitle!,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        ?trailing,
-      ],
-    );
-  }
-}
-
-/// Metrika uchun kichik sarlavha.
-class AppOverline extends StatelessWidget {
-  const AppOverline(this.text, {super.key});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text.toUpperCase(),
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: .6,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-    );
-  }
-}
-
-/// Streak, XP, Level ko'rsatgichlari uchun progress bar.
+/// Ingichka, animatsiyali chiziqli progress.
 class AppProgressBar extends StatelessWidget {
   const AppProgressBar({
     super.key,
     required this.value,
     this.color,
     this.backgroundColor,
-    this.height = 6,
+    this.height = 4,
   });
 
-  final double value; // 0.0 - 1.0
+  final double value;
   final Color? color;
   final Color? backgroundColor;
   final double height;
@@ -226,76 +129,187 @@ class AppProgressBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(height / 2),
-      child: LinearProgressIndicator(
-        value: value.clamp(0.0, 1.0),
-        minHeight: height,
-        backgroundColor: backgroundColor ?? scheme.surfaceContainerHigh,
-        valueColor: AlwaysStoppedAnimation(color ?? scheme.primary),
+      borderRadius: BorderRadius.circular(height),
+      child: SizedBox(
+        height: height,
+        child: Stack(
+          children: [
+            Positioned.fill(child: ColoredBox(color: backgroundColor ?? scheme.surfaceContainerHigh)),
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: value.clamp(0, 1).toDouble()),
+              duration: AppMotion.slow,
+              curve: AppMotion.curve,
+              builder: (_, v, _) => FractionallySizedBox(
+                widthFactor: v,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: color ?? scheme.primary,
+                    borderRadius: BorderRadius.circular(height),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Discipline Score ko'rsatgichi (0-100).
-class DisciplineGauge extends StatelessWidget {
-  const DisciplineGauge({
+/// Halqali ko'rsatkich (0..100). Raqam o'rtada, ostida izoh.
+class ScoreRing extends StatelessWidget {
+  const ScoreRing({
     super.key,
-    required this.score,
+    required this.value,
     this.size = 80,
+    this.label,
+    this.color,
+    this.stroke,
   });
 
-  final int score;
+  final int value;
   final double size;
+  final String? label;
+  final Color? color;
+  final double? stroke;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = score >= 70
-        ? AppPalette.disciplineGreen
-        : score >= 40
-            ? AppPalette.warning
-            : AppPalette.danger;
-
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          SizedBox(
-            width: size,
-            height: size,
-            child: CircularProgressIndicator(
-              value: score / 100,
-              strokeWidth: 6,
-              backgroundColor: scheme.surfaceContainerHigh,
-              valueColor: AlwaysStoppedAnimation(color),
-              strokeCap: StrokeCap.round,
+    final c = color ?? (Theme.of(context).brightness == Brightness.dark ? AppPalette.brandOnDark : AppPalette.brandBright);
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: value / 100),
+      duration: AppMotion.slow,
+      curve: AppMotion.curve,
+      builder: (_, v, _) => SizedBox(
+        width: size,
+        height: size,
+        child: CustomPaint(
+          painter: RingPainter(v, c, scheme.surfaceContainerHigh, stroke ?? size * .075),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${(v * 100).round()}',
+                  style: TextStyle(
+                    fontSize: size * .3,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -size * .012,
+                    fontFeatures: tabularFigures,
+                    height: 1.05,
+                  ),
+                ),
+                if (label != null)
+                  Text(label!, style: TextStyle(fontSize: size * .12, color: scheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
+              ],
             ),
           ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '$score',
-                style: TextStyle(
-                  fontSize: size * .28,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onSurface,
-                ),
-              ),
-              Text(
-                'ball',
-                style: TextStyle(
-                  fontSize: size * .13,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
 }
+
+class RingPainter extends CustomPainter {
+  RingPainter(this.progress, this.color, this.track, this.stroke);
+
+  final double progress;
+  final Color color;
+  final Color track;
+  final double stroke;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset(stroke / 2, stroke / 2) & Size(size.width - stroke, size.height - stroke);
+    canvas.drawArc(rect, 0, math.pi * 2, false, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..color = track);
+    if (progress <= 0) return;
+    canvas.drawArc(rect, -math.pi / 2, math.pi * 2 * progress.clamp(0, 1), false, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round
+      ..color = color);
+  }
+
+  @override
+  bool shouldRepaint(RingPainter old) =>
+      old.progress != progress || old.color != color || old.track != track || old.stroke != stroke;
+}
+
+/// IntizomAI logosi (yumaloq burchakli).
+class BrandMark extends StatelessWidget {
+  const BrandMark({super.key, this.size = 40});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(size * .26),
+    child: Image.asset('assets/images/logo.png', width: size, height: size, fit: BoxFit.cover),
+  );
+}
+
+/// Odat belgisi (serverda emoji saqlanadi) → ilovada bir xil uslubdagi ikonka.
+const habitGlyphs = <String, IconData>{
+  '🏃': LucideIcons.footprints,
+  '💪': LucideIcons.dumbbell,
+  '🌅': LucideIcons.sunrise,
+  '🛏️': LucideIcons.bed,
+  '🛏': LucideIcons.bed,
+  '💧': LucideIcons.droplet,
+  '🍽️': LucideIcons.utensils,
+  '🍽': LucideIcons.utensils,
+  '🙏': LucideIcons.handHeart,
+  '📚': LucideIcons.library,
+  '📖': LucideIcons.bookOpen,
+  '💻': LucideIcons.laptop,
+  '🧠': LucideIcons.brain,
+  '✍️': LucideIcons.penLine,
+  '✍': LucideIcons.penLine,
+  '💼': LucideIcons.briefcase,
+  '🎯': LucideIcons.target,
+  '💸': LucideIcons.wallet,
+  '🧹': LucideIcons.brush,
+  '❤️': LucideIcons.heart,
+  '❤': LucideIcons.heart,
+  '🚭': LucideIcons.cigaretteOff,
+  '🫂': LucideIcons.users,
+  '🛒': LucideIcons.shoppingCart,
+  '🚗': LucideIcons.car,
+  '✅': LucideIcons.circleCheck,
+};
+
+/// Odat ikonkasi plitasi. Noma'lum emoji bo'lsa — emojining o'zi.
+class HabitGlyph extends StatelessWidget {
+  const HabitGlyph({super.key, required this.icon, this.size = 36, this.done = false});
+
+  final String icon;
+  final double size;
+  final bool done;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final glyph = habitGlyphs[icon.trim()];
+    final fg = done ? AppPalette.success : scheme.onSurface;
+    return AnimatedContainer(
+      duration: AppMotion.base,
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: done ? AppPalette.success.withValues(alpha: .1) : scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(size * .3),
+      ),
+      child: glyph != null
+          ? Icon(glyph, size: size * .48, color: fg)
+          : Text(icon, style: TextStyle(fontSize: size * .46)),
+    );
+  }
+}
+
+/// Yengil tebranish (Android/iOS).
+void tapFeedback() => HapticFeedback.selectionClick();
+void successFeedback() => HapticFeedback.lightImpact();
