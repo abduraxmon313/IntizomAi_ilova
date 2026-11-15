@@ -3,7 +3,7 @@ workflows:
   # APK doimiy IntizomAI kaliti bilan imzolanadi (android/app/intizomai-upload.p12),
   # shuning uchun yangi APK eskisining ustiga "Yangilash" sifatida o'rnatiladi.
   #
-  # Codemagic → IntizomAi_ilova → Environment variables → guruh nomi: intizomai
+  # Codemagic → IntizomAi_ilova → Environment variables → guruh nomi: IntizomAi
   #   ANDROID_KEYSTORE_PASSWORD  — imzo kaliti paroli (Secure belgilang)
   android-apk:
     name: Android APK
@@ -12,7 +12,7 @@ workflows:
     environment:
       flutter: stable
       groups:
-        - intizomai
+        - IntizomAi
       vars:
         # Railway server (bot + Mini App). Maxfiy emas.
         API_BASE_URL: https://intizom-aibot-production.up.railway.app
