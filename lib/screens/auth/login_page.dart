@@ -195,18 +195,6 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 40),
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(value: 'uz', label: Text("O'zbekcha")),
-                      ButtonSegment(value: 'ru', label: Text('Русский')),
-                      ButtonSegment(value: 'en', label: Text('English')),
-                    ],
-                    selected: {AppLocalizations.of(context).languageCode},
-                    showSelectedIcon: false,
-                    onSelectionChanged: (s) =>
-                        widget.onLanguageChanged?.call(s.first),
-                  ),
                 ],
               ),
             ),

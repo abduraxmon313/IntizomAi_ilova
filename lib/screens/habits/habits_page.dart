@@ -2,406 +2,371 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../models/habit.dart';
+import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/app_ui.dart';
+import '../../utils/dates.dart';
+import '../../widgets/feedback.dart';
+import '../../widgets/ui_kit.dart';
+import '../forms.dart';
 
-/// Mini App uslubidagi Odatlar sahifasi: Bugun/Tracker toggle,
-/// summary cards, habits list sorted by reminder time, tracker 7-day table.
+/// Odatlar: Bugun (ro'yxat) / Tracker (haftalik jadval).
 class HabitsPage extends StatefulWidget {
-  const HabitsPage({
-    super.key,
-    required this.habits,
-    required this.onToggle,
-    required this.onDelete,
-    required this.onAdd,
-    required this.onRefresh,
-  });
+  const HabitsPage({super.key, required this.state});
 
-  final List<Habit> habits;
-  final void Function(Habit habit) onToggle;
-  final void Function(Habit habit) onDelete;
-  final VoidCallback onAdd;
-  final Future<void> Function() onRefresh;
+  final AppState state;
 
   @override
   State<HabitsPage> createState() => _HabitsPageState();
 }
 
 class _HabitsPageState extends State<HabitsPage> {
-  String _view = 'today'; // today | tracker
-  late DateTime _trackerWeekStart;
+  AppState get s => widget.state;
 
-  @override
-  void initState() {
-    super.initState();
-    _trackerWeekStart = _startOfWeek(DateTime.now());
+  String _view = 'today';
+  DateTime _week = weekStart(tashkentToday());
+
+  Future<void> _add() async {
+    if (await showHabitForm(context, api: s.api)) await s.refreshHabits();
   }
 
-  static DateTime _startOfWeek(DateTime d) {
-    final weekday = d.weekday; // 1=Mon .. 7=Sun
-    final monday = d.subtract(Duration(days: weekday - 1));
-    return DateTime(monday.year, monday.month, monday.day);
+  Future<void> _edit(Habit h) async {
+    if (await showHabitForm(context, api: s.api, habit: h)) await s.refreshHabits();
   }
 
-  List<Habit> get _sortedByTime {
-    final list = List<Habit>.of(widget.habits);
-    list.sort((a, b) {
-      final aKey = a.reminderTime ?? '99:99';
-      final bKey = b.reminderTime ?? '99:99';
-      return aKey.compareTo(bKey);
-    });
-    return list;
-  }
-
-  String _formatRange(DateTime start) {
-    final end = start.add(const Duration(days: 6));
-    if (start.month == end.month) {
-      return '${start.day}–${end.day} ${_monthShort(start.month)}';
+  Future<void> _delete(Habit h) async {
+    if (!await confirmAction(
+      context,
+      title: "Odatni o'chirish",
+      message: "«${h.title}» va uning tarixi o'chiriladi.",
+    )) {
+      return;
     }
-    return '${start.day} ${_monthShort(start.month)} – ${end.day} ${_monthShort(end.month)}';
+    try {
+      await s.api.deleteHabit(h.id);
+      await s.refreshHabits();
+      s.refreshStats();
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    }
   }
 
-  static String _monthShort(int m) {
-    const months = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'];
-    return months[m - 1];
+  Future<void> _toggleToday(Habit h) async {
+    if (h.finished) {
+      toast(context, 'Bu odat muddati tugagan');
+      return;
+    }
+    if (!h.dueToday) {
+      toast(context, 'Bu odat bugun rejada yo\'q');
+      return;
+    }
+    try {
+      final u = await s.api.toggleHabit(h.id, done: !h.doneToday);
+      s.replaceHabit(u);
+      if (u.doneToday && mounted) toast(context, '${u.streak} kunlik streak');
+      s.refreshStats();
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    }
+  }
+
+  Future<void> _toggleOn(Habit h, DateTime day) async {
+    try {
+      final u = await s.api.toggleHabit(h.id, done: !h.doneOn(day), day: day);
+      s.replaceHabit(u);
+      s.refreshStats();
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final due = widget.habits.where((h) => h.dueToday && !h.finished).toList();
-    final doneCount = due.where((h) => h.doneToday).length;
-    final bestStreak = widget.habits.fold(0, (m, h) => h.streak > m ? h.streak : m);
-
-    return SafeArea(
-      child: RefreshIndicator(
-        onRefresh: widget.onRefresh,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-          children: [
-            // Header
-            Text(
-              'Odatlar ✅',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              "Har kuni takrorla, streak yig'",
-              style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 14),
-
-            // Bugun / Tracker toggle
-            _ViewToggle(
-              selected: _view,
+    final habits = [...s.habits]
+      ..sort((a, b) => (a.reminderTime ?? '99:99').compareTo(b.reminderTime ?? '99:99'));
+    return RefreshIndicator(
+      onRefresh: s.refreshHabits,
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 28),
+        children: [
+          PageHeader(
+            title: 'Odatlar',
+            subtitle: "Har kuni takrorlang, streak yig'ing",
+            actions: [HeaderIconButton(icon: LucideIcons.plus, tooltip: "Odat qo'shish", onTap: _add)],
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: SegmentTabs<String>(
+              value: _view,
+              items: const [('today', 'Bugun', LucideIcons.listChecks), ('tracker', 'Tracker', LucideIcons.calendarDays)],
               onChanged: (v) => setState(() => _view = v),
             ),
-            const SizedBox(height: 14),
-
-            if (_view == 'today') ...[
-              // Summary cards
-              if (widget.habits.isNotEmpty) ...[
-                Row(
-                  children: [
-                    _SummaryCard(
-                      value: '$doneCount/${due.length}',
-                      label: 'Bugun bajarildi',
-                    ),
-                    const SizedBox(width: 10),
-                    _SummaryCard(
-                      value: '$bestStreak',
-                      label: 'Eng uzun streak',
-                    ),
-                    const SizedBox(width: 10),
-                    _SummaryCard(
-                      value: '${widget.habits.length}',
-                      label: 'Jami odat',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-              ],
-
-              // Add button
-              _GradientButton(
-                label: "Odat qo'shish",
-                onTap: widget.onAdd,
-              ),
-              const SizedBox(height: 14),
-
-              // Habits list
-              if (widget.habits.isEmpty)
-                _EmptyHabits(onAdd: widget.onAdd)
-              else
-                for (final h in _sortedByTime) ...[
-                  _HabitTile(
-                    habit: h,
-                    onToggle: () => widget.onToggle(h),
-                    onDelete: () => widget.onDelete(h),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-            ] else ...[
-              // Tracker view
-              _TrackerHeader(
-                range: _formatRange(_trackerWeekStart),
-                onPrev: () => setState(() =>
-                    _trackerWeekStart = _trackerWeekStart.subtract(const Duration(days: 7))),
-                onNext: () => setState(() =>
-                    _trackerWeekStart = _trackerWeekStart.add(const Duration(days: 7))),
-              ),
-              const SizedBox(height: 14),
-              if (widget.habits.isEmpty)
-                _EmptyHabits(onAdd: widget.onAdd)
-              else
-                _TrackerTable(
-                  habits: widget.habits,
-                  weekStart: _trackerWeekStart,
-                ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ViewToggle extends StatelessWidget {
-  const _ViewToggle({required this.selected, required this.onChanged});
-  final String selected;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          _ToggleItem(
-            label: '📋 Bugun',
-            active: selected == 'today',
-            onTap: () => onChanged('today'),
           ),
-          _ToggleItem(
-            label: '🗓️ Tracker',
-            active: selected == 'tracker',
-            onTap: () => onChanged('tracker'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: habits.isEmpty
+                ? EmptyView(
+                    icon: LucideIcons.repeat,
+                    title: "Hali odat yo'q",
+                    message: "Har kuni takrorlanadigan odat qo'shing — streak yig'iladi.",
+                    actionLabel: "Odat qo'shish",
+                    onAction: _add,
+                  )
+                : _view == 'today'
+                    ? _today(habits)
+                    : _tracker(habits),
           ),
         ],
       ),
     );
   }
-}
 
-class _ToggleItem extends StatelessWidget {
-  const _ToggleItem({required this.label, required this.active, required this.onTap});
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
+  Widget _today(List<Habit> habits) {
+    final due = habits.where((h) => h.dueToday && !h.finished).toList();
+    final done = due.where((h) => h.doneToday).length;
+    final best = habits.fold<int>(0, (m, h) => h.streak > m ? h.streak : m);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(child: _Summary(value: '$done/${due.length}', label: 'Bugun bajarildi')),
+            const SizedBox(width: 8),
+            Expanded(child: _Summary(value: '$best', label: 'Eng uzun streak')),
+            const SizedBox(width: 8),
+            Expanded(child: _Summary(value: '${habits.length}', label: 'Jami odat')),
+          ],
+        ),
+        SectionBar(title: 'Odatlarim', actionLabel: "Qo'shish", onAction: _add),
+        GroupCard(
+          children: [
+            for (final h in habits)
+              _HabitTile(
+                habit: h,
+                onToggle: () => _toggleToday(h),
+                onEdit: () => _edit(h),
+                onDelete: () => _delete(h),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _tracker(List<Habit> habits) {
     final scheme = Theme.of(context).colorScheme;
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 9),
-          decoration: BoxDecoration(
-            gradient: active
-                ? LinearGradient(colors: [scheme.primary, AppPalette.accent])
-                : null,
-            borderRadius: BorderRadius.circular(11),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: active ? Colors.white : scheme.onSurfaceVariant,
+    final today = tashkentToday();
+    final days = [for (var i = 0; i < 7; i++) _week.add(Duration(days: i))];
+    final end = days.last;
+    final range = _week.month == end.month
+        ? '${_week.day}–${end.day} ${uzMonthsShort[end.month - 1]}'
+        : '${shortDate(_week)} – ${shortDate(end)}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            IconButton(
+              onPressed: () => setState(() => _week = _week.subtract(const Duration(days: 7))),
+              icon: const Icon(LucideIcons.chevronLeft, size: 20),
             ),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _week = weekStart(today)),
+                child: Text(range, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              ),
+            ),
+            IconButton(
+              onPressed: () => setState(() => _week = _week.add(const Duration(days: 7))),
+              icon: const Icon(LucideIcons.chevronRight, size: 20),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          padding: const EdgeInsets.fromLTRB(12, 10, 8, 6),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  const Expanded(flex: 3, child: SizedBox()),
+                  for (final d in days)
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        children: [
+                          Text(
+                            uzWeekdaysShort[d.weekday - 1],
+                            style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+                          ),
+                          Text(
+                            '${d.day}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: sameDay(d, today) ? scheme.primary : scheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              for (final h in habits)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          '${h.icon} ${h.title}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      for (final d in days)
+                        Expanded(
+                          flex: 2,
+                          child: _TrackerCell(
+                            done: h.doneOn(d),
+                            due: h.dueOn(d),
+                            future: d.isAfter(today),
+                            tooOld: today.difference(d).inDays > 44,
+                            onTap: () => _toggleOn(h, d),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
           ),
         ),
-      ),
+        const SizedBox(height: 10),
+        Text(
+          "Katakni bosib o'tgan kunlarni ham belgilashingiz mumkin.",
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+        ),
+      ],
     );
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.value, required this.label});
+class _Summary extends StatelessWidget {
+  const _Summary({required this.value, required this.label});
   final String value;
   final String label;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                foreground: Paint()
-                  ..shader = LinearGradient(
-                    colors: [scheme.primary, AppPalette.accent],
-                  ).createShader(const Rect.fromLTWH(0, 0, 60, 22)),
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: scheme.outlineVariant),
       ),
-    );
-  }
-}
-
-class _GradientButton extends StatelessWidget {
-  const _GradientButton({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 52,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [scheme.primary, AppPalette.accent]),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: scheme.primary.withValues(alpha: .3),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(LucideIcons.plus, color: Colors.white, size: 18),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
+      child: Column(
+        children: [
+          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+          ),
+        ],
       ),
     );
   }
 }
 
 class _HabitTile extends StatelessWidget {
-  const _HabitTile({required this.habit, required this.onToggle, required this.onDelete});
+  const _HabitTile({required this.habit, required this.onToggle, required this.onEdit, required this.onDelete});
+
   final Habit habit;
   final VoidCallback onToggle;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
-
-  String _freqLabel() {
-    if (habit.frequency == 'weekly' && habit.weekdays.isNotEmpty && habit.weekdays.length < 7) {
-      const wd = ['Du', 'Se', 'Cho', 'Pa', 'Ju', 'Sha', 'Ya'];
-      return habit.weekdays.map((i) => wd[i]).join(', ');
-    }
-    return 'Har kuni';
-  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final enabled = habit.dueToday && !habit.finished;
-    return Opacity(
-      opacity: enabled ? 1 : .55,
-      child: AppCard(
-        padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
-        onTap: enabled ? onToggle : null,
+    final h = habit;
+    final inactive = !h.dueToday || h.finished;
+    final rep = h.isWeekly ? h.weekdays.map((i) => uzWeekdaysShort[i]).join(', ') : 'Har kuni';
+    String dur = 'Doimiy';
+    if (h.durationType == 'days' && h.targetDays != null) {
+      dur = h.finished ? 'Tugadi' : (h.daysLeft != null ? '${h.daysLeft} kun qoldi' : '${h.targetDays} kun');
+    }
+    return InkWell(
+      onTap: onEdit,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 10, 4, 10),
         child: Row(
           children: [
-            // Toggle check / icon
-            GestureDetector(
-              onTap: enabled ? onToggle : null,
-              child: Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: habit.doneToday
-                      ? AppPalette.disciplineGreen.withValues(alpha: .1)
-                      : scheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  habit.finished
-                      ? '🏁'
-                      : habit.doneToday
-                          ? '✓'
-                          : habit.icon,
-                  style: TextStyle(
-                    fontSize: habit.doneToday ? 18 : 20,
-                    fontWeight: habit.doneToday ? FontWeight.w700 : null,
-                    color: habit.doneToday ? AppPalette.disciplineGreen : null,
-                  ),
-                ),
+            CheckCircle(checked: h.doneToday, disabled: inactive && !h.doneToday, onTap: onToggle),
+            const SizedBox(width: 6),
+            Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
+              child: Text(h.icon, style: const TextStyle(fontSize: 17)),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    habit.title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: scheme.onSurface,
+              child: Opacity(
+                opacity: inactive ? .6 : 1,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      h.title,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w500,
+                        decoration: h.doneToday ? TextDecoration.lineThrough : null,
+                        color: h.doneToday ? scheme.onSurfaceVariant : scheme.onSurface,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      if (habit.reminderTime != null)
-                        _Badge('⏰ ${habit.reminderTime!}'),
-                      _Badge('🔥 ${habit.streak} kun'),
-                      _Badge('🔁 ${_freqLabel()}'),
-                    ],
-                  ),
-                ],
+                    const SizedBox(height: 3),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 2,
+                      children: [
+                        if (h.reminderTime != null) MetaTag(icon: LucideIcons.bell, text: h.reminderTime!),
+                        MetaTag(icon: LucideIcons.flame, text: '${h.streak} kun', color: AppPalette.streakOrange),
+                        MetaTag(icon: LucideIcons.repeat, text: rep),
+                        MetaTag(icon: LucideIcons.hourglass, text: dur),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-            IconButton(
-              icon: Icon(LucideIcons.trash2, size: 17, color: scheme.onSurfaceVariant),
-              onPressed: onDelete,
+            PopupMenuButton<String>(
+              icon: Icon(LucideIcons.ellipsisVertical, size: 18, color: scheme.onSurfaceVariant),
+              onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'edit', child: Text('Tahrirlash')),
+                PopupMenuItem(value: 'delete', child: Text("O'chirish", style: TextStyle(color: AppPalette.danger))),
+              ],
             ),
           ],
         ),
@@ -410,214 +375,49 @@ class _HabitTile extends StatelessWidget {
   }
 }
 
-class _Badge extends StatelessWidget {
-  const _Badge(this.text);
-  final String text;
+class _TrackerCell extends StatelessWidget {
+  const _TrackerCell({
+    required this.done,
+    required this.due,
+    required this.future,
+    required this.tooOld,
+    required this.onTap,
+  });
 
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(fontSize: 10.5, color: scheme.onSurfaceVariant),
-      ),
-    );
-  }
-}
-
-class _EmptyHabits extends StatelessWidget {
-  const _EmptyHabits({required this.onAdd});
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 40),
-      child: Column(
-        children: [
-          const Text('✅', style: TextStyle(fontSize: 36)),
-          const SizedBox(height: 8),
-          Text(
-            "Hozircha odat yo'q",
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: scheme.onSurface),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "Har kuni takrorlanadigan odat qo'shing — streak yig'ing",
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TrackerHeader extends StatelessWidget {
-  const _TrackerHeader({required this.range, required this.onPrev, required this.onNext});
-  final String range;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _NavBtn(label: '‹', onTap: onPrev),
-        Text(
-          range,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: scheme.onSurface,
-          ),
-        ),
-        _NavBtn(label: '›', onTap: onNext),
-      ],
-    );
-  }
-}
-
-class _NavBtn extends StatelessWidget {
-  const _NavBtn({required this.label, required this.onTap});
-  final String label;
+  final bool done;
+  final bool due;
+  final bool future;
+  final bool tooOld;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final tappable = due && !future && !tooOld;
+    Color bg;
+    Widget? child;
+    if (done) {
+      bg = AppPalette.disciplineGreen;
+      child = const Icon(LucideIcons.check, size: 14, color: Colors.white);
+    } else if (!due) {
+      bg = Colors.transparent;
+      child = Container(width: 4, height: 4, decoration: BoxDecoration(color: scheme.outlineVariant, shape: BoxShape.circle));
+    } else if (future) {
+      bg = scheme.surfaceContainerLow;
+    } else {
+      bg = scheme.surfaceContainerHigh;
+    }
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: scheme.onSurface,
-          ),
+      onTap: tappable ? onTap : null,
+      child: Center(
+        child: Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppRadius.sm)),
+          child: child,
         ),
       ),
     );
   }
-}
-
-class _TrackerTable extends StatelessWidget {
-  const _TrackerTable({required this.habits, required this.weekStart});
-  final List<Habit> habits;
-  final DateTime weekStart;
-
-  static final List<String> _uzDow = ['Du', 'Se', 'Cho', 'Pa', 'Ju', 'Sha', 'Ya'];
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final days = List.generate(7, (i) => weekStart.add(Duration(days: i)));
-    final todayStr = _ymd(DateTime.now());
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columnSpacing: 12,
-        headingRowHeight: 44,
-        dataRowMinHeight: 40,
-        dataRowMaxHeight: 40,
-        columns: [
-          const DataColumn(label: Text('Odat', style: TextStyle(fontWeight: FontWeight.w600))),
-          for (final d in days)
-            DataColumn(
-              label: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _uzDow[(d.weekday - 1) % 7],
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: _ymd(d) == todayStr ? scheme.primary : scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  Text(
-                    '${d.day}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: _ymd(d) == todayStr ? scheme.primary : scheme.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-        rows: [
-          for (final h in habits)
-            DataRow(
-              cells: [
-                DataCell(
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(h.icon, style: const TextStyle(fontSize: 14)),
-                      const SizedBox(width: 4),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 80),
-                        child: Text(
-                          h.title,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                for (final d in days)
-                  DataCell(
-                    Center(
-                      child: Container(
-                        width: 26,
-                        height: 26,
-                        decoration: BoxDecoration(
-                          color: h.doneToday && _ymd(d) == todayStr
-                              ? AppPalette.disciplineGreen
-                              : scheme.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        alignment: Alignment.center,
-                        child: h.doneToday && _ymd(d) == todayStr
-                            ? const Text('✓',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                ))
-                            : null,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  static String _ymd(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 }
