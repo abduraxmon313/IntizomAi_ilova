@@ -1,21 +1,25 @@
 /// IntizomAI ilova konfiguratsiyasi.
 ///
-/// API bazaviy URL — Railway'dagi mavjud webapp serverga ulanadi.
-/// Bot va ilova BIR XUL server, BIR XUL DB ishlatadi.
-///
-/// Build vaqtida: flutter run --dart-define=API_BASE_URL=https://sizning-app.up.railway.app
+/// Ilova bot va Mini App ishlayotgan o'sha Railway serveriga ulanadi
+/// (IntizomAi_Bot_Pro_Copy → webapp/app.py). Manzil build vaqtida beriladi:
+/// `flutter build apk --dart-define=API_BASE_URL=https://railway-domen`
+/// Codemagic buni `intizomai` guruhidagi API_BASE_URL o'zgaruvchisidan oladi.
 library;
 
-const kApiBaseUrl = String.fromEnvironment(
-  'API_BASE_URL',
-  defaultValue: 'https://your-app.up.railway.app',
-);
+const kApiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
-/// Telegram bot username (deep-link uchun).
+/// Telegram bot username (kirish va to'lov uchun).
 const kBotUsername = 'intizomAi_bot';
 
-/// Telegram bot URL.
-const kBotUrl = 'https://t.me/$kBotUsername';
+/// Bot havolasi; [start] — /start payload.
+Uri botUri([String? start]) => Uri.https(
+  't.me',
+  '/$kBotUsername',
+  start == null ? null : {'start': start},
+);
 
-/// API to'liq yo'li — /api/v1 prefiksi (webapp/app.py'dagi route prefix).
-String apiUrl(String path) => '$kApiBaseUrl/api/v1$path';
+/// Mini App bilan umumiy API: /api/webapp/...
+Uri apiUri(String path, [Map<String, String>? query]) {
+  final base = kApiBaseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+  return Uri.parse('$base/api/webapp$path').replace(queryParameters: query);
+}

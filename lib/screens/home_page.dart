@@ -1,534 +1,546 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 import '../l10n/app_localizations.dart';
-import '../models/plan.dart';
-import '../models/habit.dart';
 import '../models/goal.dart';
-import '../models/user_profile.dart';
-import '../services/plan_service.dart';
-import '../services/habit_service.dart';
-import '../services/goal_service.dart';
-import '../services/user_service.dart';
-import '../services/coach_service.dart';
-import '../services/api_client.dart';
-import '../theme/app_theme.dart';
-import 'dashboard/dashboard_page.dart';
-import 'plans/plans_page.dart';
-import 'habits/habits_page.dart';
-import 'goals/goals_page.dart';
+import '../models/habit.dart';
+import '../models/plan.dart';
+import '../models/profile.dart';
+import '../models/stats.dart';
+import '../services/intizom_api.dart';
+import '../widgets/feedback.dart';
 import 'coach/coach_page.dart';
+import 'dashboard/dashboard_page.dart';
+import 'goals/goals_page.dart';
+import 'habits/habits_page.dart';
+import 'plans/plans_page.dart';
 import 'profile/profile_page.dart';
 
-/// Asosiy sahifa — MyFit uslubidagi tab navigatsiya.
+/// Asosiy oyna: pastki navigatsiya + profil (avatar orqali).
 class HomePage extends StatefulWidget {
   const HomePage({
     super.key,
-    required this.profile,
+    required this.api,
     required this.onLogout,
-    this.onAppearanceChanged,
-    this.onLanguageChanged,
+    required this.onAppearanceChanged,
+    required this.onLanguageChanged,
   });
 
-  final UserProfile profile;
+  final IntizomApi api;
   final VoidCallback onLogout;
-  final ValueChanged<String>? onAppearanceChanged;
-  final ValueChanged<String>? onLanguageChanged;
+  final ValueChanged<String> onAppearanceChanged;
+  final ValueChanged<String> onLanguageChanged;
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  int _navIndex = 0;
-  final List<int> _navHistory = [0];
+  static const _profileTab = 5;
 
-  // Services
-  late final PlanService _planService;
-  late final HabitService _habitService;
-  late final GoalService _goalService;
-  late final UserService _userService;
-  late final CoachService _coachService;
+  int _tab = 0;
+  final List<int> _history = [0];
 
-  // Data
-  UserProfile? _profile;
-  List<Plan> _plans = [];
-  List<Habit> _habits = [];
-  List<Goal> _goals = [];
-  String? _smartMessage;
+  Profile? _profile;
+  UserStats _stats = const UserStats();
+  DailyQuest? _quest;
+  String? _coach;
+  List<Plan> _plans = const [];
+  List<Habit> _habits = const [];
+  List<Goal> _goals = const [];
+
   bool _loading = true;
+  String? _loadError;
+
+  IntizomApi get _api => widget.api;
 
   @override
   void initState() {
     super.initState();
-    _profile = widget.profile;
-    _planService = PlanService();
-    _habitService = HabitService();
-    _goalService = GoalService();
-    _userService = UserService();
-    _coachService = CoachService();
     _loadAll();
   }
 
+  /// Toshkent sanasi (server ham shu sana bo'yicha ishlaydi).
+  static DateTime _tashkentNow() => DateTime.now().toUtc().add(const Duration(hours: 5));
+
+  static String _isoDate(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
   Future<void> _loadAll() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = _profile == null;
+      _loadError = null;
+    });
     try {
       final results = await Future.wait([
-        _planService.getToday(),
-        _habitService.getAll(),
-        _goalService.getAll(),
-        _userService.getProfile(),
-        _coachService.getSmartMessage(),
+        _api.profile(),
+        _api.stats(),
+        _api.todayPlans(),
+        _api.habits(),
+        _api.goals(),
       ]);
+      if (!mounted) return;
+      setState(() {
+        _profile = results[0] as Profile;
+        _stats = results[1] as UserStats;
+        _plans = results[2] as List<Plan>;
+        _habits = results[3] as List<Habit>;
+        _goals = results[4] as List<Goal>;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = e.toString();
+      });
+      return;
+    }
+    // Ikkinchi darajali ma'lumotlar — xato bo'lsa ham asosiy oyna ishlaydi.
+    _loadExtras();
+  }
+
+  Future<void> _loadExtras() async {
+    try {
+      final quest = await _api.quest();
+      final coach = _stats.isPremium ? await _api.coachMessage() : null;
       if (mounted) {
         setState(() {
-          _plans = results[0] as List<Plan>;
-          _habits = results[1] as List<Habit>;
-          _goals = results[2] as List<Goal>;
-          _profile = results[3] as UserProfile;
-          _smartMessage = results[4] as String?;
-          _loading = false;
+          _quest = quest;
+          _coach = coach;
         });
       }
+    } catch (_) {}
+  }
+
+  Future<void> _refreshStats() async {
+    try {
+      final s = await _api.stats();
+      if (mounted) setState(() => _stats = s);
+      _loadExtras();
+    } catch (_) {}
+  }
+
+  /// Amalni bajaradi, xatoni ko'rsatadi, so'ng statistikani yangilaydi.
+  Future<void> _run(Future<void> Function() action) async {
+    try {
+      await action();
+      await _refreshStats();
     } catch (e) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) showApiError(context, e);
     }
   }
 
-  Future<void> _refreshPlans() async {
-    try {
-      final plans = await _planService.getToday();
-      final profile = await _userService.getProfile();
-      if (mounted) setState(() { _plans = plans; _profile = profile; });
-    } catch (_) {}
-  }
-
-  Future<void> _refreshHabits() async {
-    try {
-      final habits = await _habitService.getAll();
-      final profile = await _userService.getProfile();
-      if (mounted) setState(() { _habits = habits; _profile = profile; });
-    } catch (_) {}
-  }
-
-  Future<void> _refreshGoals() async {
-    try {
-      final goals = await _goalService.getAll();
-      if (mounted) setState(() => _goals = goals);
-    } catch (_) {}
-  }
-
-  void _navigateTo(int index) {
-    if (index == _navIndex) return;
+  void _go(int tab) {
+    if (tab == _tab) return;
     setState(() {
-      _navHistory.add(index);
-      _navIndex = index;
+      _tab = tab;
+      _history.add(tab);
     });
   }
 
-  // Tab indekslari: 0=Dashboard, 1=Plans, 2=Habits, 3=Goals, 4=Coach
-  // Profile alohida (5)
-  static const _pageForTab = [0, 1, 2, 3, 4]; // navBar index -> page index
+  // ── Rejalar ──────────────────────────────────────────
+  Future<void> _reloadPlans() async {
+    final p = await _api.todayPlans();
+    if (mounted) setState(() => _plans = p);
+  }
+
+  void _togglePlan(Plan p) => _run(() async {
+    await _api.setPlanStatus(p.id, p.isDone ? 'pending' : 'done');
+    await _reloadPlans();
+  });
+
+  void _deletePlan(Plan p) async {
+    if (!await _confirmDelete(p.title)) return;
+    _run(() async {
+      await _api.deletePlan(p.id);
+      await _reloadPlans();
+    });
+  }
+
+  // ── Odatlar ──────────────────────────────────────────
+  Future<void> _reloadHabits() async {
+    final h = await _api.habits();
+    if (mounted) setState(() => _habits = h);
+  }
+
+  void _toggleHabit(Habit h) => _run(() async {
+    final updated = await _api.toggleHabit(h.id);
+    if (mounted) {
+      setState(() => _habits = [for (final x in _habits) x.id == h.id ? updated : x]);
+    }
+  });
+
+  void _deleteHabit(Habit h) async {
+    if (!await _confirmDelete(h.title)) return;
+    _run(() async {
+      await _api.deleteHabit(h.id);
+      await _reloadHabits();
+    });
+  }
+
+  // ── Maqsadlar ────────────────────────────────────────
+  Future<void> _reloadGoals() async {
+    final g = await _api.goals();
+    if (mounted) setState(() => _goals = g);
+  }
+
+  void _toggleGoal(Goal g) => _run(() async {
+    await _api.setGoalCompleted(g.id, !g.completed);
+    await _reloadGoals();
+  });
+
+  void _deleteGoal(Goal g) async {
+    if (!await _confirmDelete(g.title)) return;
+    _run(() async {
+      await _api.deleteGoal(g.id);
+      await _reloadGoals();
+    });
+  }
+
+  Future<bool> _confirmDelete(String title) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(context.tr('O\'chirilsinmi?')),
+        content: Text(title),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(context.tr('Bekor qilish')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(context.tr('O\'chirish')),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  // ── Profil ───────────────────────────────────────────
+  void _setNotifications(bool on) => _run(() async {
+    final p = await _api.updateProfile(notifications: on);
+    if (mounted) setState(() => _profile = p);
+  });
+
+  // ── Qo'shish oynalari ────────────────────────────────
+  void _add() {
+    switch (_tab) {
+      case 1:
+        _addPlanSheet();
+      case 2:
+        _addHabitSheet();
+      case 3:
+        _addGoalSheet();
+    }
+  }
+
+  Future<String?> _pickTime() async {
+    final t = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      builder: (ctx, child) => MediaQuery(
+        data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
+        child: child!,
+      ),
+    );
+    if (t == null) return null;
+    return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _addPlanSheet() {
+    final title = TextEditingController();
+    String? time;
+    _sheet(
+      title: context.tr('Yangi reja'),
+      builder: (setSheet) => [
+        TextField(
+          controller: title,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(hintText: context.tr('Nima qilmoqchisiz?')),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () async {
+            final t = await _pickTime();
+            if (t != null) setSheet(() => time = t);
+          },
+          icon: const Icon(LucideIcons.clock, size: 18),
+          label: Text(time ?? context.tr('Vaqt (ixtiyoriy)')),
+        ),
+      ],
+      onSave: () async {
+        final text = title.text.trim();
+        if (text.isEmpty) return false;
+        await _run(() async {
+          await _api.createPlan(
+            title: text,
+            scheduledTime: time,
+            planDate: _isoDate(_tashkentNow()),
+          );
+          await _reloadPlans();
+        });
+        return true;
+      },
+    );
+  }
+
+  void _addHabitSheet() {
+    final title = TextEditingController();
+    final icon = TextEditingController(text: '✅');
+    String? time;
+    _sheet(
+      title: context.tr('Yangi odat'),
+      builder: (setSheet) => [
+        Row(
+          children: [
+            SizedBox(
+              width: 64,
+              child: TextField(
+                controller: icon,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 22),
+                maxLength: 2,
+                decoration: const InputDecoration(counterText: ''),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: title,
+                autofocus: true,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(hintText: context.tr('Odat nomi')),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () async {
+            final t = await _pickTime();
+            if (t != null) setSheet(() => time = t);
+          },
+          icon: const Icon(LucideIcons.bell, size: 18),
+          label: Text(time ?? context.tr('Eslatma vaqti (ixtiyoriy)')),
+        ),
+      ],
+      onSave: () async {
+        final text = title.text.trim();
+        if (text.isEmpty) return false;
+        await _run(() async {
+          await _api.createHabit(
+            title: text,
+            icon: icon.text.trim().isEmpty ? null : icon.text.trim(),
+            reminderTime: time,
+          );
+          await _reloadHabits();
+        });
+        return true;
+      },
+    );
+  }
+
+  void _addGoalSheet() {
+    final title = TextEditingController();
+    var type = 'yearly';
+    _sheet(
+      title: context.tr('Yangi maqsad'),
+      builder: (setSheet) => [
+        TextField(
+          controller: title,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(hintText: context.tr('Maqsad nomi')),
+        ),
+        const SizedBox(height: 12),
+        SegmentedButton<String>(
+          showSelectedIcon: false,
+          segments: [
+            ButtonSegment(value: 'yearly', label: Text(context.tr('Yillik'))),
+            ButtonSegment(value: 'monthly', label: Text(context.tr('Oylik'))),
+          ],
+          selected: {type},
+          onSelectionChanged: (s) => setSheet(() => type = s.first),
+        ),
+      ],
+      onSave: () async {
+        final text = title.text.trim();
+        if (text.isEmpty) return false;
+        final now = _tashkentNow();
+        final period = type == 'yearly'
+            ? '${now.year}'
+            : '${now.year}-${now.month.toString().padLeft(2, '0')}';
+        await _run(() async {
+          await _api.createGoal(title: text, goalType: type, period: period);
+          await _reloadGoals();
+        });
+        return true;
+      },
+    );
+  }
+
+  void _sheet({
+    required String title,
+    required List<Widget> Function(StateSetter setSheet) builder,
+    required Future<bool> Function() onSave,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.viewInsetsOf(ctx).bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(title, style: Theme.of(ctx).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              ...builder(setSheet),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: () async {
+                  final nav = Navigator.of(ctx);
+                  final ok = await onSave();
+                  if (ok && nav.mounted) nav.pop();
+                },
+                child: Text(context.tr('Saqlash')),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── UI ───────────────────────────────────────────────
+  String _title(BuildContext context) => switch (_tab) {
+    1 => context.tr('Rejalar'),
+    2 => context.tr('Odatlar'),
+    3 => context.tr('Maqsadlar'),
+    4 => context.tr('AI Coach'),
+    _profileTab => context.tr('Profil'),
+    _ => 'IntizomAI',
+  };
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final profile = _profile ?? widget.profile;
+
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final profile = _profile;
+    if (profile == null) {
+      return Scaffold(
+        body: ErrorRetry(message: _loadError ?? context.tr('Xatolik yuz berdi'), onRetry: _loadAll),
+      );
+    }
 
     return PopScope(
-      canPop: _navIndex == 0,
+      canPop: _history.length <= 1,
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        if (_navHistory.length > 1) {
-          _navHistory.removeLast();
-          setState(() => _navIndex = _navHistory.last);
-        }
+        if (didPop || _history.length <= 1) return;
+        setState(() {
+          _history.removeLast();
+          _tab = _history.last;
+        });
       },
       child: Scaffold(
-        appBar: _navIndex == 5
-            ? null
-            : AppBar(
-                title: Text(_appBarTitle(context)),
-                actions: [
-                  // Profile avatar
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: GestureDetector(
-                      onTap: () => _navigateTo(5),
-                      child: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: scheme.primaryContainer,
-                        backgroundImage: profile.effectivePhotoUrl != null
-                            ? NetworkImage(profile.effectivePhotoUrl!)
-                            : null,
-                        child: profile.effectivePhotoUrl == null
-                            ? Text(
-                                profile.avatarEmoji,
-                                style: const TextStyle(fontSize: 18),
-                              )
-                            : null,
-                      ),
-                    ),
-                  ),
-                ],
+        appBar: AppBar(
+          title: Text(_title(context)),
+          actions: [
+            if (_tab != _profileTab)
+              Padding(
+                padding: const EdgeInsets.only(right: 14),
+                child: GestureDetector(
+                  onTap: () => _go(_profileTab),
+                  child: ProfileAvatar(url: profile.avatar, size: 36),
+                ),
               ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _buildPage(profile),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _navIndex < 5 ? _navIndex : 0,
-          onDestinationSelected: (i) => _navigateTo(_pageForTab[i]),
-          destinations: [
-            NavigationDestination(
-              icon: const Icon(LucideIcons.house),
-              selectedIcon: Icon(LucideIcons.house, color: scheme.primary),
-              label: context.tr('Bosh sahifa'),
+          ],
+        ),
+        body: IndexedStack(
+          index: _tab,
+          children: [
+            DashboardPage(
+              profile: profile,
+              stats: _stats,
+              quest: _quest,
+              coachMessage: _coach,
+              onRefresh: _loadAll,
             ),
-            NavigationDestination(
-              icon: const Icon(LucideIcons.clipboardCheck),
-              selectedIcon: Icon(LucideIcons.clipboardCheck, color: scheme.primary),
-              label: context.tr('Rejalar'),
+            PlansPage(
+              plans: _plans,
+              onToggle: _togglePlan,
+              onDelete: _deletePlan,
+              onAdd: _addPlanSheet,
+              onRefresh: () => _run(_reloadPlans),
             ),
-            NavigationDestination(
-              icon: const Icon(LucideIcons.repeat),
-              selectedIcon: Icon(LucideIcons.repeat, color: scheme.primary),
-              label: context.tr('Odatlar'),
+            HabitsPage(
+              habits: _habits,
+              onToggle: _toggleHabit,
+              onDelete: _deleteHabit,
+              onAdd: _addHabitSheet,
+              onRefresh: () => _run(_reloadHabits),
             ),
-            NavigationDestination(
-              icon: const Icon(LucideIcons.target),
-              selectedIcon: Icon(LucideIcons.target, color: scheme.primary),
-              label: context.tr('Maqsadlar'),
+            GoalsPage(
+              goals: _goals,
+              onToggle: _toggleGoal,
+              onDelete: _deleteGoal,
+              onAdd: _addGoalSheet,
+              onRefresh: () => _run(_reloadGoals),
             ),
-            NavigationDestination(
-              icon: const Icon(LucideIcons.messageCircle),
-              selectedIcon: Icon(LucideIcons.messageCircle, color: scheme.primary),
-              label: context.tr('Coach'),
+            CoachPage(api: _api),
+            ProfilePage(
+              profile: profile,
+              stats: _stats,
+              isDark: Theme.of(context).brightness == Brightness.dark,
+              onLogout: widget.onLogout,
+              onAppearanceChanged: widget.onAppearanceChanged,
+              onLanguageChanged: widget.onLanguageChanged,
+              onNotificationsChanged: _setNotifications,
             ),
           ],
         ),
-        // FAB — yangi element qo'shish
-        floatingActionButton: (_navIndex >= 1 && _navIndex <= 3)
+        floatingActionButton: (_tab >= 1 && _tab <= 3)
             ? FloatingActionButton(
-                onPressed: () => _showAddDialog(context),
+                onPressed: _add,
                 backgroundColor: scheme.primary,
                 foregroundColor: scheme.onPrimary,
                 child: const Icon(LucideIcons.plus),
               )
             : null,
-      ),
-    );
-  }
-
-  Widget _buildPage(UserProfile profile) {
-    switch (_navIndex) {
-      case 0:
-        final donePlans = _plans.where((p) => p.isDone).length;
-        final activeHabits = _habits.where((h) => !h.archived).toList();
-        final doneHabits = activeHabits.where((h) => h.todayDone).length;
-        return DashboardPage(
-          profile: profile,
-          todayDone: donePlans,
-          todayTotal: _plans.length,
-          todayHabitsDone: doneHabits,
-          todayHabitsTotal: activeHabits.length,
-          smartMessage: _smartMessage,
-          onRefresh: _loadAll,
-        );
-      case 1:
-        return PlansPage(
-          plans: _plans,
-          isPremium: profile.isPremium,
-          onToggleStatus: (id, status) async {
-            await _planService.setStatus(id, status);
-            await _refreshPlans();
-          },
-          onDelete: (id) async {
-            await _planService.delete(id);
-            await _refreshPlans();
-          },
-          onAdd: () => _showAddPlanDialog(context),
-          onMoveToTomorrow: (id) async {
-            await _planService.moveToTomorrow(id);
-            await _refreshPlans();
-          },
-          onRefresh: _refreshPlans,
-        );
-      case 2:
-        return HabitsPage(
-          habits: _habits,
-          onToggle: (id) async {
-            await _habitService.toggleToday(id);
-            await _refreshHabits();
-          },
-          onAdd: () => _showAddHabitDialog(context),
-          onArchive: (id) async {
-            await _habitService.archive(id);
-            await _refreshHabits();
-          },
-          onRefresh: _refreshHabits,
-        );
-      case 3:
-        return GoalsPage(
-          goals: _goals,
-          onToggle: (id) async {
-            await _goalService.toggleCompleted(id);
-            await _refreshGoals();
-          },
-          onAdd: () => _showAddGoalDialog(context),
-          onDelete: (id) async {
-            await _goalService.delete(id);
-            await _refreshGoals();
-          },
-          onRefresh: _refreshGoals,
-        );
-      case 4:
-        return CoachPage(coachService: _coachService);
-      case 5:
-        return ProfilePage(
-          profile: profile,
-          onLogout: widget.onLogout,
-          onAppearanceChanged: widget.onAppearanceChanged,
-          onLanguageChanged: widget.onLanguageChanged,
-          onNotificationsChanged: (val) async {
-            try {
-              await _userService.setNotifications(val);
-              final p = await _userService.getProfile();
-              if (mounted) setState(() => _profile = p);
-            } catch (_) {}
-          },
-        );
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
-  String _appBarTitle(BuildContext context) => switch (_navIndex) {
-    0 => 'IntizomAI',
-    1 => context.tr('Rejalar'),
-    2 => context.tr('Odatlar'),
-    3 => context.tr('Maqsadlar'),
-    4 => context.tr('Coach'),
-    _ => 'IntizomAI',
-  };
-
-  void _showAddDialog(BuildContext context) {
-    switch (_navIndex) {
-      case 1: _showAddPlanDialog(context);
-      case 2: _showAddHabitDialog(context);
-      case 3: _showAddGoalDialog(context);
-    }
-  }
-
-  void _showAddPlanDialog(BuildContext context) {
-    final titleCtrl = TextEditingController();
-    final timeCtrl = TextEditingController();
-    final scheme = Theme.of(context).colorScheme;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20, 24, 20,
-          MediaQuery.of(ctx).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              context.tr('Yangi reja'),
-              style: Theme.of(ctx).textTheme.titleLarge,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _tab == _profileTab ? 0 : _tab,
+          onDestinationSelected: _go,
+          destinations: [
+            NavigationDestination(
+              icon: const Icon(LucideIcons.house),
+              label: context.tr('Bosh sahifa'),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: titleCtrl,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'Nima qilmoqchisiz?',
-                prefixIcon: Icon(LucideIcons.pencil, size: 18),
-              ),
+            NavigationDestination(
+              icon: const Icon(LucideIcons.clipboardCheck),
+              label: context.tr('Rejalar'),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: timeCtrl,
-              decoration: InputDecoration(
-                hintText: 'Vaqt (masalan: 09:00)',
-                prefixIcon: Icon(LucideIcons.clock, size: 18),
-              ),
+            NavigationDestination(
+              icon: const Icon(LucideIcons.repeat),
+              label: context.tr('Odatlar'),
             ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () async {
-                  if (titleCtrl.text.trim().isEmpty) return;
-                  Navigator.pop(ctx);
-                  final now = DateTime.now();
-                  final date =
-                      '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-                  try {
-                    await _planService.create(
-                      title: titleCtrl.text.trim(),
-                      scheduledTime:
-                          timeCtrl.text.trim().isNotEmpty ? timeCtrl.text.trim() : null,
-                      planDate: date,
-                    );
-                    await _refreshPlans();
-                  } catch (_) {}
-                },
-                child: Text(context.tr('Saqlash')),
-              ),
+            NavigationDestination(
+              icon: const Icon(LucideIcons.target),
+              label: context.tr('Maqsadlar'),
+            ),
+            NavigationDestination(
+              icon: const Icon(LucideIcons.messageCircle),
+              label: context.tr('Coach'),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  void _showAddHabitDialog(BuildContext context) {
-    final titleCtrl = TextEditingController();
-    final iconCtrl = TextEditingController(text: '✅');
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20, 24, 20,
-          MediaQuery.of(ctx).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              context.tr('Yangi odat'),
-              style: Theme.of(ctx).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                SizedBox(
-                  width: 60,
-                  child: TextField(
-                    controller: iconCtrl,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 24),
-                    decoration: const InputDecoration(hintText: '✅'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: titleCtrl,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      hintText: 'Odat nomi',
-                      prefixIcon: Icon(LucideIcons.pencil, size: 18),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () async {
-                  if (titleCtrl.text.trim().isEmpty) return;
-                  Navigator.pop(ctx);
-                  try {
-                    await _habitService.create({
-                      'title': titleCtrl.text.trim(),
-                      'icon': iconCtrl.text.trim().isNotEmpty
-                          ? iconCtrl.text.trim()
-                          : '✅',
-                      'frequency': 'daily',
-                    });
-                    await _refreshHabits();
-                  } catch (_) {}
-                },
-                child: Text(context.tr('Saqlash')),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showAddGoalDialog(BuildContext context) {
-    final titleCtrl = TextEditingController();
-    String goalType = 'yearly';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            20, 24, 20,
-            MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                context.tr('Yangi maqsad'),
-                style: Theme.of(ctx).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: titleCtrl,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'Maqsad nomi',
-                  prefixIcon: Icon(LucideIcons.pencil, size: 18),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SegmentedButton<String>(
-                segments: [
-                  ButtonSegment(
-                    value: 'yearly',
-                    label: Text(context.tr('Yillik')),
-                  ),
-                  ButtonSegment(
-                    value: 'monthly',
-                    label: Text(context.tr('Oylik')),
-                  ),
-                ],
-                selected: {goalType},
-                onSelectionChanged: (sel) =>
-                    setSheetState(() => goalType = sel.first),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    if (titleCtrl.text.trim().isEmpty) return;
-                    Navigator.pop(ctx);
-                    final now = DateTime.now();
-                    final period = goalType == 'yearly'
-                        ? '${now.year}'
-                        : '${now.year}-${now.month.toString().padLeft(2, '0')}';
-                    try {
-                      await _goalService.create({
-                        'title': titleCtrl.text.trim(),
-                        'goal_type': goalType,
-                        'period': period,
-                      });
-                      await _refreshGoals();
-                    } catch (_) {}
-                  },
-                  child: Text(context.tr('Saqlash')),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

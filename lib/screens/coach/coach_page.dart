@@ -1,75 +1,75 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 import '../../l10n/app_localizations.dart';
-import '../../services/coach_service.dart';
-import '../../theme/app_theme.dart';
+import '../../services/intizom_api.dart';
+import '../../widgets/feedback.dart';
 
-/// AI Coach suhbat sahifasi.
+/// AI Coach suhbati. Tarix faqat ilovada saqlanadi (Mini App kabi).
+/// Bepul foydalanuvchiga kuniga cheklangan xabar — server hisoblaydi.
 class CoachPage extends StatefulWidget {
-  const CoachPage({super.key, required this.coachService});
+  const CoachPage({super.key, required this.api});
 
-  final CoachService coachService;
+  final IntizomApi api;
 
   @override
   State<CoachPage> createState() => _CoachPageState();
 }
 
-class _CoachPageState extends State<CoachPage> {
-  final _controller = TextEditingController();
-  final _scrollController = ScrollController();
+class _CoachPageState extends State<CoachPage> with AutomaticKeepAliveClientMixin {
+  final _input = TextEditingController();
+  final _scroll = ScrollController();
   final List<ChatMessage> _messages = [];
-  bool _loading = false;
+  bool _sending = false;
+  int? _remaining;
 
   @override
-  void initState() {
-    super.initState();
-    _loadHistory();
-  }
+  bool get wantKeepAlive => true;
 
-  Future<void> _loadHistory() async {
-    final history = await widget.coachService.getHistory();
-    if (mounted) {
-      setState(() => _messages.addAll(history));
-      _scrollToBottom();
-    }
+  @override
+  void dispose() {
+    _input.dispose();
+    _scroll.dispose();
+    super.dispose();
   }
 
   Future<void> _send() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty || _loading) return;
-
-    _controller.clear();
+    final text = _input.text.trim();
+    if (text.isEmpty || _sending) return;
+    _input.clear();
     setState(() {
-      _messages.add(ChatMessage(role: 'user', content: text));
-      _loading = true;
+      _messages.add(ChatMessage('user', text));
+      _sending = true;
     });
-    _scrollToBottom();
-
+    _scrollDown();
     try {
-      final reply = await widget.coachService.sendMessage(text);
-      if (mounted) {
-        setState(() {
-          _messages.add(ChatMessage(role: 'assistant', content: reply.reply));
-          _loading = false;
-        });
-        _scrollToBottom();
-      }
+      // Oxirgi 12 ta xabar kontekst sifatida yuboriladi.
+      final history = _messages.length > 12
+          ? _messages.sublist(_messages.length - 12)
+          : List<ChatMessage>.of(_messages);
+      final reply = await widget.api.chat(history);
+      if (!mounted) return;
+      setState(() {
+        _messages.add(ChatMessage('assistant', reply.reply));
+        _remaining = reply.remaining;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.tr('Xatolik yuz berdi'))),
-        );
-      }
+      if (!mounted) return;
+      setState(() => _messages.removeLast());
+      _input.text = text;
+      showApiError(context, e);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+      _scrollDown();
     }
   }
 
-  void _scrollToBottom() {
+  void _scrollDown() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+      if (_scroll.hasClients) {
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
       }
@@ -77,38 +77,57 @@ class _CoachPageState extends State<CoachPage> {
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final scheme = Theme.of(context).colorScheme;
-
     return Column(
       children: [
-        // Xabarlar ro'yxati
         Expanded(
-          child: _messages.isEmpty && !_loading
-              ? _EmptyCoach()
+          child: _messages.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('🧠', style: TextStyle(fontSize: 44)),
+                        const SizedBox(height: 12),
+                        Text(
+                          context.tr('AI Coach'),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          context.tr('Rejalaringiz, odatlaringiz va streakingizni biladi. Savol bering.'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               : ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  itemCount: _messages.length + (_loading ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == _messages.length) {
-                      return const _TypingIndicator();
-                    }
-                    return _MessageBubble(message: _messages[index]);
-                  },
+                  controller: _scroll,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  itemCount: _messages.length + (_sending ? 1 : 0),
+                  itemBuilder: (_, i) => i == _messages.length
+                      ? const _Bubble(text: '…', fromUser: false)
+                      : _Bubble(
+                          text: _messages[i].content,
+                          fromUser: _messages[i].role == 'user',
+                        ),
                 ),
         ),
-
-        // Input
+        if (_remaining != null && _remaining! >= 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              context.tr('Bugun qolgan bepul xabarlar: {n}', {'n': _remaining!}),
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+            ),
+          ),
         Container(
-          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+          padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
           decoration: BoxDecoration(
             color: scheme.surfaceContainerLowest,
             border: Border(top: BorderSide(color: scheme.outlineVariant)),
@@ -119,26 +138,23 @@ class _CoachPageState extends State<CoachPage> {
               children: [
                 Expanded(
                   child: TextField(
-                    controller: _controller,
+                    controller: _input,
+                    minLines: 1,
+                    maxLines: 4,
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => _send(),
                     decoration: InputDecoration(
                       hintText: context.tr('Xabar yozing...'),
+                      filled: false,
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
-                      filled: false,
                     ),
-                    maxLines: 4,
-                    minLines: 1,
                   ),
                 ),
                 IconButton(
-                  onPressed: _send,
-                  icon: Icon(
-                    LucideIcons.sendHorizontal,
-                    color: scheme.primary,
-                  ),
+                  onPressed: _sending ? null : _send,
+                  icon: Icon(LucideIcons.sendHorizontal, color: scheme.primary),
                 ),
               ],
             ),
@@ -149,137 +165,35 @@ class _CoachPageState extends State<CoachPage> {
   }
 }
 
-class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message});
-  final ChatMessage message;
+class _Bubble extends StatelessWidget {
+  const _Bubble({required this.text, required this.fromUser});
+  final String text;
+  final bool fromUser;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isUser = message.role == 'user';
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!isUser) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: scheme.primaryContainer,
-              child: const Text('🤖', style: TextStyle(fontSize: 16)),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: isUser
-                    ? scheme.primary
-                    : scheme.surfaceContainerLow,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isUser ? 16 : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : 16),
-                ),
-              ),
-              child: Text(
-                message.content,
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.45,
-                  color: isUser ? scheme.onPrimary : scheme.onSurface,
-                ),
-              ),
-            ),
-          ),
-          if (isUser) const SizedBox(width: 8),
-        ],
-      ),
-    );
-  }
-}
-
-class _TypingIndicator extends StatelessWidget {
-  const _TypingIndicator();
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: scheme.primaryContainer,
-            child: const Text('🤖', style: TextStyle(fontSize: 16)),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: List.generate(3, (i) => Padding(
-                padding: EdgeInsets.only(left: i > 0 ? 4 : 0),
-                child: _Dot(delay: i * 200),
-              )),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Dot extends StatefulWidget {
-  const _Dot({required this.delay});
-  final int delay;
-
-  @override
-  State<_Dot> createState() => _DotState();
-}
-
-class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    Future.delayed(Duration(milliseconds: widget.delay), () {
-      if (mounted) _ctrl.repeat(reverse: true);
-    });
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (_, child) => Container(
-        width: 7,
-        height: 7,
+    return Align(
+      alignment: fromUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * .8),
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(
-            alpha: .3 + _ctrl.value * .5,
+          color: fromUser ? scheme.primary : scheme.surfaceContainerLow,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(fromUser ? 16 : 4),
+            bottomRight: Radius.circular(fromUser ? 4 : 16),
+          ),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.45,
+            color: fromUser ? scheme.onPrimary : scheme.onSurface,
           ),
         ),
       ),

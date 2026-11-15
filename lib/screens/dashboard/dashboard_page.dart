@@ -1,105 +1,80 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 import '../../l10n/app_localizations.dart';
-import '../../models/user_profile.dart';
+import '../../models/profile.dart';
+import '../../models/stats.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_ui.dart';
+import '../../widgets/feedback.dart';
 
-/// Asosiy dashboard — streak, XP, discipline, bugungi natijalar.
+/// Bosh sahifa — streak, daraja, intizom balli, bugungi natija.
 class DashboardPage extends StatelessWidget {
   const DashboardPage({
     super.key,
     required this.profile,
-    this.todayDone = 0,
-    this.todayTotal = 0,
-    this.todayHabitsDone = 0,
-    this.todayHabitsTotal = 0,
-    this.smartMessage,
-    this.onRefresh,
+    required this.stats,
+    this.quest,
+    this.coachMessage,
+    required this.onRefresh,
   });
 
-  final UserProfile profile;
-  final int todayDone;
-  final int todayTotal;
-  final int todayHabitsDone;
-  final int todayHabitsTotal;
-  final String? smartMessage;
-  final Future<void> Function()? onRefresh;
+  final Profile profile;
+  final UserStats stats;
+  final DailyQuest? quest;
+  final String? coachMessage;
+  final Future<void> Function() onRefresh;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
     return RefreshIndicator(
-      onRefresh: onRefresh ?? () async {},
+      onRefresh: onRefresh,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
-          // Salom
-          _GreetingHeader(profile: profile),
-          const SizedBox(height: 20),
-
-          // Smart coach xabari
-          if (smartMessage != null) ...[
-            _CoachMessageCard(message: smartMessage!),
-            const SizedBox(height: 16),
+          _Greeting(profile: profile, stats: stats),
+          const SizedBox(height: 18),
+          if (coachMessage != null) ...[
+            _CoachCard(message: coachMessage!),
+            const SizedBox(height: 14),
           ],
-
-          // Gamification kartalar
-          _StatsRow(profile: profile),
-          const SizedBox(height: 16),
-
-          // Discipline score
-          _DisciplineCard(score: profile.disciplineScore),
-          const SizedBox(height: 16),
-
-          // Bugungi natijalar
-          AppSectionHeader(context.tr('Bugungi natijalar')),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _TodayStatCard(
-                  icon: LucideIcons.clipboardCheck,
-                  accent: AppPalette.accentBlue,
-                  label: context.tr('Rejalar'),
-                  value: '$todayDone/$todayTotal',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _TodayStatCard(
-                  icon: LucideIcons.repeat,
-                  accent: AppPalette.accentGreen,
-                  label: context.tr('Odatlar'),
-                  value: '$todayHabitsDone/$todayHabitsTotal',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // XP progress
-          _XpProgressCard(profile: profile),
+          _StatsRow(stats: stats),
+          const SizedBox(height: 14),
+          _DisciplineCard(score: stats.disciplineScore),
+          const SizedBox(height: 14),
+          if (quest != null) ...[
+            _QuestCard(quest: quest!),
+            const SizedBox(height: 14),
+          ],
+          _TodayCard(done: stats.todayDone, total: stats.todayTotal),
+          const SizedBox(height: 14),
+          _XpCard(stats: stats),
+          if (!stats.isPremium) ...[
+            const SizedBox(height: 14),
+            const _PremiumBanner(),
+          ],
+          if (stats.achievements.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            AppSectionHeader(context.tr('Yutuqlar')),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final a in stats.achievements) _AchievementChip(a: a),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-// ──────────────────────────────────────────────
-// Greeting header
-// ──────────────────────────────────────────────
-class _GreetingHeader extends StatelessWidget {
-  const _GreetingHeader({required this.profile});
-  final UserProfile profile;
-
-  String _greeting(BuildContext context) {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return context.tr('Assalomu alaykum');
-    if (hour < 18) return context.tr('Assalomu alaykum');
-    return context.tr('Assalomu alaykum');
-  }
+class _Greeting extends StatelessWidget {
+  const _Greeting({required this.profile, required this.stats});
+  final Profile profile;
+  final UserStats stats;
 
   @override
   Widget build(BuildContext context) {
@@ -111,45 +86,34 @@ class _GreetingHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _greeting(context),
-                style: TextStyle(
-                  fontSize: 14,
-                  color: scheme.onSurfaceVariant,
-                ),
+                context.tr('Assalomu alaykum'),
+                style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 2),
               Text(
-                '${profile.avatarEmoji} ${profile.name}',
+                profile.fullName,
                 style: Theme.of(context).textTheme.titleLarge,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         ),
-        // Premium badge
-        if (profile.isPremium)
+        if (stats.isPremium)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
               color: AppPalette.levelGold.withValues(alpha: .12),
               borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(
-                color: AppPalette.levelGold.withValues(alpha: .3),
-              ),
+              border: Border.all(color: AppPalette.levelGold.withValues(alpha: .3)),
             ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('💎', style: TextStyle(fontSize: 14)),
-                SizedBox(width: 4),
-                Text(
-                  'Premium',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppPalette.levelGold,
-                  ),
-                ),
-              ],
+            child: const Text(
+              '💎 Premium',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppPalette.levelGold,
+              ),
             ),
           ),
       ],
@@ -157,11 +121,8 @@ class _GreetingHeader extends StatelessWidget {
   }
 }
 
-// ──────────────────────────────────────────────
-// Coach message card
-// ──────────────────────────────────────────────
-class _CoachMessageCard extends StatelessWidget {
-  const _CoachMessageCard({required this.message});
+class _CoachCard extends StatelessWidget {
+  const _CoachCard({required this.message});
   final String message;
 
   @override
@@ -169,65 +130,46 @@ class _CoachMessageCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return AppCard(
       color: scheme.primaryContainer,
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('🤖', style: TextStyle(fontSize: 24)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.5,
-                color: scheme.onPrimaryContainer,
-              ),
-            ),
-          ),
-        ],
+      child: Text(
+        message,
+        style: TextStyle(fontSize: 14, height: 1.5, color: scheme.onPrimaryContainer),
       ),
     );
   }
 }
 
-// ──────────────────────────────────────────────
-// Stats row: streak, level, weekly XP
-// ──────────────────────────────────────────────
 class _StatsRow extends StatelessWidget {
-  const _StatsRow({required this.profile});
-  final UserProfile profile;
+  const _StatsRow({required this.stats});
+  final UserStats stats;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Expanded(
-          child: _StatCard(
+          child: _StatTile(
             icon: LucideIcons.flame,
             accent: AppPalette.streakOrange,
-            value: '${profile.streak}',
+            value: '${stats.streak}',
             label: context.tr('Streak'),
-            suffix: context.tr('kun'),
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: _StatCard(
+          child: _StatTile(
             icon: LucideIcons.trophy,
             accent: AppPalette.levelGold,
-            value: '${profile.level}',
+            value: '${stats.level}',
             label: context.tr('Daraja'),
-            suffix: profile.rankTitle ?? '',
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: _StatCard(
-            icon: LucideIcons.zap,
+          child: _StatTile(
+            icon: LucideIcons.star,
             accent: AppPalette.xpBlue,
-            value: '${profile.weeklyXp}',
-            label: context.tr('Haftalik XP'),
+            value: '${stats.totalScore}',
+            label: context.tr('Ball'),
           ),
         ),
       ],
@@ -235,20 +177,18 @@ class _StatsRow extends StatelessWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
+class _StatTile extends StatelessWidget {
+  const _StatTile({
     required this.icon,
     required this.accent,
     required this.value,
     required this.label,
-    this.suffix,
   });
 
   final IconData icon;
   final Color accent;
   final String value;
   final String label;
-  final String? suffix;
 
   @override
   Widget build(BuildContext context) {
@@ -258,68 +198,49 @@ class _StatCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppIconTile.tinted(icon: icon, accent: accent, size: 36),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onSurface,
-                ),
-              ),
-              if (suffix != null && suffix!.isNotEmpty) ...[
-                const SizedBox(width: 4),
-                Text(
-                  suffix!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 2),
+          AppIconTile.tinted(icon: icon, accent: accent, size: 34),
+          const SizedBox(height: 10),
           Text(
-            label,
+            value,
             style: TextStyle(
-              fontSize: 12,
-              color: scheme.onSurfaceVariant,
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: scheme.onSurface,
             ),
           ),
+          Text(label, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
         ],
       ),
     );
   }
 }
 
-// ──────────────────────────────────────────────
-// Discipline card
-// ──────────────────────────────────────────────
 class _DisciplineCard extends StatelessWidget {
   const _DisciplineCard({required this.score});
   final int score;
+
+  String _text(BuildContext context) {
+    if (score >= 80) return context.tr('Ajoyib natija! Siz haqiqiy intizomli insonsiz.');
+    if (score >= 60) return context.tr('Yaxshi yo\'ldasiz. Davom eting!');
+    if (score >= 40) return context.tr('O\'rta holat. Bugun bir qadam oldinga!');
+    return context.tr('Har kuni kichik qadam katta natija beradi.');
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return AppCard(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       child: Row(
         children: [
-          DisciplineGauge(score: score),
-          const SizedBox(width: 20),
+          DisciplineGauge(score: score, size: 76),
+          const SizedBox(width: 18),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  context.tr('Intizom'),
+                  context.tr('Intizom kuchi'),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -328,12 +249,8 @@ class _DisciplineCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _motivationText(context, score),
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: scheme.onSurfaceVariant,
-                    height: 1.4,
-                  ),
+                  _text(context),
+                  style: TextStyle(fontSize: 13, height: 1.4, color: scheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -342,59 +259,49 @@ class _DisciplineCard extends StatelessWidget {
       ),
     );
   }
-
-  String _motivationText(BuildContext context, int score) {
-    if (score >= 80) return 'Ajoyib natija! Siz haqiqiy intizomli insonsiz 💎';
-    if (score >= 60) return 'Yaxshi yo\'ldasiz! Davom eting 💪';
-    if (score >= 40) return 'O\'rta holat. Bugun bir qadam oldinga! ⚡';
-    return 'Boshlang! Har kuni kichik qadam katta natija beradi 🌱';
-  }
 }
 
-// ──────────────────────────────────────────────
-// Today stat card
-// ──────────────────────────────────────────────
-class _TodayStatCard extends StatelessWidget {
-  const _TodayStatCard({
-    required this.icon,
-    required this.accent,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final Color accent;
-  final String label;
-  final String value;
+class _QuestCard extends StatelessWidget {
+  const _QuestCard({required this.quest});
+  final DailyQuest quest;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final pct = quest.target > 0 ? quest.progress / quest.target : 0.0;
     return AppCard(
-      padding: const EdgeInsets.all(16),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppIconTile.tinted(icon: icon, accent: accent, size: 40),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onSurface,
-                ),
-              ),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: scheme.onSurfaceVariant,
+              Text(quest.icon, style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppOverline(context.tr('Bugungi topshiriq')),
+                    const SizedBox(height: 2),
+                    Text(
+                      quest.title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 6),
+          Text(quest.subtitle, style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+          const SizedBox(height: 10),
+          AppProgressBar(
+            value: pct,
+            color: quest.completed ? AppPalette.disciplineGreen : AppPalette.primary,
           ),
         ],
       ),
@@ -402,76 +309,153 @@ class _TodayStatCard extends StatelessWidget {
   }
 }
 
-// ──────────────────────────────────────────────
-// XP Progress card
-// ──────────────────────────────────────────────
-class _XpProgressCard extends StatelessWidget {
-  const _XpProgressCard({required this.profile});
-  final UserProfile profile;
+class _TodayCard extends StatelessWidget {
+  const _TodayCard({required this.done, required this.total});
+  final int done;
+  final int total;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    // XP progress hisoblash (bot'dagi formuladan)
-    final level = profile.level;
-    final xp = profile.xp;
-    final base = 50 * (level - 1) * level;
-    final next = 50 * level * (level + 1);
-    final inLevel = xp - base;
-    final needed = (next - base).clamp(1, 999999);
-    final pct = (inLevel / needed).clamp(0.0, 1.0);
-
+    final pct = total > 0 ? done / total : 0.0;
     return AppCard(
-      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          const AppIconTile.tinted(
+            icon: LucideIcons.clipboardCheck,
+            accent: AppPalette.accentGreen,
+            size: 40,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.tr('Bugungi natijalar'),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: scheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                AppProgressBar(
+                  value: pct,
+                  color: pct >= 1 ? AppPalette.disciplineGreen : AppPalette.accentTeal,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            '$done/$total',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: scheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _XpCard extends StatelessWidget {
+  const _XpCard({required this.stats});
+  final UserStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              AppIconTile.tinted(
-                icon: LucideIcons.star,
-                accent: AppPalette.xpBlue,
-                size: 36,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                '${context.tr('Daraja')} ${profile.level} — ${profile.rankTitle ?? ""}',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: scheme.onSurface,
+              Text(stats.rankEmoji, style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '${stats.rankTitle} · ${stats.level}-${context.tr('daraja')}',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: scheme.onSurface,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          AppProgressBar(
-            value: pct,
-            color: AppPalette.xpBlue,
-            height: 8,
-          ),
+          const SizedBox(height: 12),
+          AppProgressBar(value: stats.xpPercent / 100, color: AppPalette.xpBlue, height: 8),
           const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '$inLevel XP',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-              Text(
-                '$needed XP',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+          Text(
+            '${stats.xpInLevel} / ${stats.xpNeeded} XP',
+            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PremiumBanner extends StatelessWidget {
+  const _PremiumBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AppCard(
+      onTap: openPremiumInBot,
+      color: AppPalette.levelGold.withValues(alpha: .07),
+      child: Row(
+        children: [
+          const Text('💎', style: TextStyle(fontSize: 26)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.tr('Premium olish'),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: scheme.onSurface,
+                  ),
+                ),
+                Text(
+                  context.tr('Cheksiz reja, odat, maqsad va AI Coach. To\'lov bot orqali.'),
+                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          Icon(LucideIcons.chevronRight, size: 20, color: scheme.onSurfaceVariant),
+        ],
+      ),
+    );
+  }
+}
+
+class _AchievementChip extends StatelessWidget {
+  const _AchievementChip({required this.a});
+  final Achievement a;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Text('${a.icon} ${a.title}', style: const TextStyle(fontSize: 13)),
     );
   }
 }

@@ -1,30 +1,64 @@
-# Codemagic CI/CD — IntizomAI Flutter ilovasi.
-
 workflows:
-  android-release:
-    name: Android Release APK
-    max_build_duration: 30
+  # main'ga har push bo'lganda APK avtomatik yig'iladi (MyFit bilan bir xil sxema).
+  # APK doimiy IntizomAI kaliti bilan imzolanadi (android/app/intizomai-upload.p12),
+  # shuning uchun yangi APK eskisining ustiga "Yangilash" sifatida o'rnatiladi.
+  #
+  # Codemagic → IntizomAi_ilova → Environment variables → guruh nomi: intizomai
+  #   API_BASE_URL               — Railway server manzili (masalan https://xxx.up.railway.app)
+  #   ANDROID_KEYSTORE_PASSWORD  — imzo kaliti paroli (Secure belgilang)
+  android-apk:
+    name: Android APK
+    instance_type: mac_mini_m2
+    max_build_duration: 40
     environment:
       flutter: stable
-      vars:
-        API_BASE_URL: "https://your-app.up.railway.app"
+      groups:
+        - intizomai
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+      cancel_previous_builds: true
     scripts:
-      - name: Get dependencies
+      - name: Sozlamalarni tekshirish
         script: |
-          flutter pub get
-
-      - name: Build APK
+          if [ -z "$API_BASE_URL" ]; then
+            echo "XATO: 'intizomai' guruhida API_BASE_URL yo'q (Railway server manzili)."
+            exit 1
+          fi
+          if [ -z "$ANDROID_KEYSTORE_PASSWORD" ]; then
+            echo "XATO: 'intizomai' guruhida ANDROID_KEYSTORE_PASSWORD yo'q."
+            echo "Kalitsiz yig'ilgan APK eski ilova ustiga o'rnatilmaydi."
+            exit 1
+          fi
+      - name: Paketlarni yuklash
+        script: flutter pub get
+      - name: Kod tahlili
+        script: flutter analyze
+      - name: Imzo kalitini ulash
+        script: |
+          umask 077
+          printf 'storeFile=intizomai-upload.p12\nstoreType=pkcs12\nkeyAlias=intizomai\nstorePassword=%s\nkeyPassword=%s\n' \
+            "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEYSTORE_PASSWORD" > android/key.properties
+      - name: APK yig'ish
         script: |
           flutter build apk --release \
+            --build-number=$BUILD_NUMBER \
             --dart-define=API_BASE_URL=$API_BASE_URL
-
+      - name: Imzoni tekshirish
+        script: |
+          APKSIGNER=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs build/app/outputs/flutter-apk/app-release.apk | grep -E "SHA-256 digest" | head -1
+          rm -f android/key.properties
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
-
     publishing:
       email:
         recipients:
-          - your-email@example.com
+          - a.xakimjonov@student.pdp.university
         notify:
           success: true
           failure: true

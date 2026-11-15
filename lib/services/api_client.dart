@@ -1,130 +1,114 @@
+import 'dart:async';
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
+
 import '../config/app_config.dart';
 import 'auth_store.dart';
 
-/// Railway backend bilan REST API aloqasi.
-///
-/// Barcha so'rovlarga auth token avtomatik qo'shiladi.
-/// 401 javob kelsa — token eskirgan, qayta login kerak.
+/// Server xatosi. [statusCode]: 401 — qayta kirish, 402 — Premium kerak,
+/// 409 — amalga ruxsat yo'q (masalan reja vaqti hali kelmagan), 0 — tarmoq.
+class ApiException implements Exception {
+  const ApiException(this.message, {this.statusCode = 0});
+
+  final String message;
+  final int statusCode;
+
+  bool get isUnauthorized => statusCode == 401;
+  bool get needsPremium => statusCode == 402;
+
+  @override
+  String toString() => message;
+}
+
+/// Railway serveri bilan REST aloqa. Har so'rovga `Authorization: Bearer`
+/// qo'shiladi. 401 kelsa [onUnauthorized] chaqiriladi (ilova login sahifasiga qaytadi).
 class ApiClient {
   ApiClient({http.Client? client, AuthStore? authStore})
-      : _client = client ?? http.Client(),
-        _authStore = authStore ?? AuthStore();
+    : _client = client ?? http.Client(),
+      _authStore = authStore ?? AuthStore();
 
   final http.Client _client;
   final AuthStore _authStore;
 
-  Map<String, String> get _defaultHeaders => {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
+  /// Global: sessiya tugaganda chaqiriladi (main.dart o'rnatadi).
+  static void Function()? onUnauthorized;
 
-  Future<Map<String, String>> _authHeaders() async {
-    final token = await _authStore.getToken();
-    final headers = Map<String, String>.from(_defaultHeaders);
-    if (token != null) {
-      headers['Authorization'] = 'Bearer $token';
+  static const _timeout = Duration(seconds: 25);
+
+  Future<dynamic> get(String path, {Map<String, String>? query}) =>
+      _send('GET', path, query: query);
+
+  Future<dynamic> post(String path, {Object? body, bool auth = true}) =>
+      _send('POST', path, body: body, auth: auth);
+
+  Future<dynamic> put(String path, {Object? body}) =>
+      _send('PUT', path, body: body);
+
+  Future<dynamic> delete(String path) => _send('DELETE', path);
+
+  Future<dynamic> _send(
+    String method,
+    String path, {
+    Map<String, String>? query,
+    Object? body,
+    bool auth = true,
+  }) async {
+    if (kApiBaseUrl.isEmpty) {
+      throw const ApiException(
+        "Server manzili sozlanmagan (API_BASE_URL). Ilovani qayta yig'ing.",
+      );
     }
-    return headers;
-  }
+    final headers = <String, String>{
+      'Accept': 'application/json',
+      if (body != null) 'Content-Type': 'application/json',
+    };
+    if (auth) {
+      final token = await _authStore.getToken();
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+    }
 
-  /// GET so'rov.
-  Future<ApiResponse> get(String path, {Map<String, String>? query}) async {
-    final uri = Uri.parse(apiUrl(path)).replace(queryParameters: query);
-    final response = await _client.get(uri, headers: await _authHeaders());
-    return ApiResponse.fromHttp(response);
-  }
+    final request = http.Request(method, apiUri(path, query))
+      ..headers.addAll(headers);
+    if (body != null) request.body = jsonEncode(body);
 
-  /// POST so'rov.
-  Future<ApiResponse> post(String path, {Object? body}) async {
-    final response = await _client.post(
-      Uri.parse(apiUrl(path)),
-      headers: await _authHeaders(),
-      body: body != null ? jsonEncode(body) : null,
-    );
-    return ApiResponse.fromHttp(response);
-  }
+    final http.Response response;
+    try {
+      response = await http.Response.fromStream(
+        await _client.send(request).timeout(_timeout),
+      );
+    } on TimeoutException {
+      throw const ApiException('Server javob bermadi. Qaytadan urinib ko\'ring.');
+    } catch (_) {
+      throw const ApiException('Internet aloqasini tekshiring.');
+    }
 
-  /// PUT so'rov.
-  Future<ApiResponse> put(String path, {Object? body}) async {
-    final response = await _client.put(
-      Uri.parse(apiUrl(path)),
-      headers: await _authHeaders(),
-      body: body != null ? jsonEncode(body) : null,
-    );
-    return ApiResponse.fromHttp(response);
-  }
-
-  /// PATCH so'rov.
-  Future<ApiResponse> patch(String path, {Object? body}) async {
-    final response = await _client.patch(
-      Uri.parse(apiUrl(path)),
-      headers: await _authHeaders(),
-      body: body != null ? jsonEncode(body) : null,
-    );
-    return ApiResponse.fromHttp(response);
-  }
-
-  /// DELETE so'rov.
-  Future<ApiResponse> delete(String path) async {
-    final response = await _client.delete(
-      Uri.parse(apiUrl(path)),
-      headers: await _authHeaders(),
-    );
-    return ApiResponse.fromHttp(response);
-  }
-}
-
-/// API javob o'rami.
-class ApiResponse {
-  const ApiResponse({
-    required this.statusCode,
-    this.data,
-    this.error,
-  });
-
-  final int statusCode;
-  final dynamic data;
-  final String? error;
-
-  bool get isOk => statusCode >= 200 && statusCode < 300;
-  bool get isUnauthorized => statusCode == 401;
-  bool get isForbidden => statusCode == 403;
-  bool get isNotFound => statusCode == 404;
-
-  factory ApiResponse.fromHttp(http.Response response) {
     dynamic decoded;
     try {
-      decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      decoded = response.bodyBytes.isEmpty
+          ? null
+          : jsonDecode(utf8.decode(response.bodyBytes));
     } catch (_) {
       decoded = null;
     }
 
-    String? error;
-    if (!_isOk(response.statusCode) && decoded is Map) {
-      error = decoded['error']?.toString() ??
-          decoded['detail']?.toString() ??
-          decoded['message']?.toString();
+    final code = response.statusCode;
+    if (code >= 200 && code < 300) return decoded;
+
+    final detail = decoded is Map ? decoded['detail'] : null;
+    final message = detail is String && detail.isNotEmpty
+        ? detail
+        : switch (code) {
+            401 => 'Sessiya tugagan. Qaytadan kiring.',
+            402 => 'Bu imkoniyat Premium foydalanuvchilar uchun.',
+            404 => 'Ma\'lumot topilmadi.',
+            429 => 'Juda ko\'p so\'rov. Biroz kuting.',
+            _ => 'Server xatosi ($code).',
+          };
+    if (code == 401 && auth) {
+      await _authStore.clear();
+      onUnauthorized?.call();
     }
-
-    return ApiResponse(
-      statusCode: response.statusCode,
-      data: decoded,
-      error: error,
-    );
+    throw ApiException(message, statusCode: code);
   }
-
-  static bool _isOk(int code) => code >= 200 && code < 300;
-}
-
-/// API xatolik sinfi.
-class ApiException implements Exception {
-  const ApiException(this.message, {this.statusCode});
-
-  final String message;
-  final int? statusCode;
-
-  @override
-  String toString() => 'ApiException($statusCode): $message';
 }

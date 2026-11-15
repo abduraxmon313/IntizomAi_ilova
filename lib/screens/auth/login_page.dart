@@ -1,26 +1,25 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../../config/app_config.dart';
+
 import '../../l10n/app_localizations.dart';
-import '../../services/auth_store.dart';
 import '../../services/api_client.dart';
+import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 
-/// Telegram orqali kirish sahifasi.
+/// Telegram orqali kirish.
 ///
-/// Oqim:
-/// 1) Foydalanuvchi "Telegram orqali kirish" tugmasini bosadi
-/// 2) Telegram ochiladi → IntizomAi bot → bot JWT token beradi
-/// 3) Foydalanuvchi tokenni ilovaga nusxalab kiritadi
-/// 4) Ilova token bilan API'ga ulanadi
+/// Tugma bosilganda bot ochiladi; foydalanuvchi botda "Tasdiqlash"ni bosadi,
+/// ilova esa tasdiqni o'zi kutib oladi (token nusxalash shart emas).
 class LoginPage extends StatefulWidget {
   const LoginPage({
     super.key,
+    required this.authService,
     required this.onLoginSuccess,
     this.onLanguageChanged,
   });
 
+  final AuthService authService;
   final VoidCallback onLoginSuccess;
   final ValueChanged<String>? onLanguageChanged;
 
@@ -28,135 +27,134 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
-  final _tokenController = TextEditingController();
-  bool _loading = false;
+class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
+  static const _pollEvery = Duration(seconds: 2);
+  static const _giveUpAfter = Duration(minutes: 10);
+
+  String? _nonce;
+  Timer? _timer;
+  DateTime? _startedAt;
+  bool _polling = false;
   String? _error;
-  bool _showTokenInput = false;
 
-  Future<void> _launchTelegramLogin() async {
-    final uri = Uri.parse('$kBotUrl?start=app_login');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      // Telegram ochilgandan keyin token kiritish bo'limini ko'rsatamiz
-      if (mounted) {
-        setState(() => _showTokenInput = true);
-      }
-    } else {
-      if (mounted) {
-        setState(() => _error = 'Telegram topilmadi');
-      }
-    }
-  }
-
-  Future<void> _verifyToken() async {
-    final token = _tokenController.text.trim();
-    if (token.isEmpty) {
-      setState(() => _error = 'Tokenni kiriting');
-      return;
-    }
-
-    setState(() { _loading = true; _error = null; });
-
-    try {
-      // Token'ni saqlash
-      final authStore = AuthStore();
-      await authStore.saveToken(token);
-
-      // API bilan tekshirish
-      final api = ApiClient(authStore: authStore);
-      final res = await api.get('/user/profile');
-
-      if (res.isOk) {
-        // Muvaffaqiyat — profil olindi
-        final data = res.data as Map<String, dynamic>;
-        await authStore.saveUserId(data['id'] as int);
-        await authStore.saveTelegramId(data['telegram_id'] as int);
-        if (mounted) widget.onLoginSuccess();
-      } else if (res.isUnauthorized) {
-        await authStore.clear();
-        if (mounted) setState(() => _error = 'Token noto\'g\'ri yoki muddati o\'tgan');
-      } else {
-        await authStore.clear();
-        if (mounted) setState(() => _error = res.error ?? 'Server bilan bog\'lanib bo\'lmadi');
-      }
-    } catch (e) {
-      if (mounted) setState(() => _error = 'Tarmoq xatosi. Internetni tekshiring.');
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _pasteFromClipboard() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    if (data?.text != null && data!.text!.isNotEmpty) {
-      _tokenController.text = data.text!;
-    }
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
-    _tokenController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
     super.dispose();
+  }
+
+  // Telegram'dan qaytganda darhol tekshiramiz.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _nonce != null) _pollOnce();
+  }
+
+  Future<void> _start() async {
+    final nonce = widget.authService.newNonce();
+    setState(() {
+      _nonce = nonce;
+      _error = null;
+      _startedAt = DateTime.now();
+    });
+    final opened = await widget.authService.openBot(nonce);
+    if (!mounted) return;
+    if (!opened) {
+      setState(() {
+        _nonce = null;
+        _error = 'Telegram ochilmadi. Telegram ilovasi o\'rnatilganini tekshiring.';
+      });
+      return;
+    }
+    _timer?.cancel();
+    _timer = Timer.periodic(_pollEvery, (_) => _pollOnce());
+  }
+
+  Future<void> _pollOnce() async {
+    final nonce = _nonce;
+    if (nonce == null || _polling) return;
+    if (_startedAt != null && DateTime.now().difference(_startedAt!) > _giveUpAfter) {
+      _stop('Vaqt tugadi. Qaytadan urinib ko\'ring.');
+      return;
+    }
+    _polling = true;
+    try {
+      final status = await widget.authService.poll(nonce);
+      if (!mounted || _nonce != nonce) return;
+      if (status == 'approved') {
+        _timer?.cancel();
+        widget.onLoginSuccess();
+      }
+      // 'pending' va 'expired' (bot hali so'rovni yozmagan bo'lishi mumkin) —
+      // kutishda davom etamiz; 10 daqiqadan keyin to'xtaydi.
+    } on ApiException catch (e) {
+      if (e.statusCode != 0 && e.statusCode != 429) _stop(e.message);
+    } finally {
+      _polling = false;
+    }
+  }
+
+  void _stop(String message) {
+    _timer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _nonce = null;
+      _error = message;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final waiting = _nonce != null;
 
     return Scaffold(
       body: SafeArea(
         child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const SizedBox(height: 60),
-
-                  // Logo
                   Container(
-                    width: 100,
-                    height: 100,
+                    width: 88,
+                    height: 88,
                     decoration: BoxDecoration(
                       color: scheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(28),
+                      borderRadius: BorderRadius.circular(24),
                     ),
-                    child: const Center(
-                      child: Text('🎯', style: TextStyle(fontSize: 48)),
-                    ),
+                    alignment: Alignment.center,
+                    child: const Text('🎯', style: TextStyle(fontSize: 42)),
                   ),
-                  const SizedBox(height: 32),
-
-                  // Sarlavha
-                  Text(
-                    'IntizomAI',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
+                  const SizedBox(height: 28),
+                  Text('IntizomAI', style: Theme.of(context).textTheme.headlineMedium),
                   const SizedBox(height: 8),
                   Text(
                     context.tr('O\'z intizomingizni nazorat qiling'),
+                    textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
-                    textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 48),
-
-                  // 1-qadam: Telegram'ga o'tish
+                  const SizedBox(height: 40),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _launchTelegramLogin,
+                    child: FilledButton.icon(
+                      onPressed: _start,
                       icon: const Icon(Icons.send_rounded, size: 20),
                       label: Text(
-                        _showTokenInput
-                            ? 'Telegram\'ni qayta ochish'
+                        waiting
+                            ? context.tr('Telegram\'ni qayta ochish')
                             : context.tr('Telegram orqali kirish'),
                       ),
-                      style: ElevatedButton.styleFrom(
+                      style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF2AABEE),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -166,115 +164,41 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ),
-
-                  // 2-qadam: Token kiritish (Telegram ochilgandan keyin)
-                  if (_showTokenInput) ...[
-                    const SizedBox(height: 24),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainerLowest,
-                        borderRadius: BorderRadius.circular(AppRadius.lg),
-                        border: Border.all(color: scheme.outlineVariant),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.key_rounded,
-                                size: 18,
-                                color: scheme.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Bot bergan tokenni kiriting',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: scheme.onSurface,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Token input
-                          TextField(
-                            controller: _tokenController,
-                            decoration: InputDecoration(
-                              hintText: 'Token...',
-                              suffixIcon: IconButton(
-                                icon: Icon(Icons.paste_rounded, size: 20, color: scheme.primary),
-                                onPressed: _pasteFromClipboard,
-                                tooltip: 'Nusxadan joylashtirish',
-                              ),
-                            ),
-                            maxLines: 3,
-                            minLines: 1,
-                            style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Xatolik
-                          if (_error != null) ...[
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppPalette.danger.withValues(alpha: .08),
-                                borderRadius: BorderRadius.circular(AppRadius.sm),
-                              ),
-                              child: Text(
-                                _error!,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: AppPalette.danger,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-
-                          // Kirish tugmasi
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: _loading ? null : _verifyToken,
-                              child: _loading
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text('Kirish'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  if (!_showTokenInput) ...[
-                    const SizedBox(height: 16),
+                  const SizedBox(height: 20),
+                  if (waiting)
+                    _WaitingCard(scheme: scheme)
+                  else
                     Text(
-                      'Bot sizga token beradi — uni ilovaga kiritasiz',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                      context.tr('Botda «Tasdiqlash» tugmasini bosasiz — ilova o\'zi ochiladi.'),
                       textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppPalette.danger.withValues(alpha: .08),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(fontSize: 13, color: AppPalette.danger),
+                      ),
                     ),
                   ],
-
                   const SizedBox(height: 40),
-
-                  // Til tanlash
-                  _LanguageSelector(onChanged: widget.onLanguageChanged),
-                  const SizedBox(height: 24),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'uz', label: Text("O'zbekcha")),
+                      ButtonSegment(value: 'ru', label: Text('Русский')),
+                      ButtonSegment(value: 'en', label: Text('English')),
+                    ],
+                    selected: {AppLocalizations.of(context).languageCode},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (s) => widget.onLanguageChanged?.call(s.first),
+                  ),
                 ],
               ),
             ),
@@ -285,27 +209,35 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-class _LanguageSelector extends StatelessWidget {
-  const _LanguageSelector({this.onChanged});
-  final ValueChanged<String>? onChanged;
+class _WaitingCard extends StatelessWidget {
+  const _WaitingCard({required this.scheme});
+  final ColorScheme scheme;
 
   @override
   Widget build(BuildContext context) {
-    final current = AppLocalizations.of(context).languageCode;
-    final scheme = Theme.of(context).colorScheme;
-
-    return SegmentedButton<String>(
-      segments: const [
-        ButtonSegment(value: 'uz', label: Text("O'zbekcha")),
-        ButtonSegment(value: 'ru', label: Text('Русский')),
-        ButtonSegment(value: 'en', label: Text('English')),
-      ],
-      selected: {current},
-      onSelectionChanged: (sel) => onChanged?.call(sel.first),
-      style: SegmentedButton.styleFrom(
-        selectedBackgroundColor: scheme.primaryContainer,
-        selectedForegroundColor: scheme.onPrimaryContainer,
-        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              context.tr('Botda «✅ Ilovaga kirishni tasdiqlash» tugmasini bosing, so\'ng shu yerga qayting.'),
+              style: TextStyle(fontSize: 13, color: scheme.onSurface, height: 1.4),
+            ),
+          ),
+        ],
       ),
     );
   }
