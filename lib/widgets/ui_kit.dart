@@ -22,12 +22,20 @@ class PageHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final lead = leading ??
+        (ModalRoute.of(context)?.canPop == true
+            ? IconButton(
+                tooltip: 'Orqaga',
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: Icon(LucideIcons.chevronLeft, color: scheme.onSurface),
+              )
+            : null);
     return Padding(
-      padding: EdgeInsets.fromLTRB(leading == null ? AppSpace.page : 8, 14, 12, 14),
+      padding: EdgeInsets.fromLTRB(lead == null ? AppSpace.page : 8, 16, 14, 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          ?leading,
+          ?lead,
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,7 +129,7 @@ class SegmentTabs<T> extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final index = items.indexWhere((e) => e.$1 == value).clamp(0, items.length - 1);
     return Container(
-      height: 38,
+      height: 40,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: dark ? AppPalette.darkPaper2 : scheme.surfaceContainerHigh,
@@ -148,7 +156,8 @@ class SegmentTabs<T> extends StatelessWidget {
                   ),
                 ),
               ),
-              Row(
+              Positioned.fill(
+                child: Row(
                 children: [
                   for (final (v, label, icon) in items)
                     Expanded(
@@ -183,6 +192,7 @@ class SegmentTabs<T> extends StatelessWidget {
                     ),
                 ],
               ),
+              ),
             ],
           );
         },
@@ -200,6 +210,7 @@ class SectionBar extends StatelessWidget {
     this.actionLabel,
     this.onAction,
     this.top = 28,
+    this.actionIcon = LucideIcons.plus,
   });
 
   final String title;
@@ -207,6 +218,9 @@ class SectionBar extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
   final double top;
+
+  /// Amal ikonkasi; null — faqat matn.
+  final IconData? actionIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -243,9 +257,9 @@ class SectionBar extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(LucideIcons.plus, size: 16, color: scheme.primary),
+                    if (actionIcon != null) Icon(actionIcon, size: 16, color: scheme.primary),
                     if (actionLabel != null) ...[
-                      const SizedBox(width: 4),
+                      if (actionIcon != null) const SizedBox(width: 4),
                       Text(
                         actionLabel!,
                         style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: scheme.primary, letterSpacing: -.1),
@@ -281,7 +295,7 @@ class CheckCircle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final c = color ?? AppPalette.success;
+    final c = color ?? scheme.primary;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: disabled || onTap == null
@@ -310,7 +324,7 @@ class CheckCircle extends StatelessWidget {
                 width: 1.6,
               ),
             ),
-            child: checked ? Icon(LucideIcons.check, size: size * .6, color: Colors.white) : null,
+            child: checked ? Icon(LucideIcons.check, size: size * .6, color: scheme.onPrimary) : null,
           ),
         ),
       ),
@@ -398,12 +412,7 @@ class EmptyView extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(color: scheme.surfaceContainerLow, shape: BoxShape.circle),
-            child: Icon(icon, size: 20, color: scheme.onSurfaceVariant),
-          ),
+          AppIconTile.tinted(icon: icon, accent: AppPalette.accentBlue, size: 46),
           const SizedBox(height: 14),
           Text(
             title,
@@ -490,7 +499,7 @@ class SettingTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final iconColor = danger ? AppPalette.danger : (accent ?? scheme.onSurfaceVariant);
+    final tint = danger ? AppPalette.danger : accent;
     return InkWell(
       onTap: onTap,
       child: ConstrainedBox(
@@ -499,8 +508,11 @@ class SettingTile extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
           child: Row(
             children: [
-              Icon(icon, size: 20, color: iconColor),
-              const SizedBox(width: 16),
+              if (tint != null)
+                AppIconTile.tinted(icon: icon, accent: tint, size: 34)
+              else
+                Icon(icon, size: 20, color: scheme.onSurfaceVariant),
+              SizedBox(width: tint != null ? 14 : 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

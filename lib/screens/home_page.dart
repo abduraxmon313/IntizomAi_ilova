@@ -6,16 +6,15 @@ import '../state/app_state.dart';
 import '../widgets/app_ui.dart';
 import '../widgets/feedback.dart';
 import '../widgets/ui_kit.dart';
-import 'coach/coach_page.dart';
 import 'dashboard/dashboard_page.dart';
-import 'friends/friends_page.dart';
-import 'goals/goals_page.dart';
 import 'habits/habits_page.dart';
+import 'plans/plans_page.dart';
+import 'stats/stats_page.dart';
 
-/// Asosiy oyna: Asosiy | Maqsad | AI | Odat | Do'stlar.
+/// Asosiy oyna (MyFit kabi 4 bo'lim): Asosiy | Rejalar | Odatlar | Statistika.
+/// Maqsadlar, Do'stlar, AI chat va Yutuqlar — Asosiy sahifadagi "Tezkor kirish"da.
 ///
-/// Orqaga tugmasi: ichki ekran (masalan guruh ichi) → bo'limning boshi →
-/// Asosiy bo'lim → ilovadan chiqish.
+/// Orqaga tugmasi: ichki sahifa → Asosiy bo'lim → ilovadan chiqish.
 class HomePage extends StatefulWidget {
   const HomePage({
     super.key,
@@ -36,8 +35,10 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late final AppState _state = AppState(widget.api);
-  final _friendsKey = GlobalKey<FriendsPageState>();
   int _tab = 0;
+
+  /// Statistika birinchi ochilganda yuklanadi.
+  bool _statsOpened = false;
 
   @override
   void initState() {
@@ -53,13 +54,15 @@ class _HomePageState extends State<HomePage> {
 
   void _select(int i) {
     if (i == _tab) return;
-    setState(() => _tab = i);
+    setState(() {
+      _tab = i;
+      if (i == 3) _statsOpened = true;
+    });
   }
 
   bool get _canExit => _tab == 0;
 
   void _handleBack() {
-    if (_tab == 4 && (_friendsKey.currentState?.handleBack() ?? false)) return;
     if (_tab != 0) setState(() => _tab = 0);
   }
 
@@ -105,14 +108,15 @@ class _HomePageState extends State<HomePage> {
                       onLogout: widget.onLogout,
                       onAppearanceChanged: widget.onAppearanceChanged,
                       onLanguageChanged: widget.onLanguageChanged,
+                      onOpenPlans: () => _select(1),
+                      onOpenStats: () => _select(3),
                     ),
                   ),
-                  TabFade(active: _tab == 1, child: GoalsPage(state: _state)),
-                  TabFade(active: _tab == 2, child: CoachPage(state: _state)),
-                  TabFade(active: _tab == 3, child: HabitsPage(state: _state)),
+                  TabFade(active: _tab == 1, child: PlansPage(state: _state)),
+                  TabFade(active: _tab == 2, child: HabitsPage(state: _state)),
                   TabFade(
-                    active: _tab == 4,
-                    child: FriendsPage(key: _friendsKey, state: _state, active: _tab == 4),
+                    active: _tab == 3,
+                    child: _statsOpened ? StatsPage(state: _state) : const SizedBox.shrink(),
                   ),
                 ],
               ),
@@ -129,11 +133,10 @@ class _HomePageState extends State<HomePage> {
                 },
                 labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                 destinations: const [
-                  NavigationDestination(icon: Icon(LucideIcons.house), label: 'Bugun'),
-                  NavigationDestination(icon: Icon(LucideIcons.target), label: 'Maqsadlar'),
-                  NavigationDestination(icon: Icon(LucideIcons.sparkles), label: 'AI'),
+                  NavigationDestination(icon: Icon(LucideIcons.house), label: 'Asosiy'),
+                  NavigationDestination(icon: Icon(LucideIcons.calendarCheck), label: 'Rejalar'),
                   NavigationDestination(icon: Icon(LucideIcons.repeat), label: 'Odatlar'),
-                  NavigationDestination(icon: Icon(LucideIcons.users), label: "Do'stlar"),
+                  NavigationDestination(icon: Icon(LucideIcons.chartColumn), label: 'Statistika'),
                 ],
               ),
             ),

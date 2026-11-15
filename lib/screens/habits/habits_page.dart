@@ -164,7 +164,7 @@ class _HabitsPageState extends State<HabitsPage> {
                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
                 child: AppProgressBar(
                   value: due.isEmpty ? 0 : done / due.length,
-                  color: due.isNotEmpty && done == due.length ? AppPalette.success : null,
+                  color: null,
                 ),
               ),
             ],
@@ -401,7 +401,7 @@ class _HabitTile extends StatelessWidget {
                                 margin: const EdgeInsets.only(right: 4),
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: done ? AppPalette.success : (due ? scheme.surfaceContainerHighest : Colors.transparent),
+                                  color: done ? scheme.primary : (due ? scheme.surfaceContainerHighest : Colors.transparent),
                                   border: !done && !due ? Border.all(color: scheme.outlineVariant) : null,
                                 ),
                               );
@@ -455,7 +455,7 @@ class _TrackerCell extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: done
-                ? AppPalette.success
+                ? scheme.primary
                 : !due
                     ? Colors.transparent
                     : future
@@ -464,7 +464,7 @@ class _TrackerCell extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
           ),
           child: done
-              ? const Icon(LucideIcons.check, size: 14, color: Colors.white)
+              ? Icon(LucideIcons.check, size: 14, color: scheme.onPrimary)
               : !due
                   ? Container(width: 4, height: 4, decoration: BoxDecoration(color: scheme.outlineVariant, shape: BoxShape.circle))
                   : null,

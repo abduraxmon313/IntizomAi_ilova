@@ -128,7 +128,7 @@ class _GoalsPageState extends State<GoalsPage> {
                       AppProgressBar(
                         value: list.isEmpty ? 0 : done / list.length,
                         height: 6,
-                        color: list.isNotEmpty && done == list.length ? AppPalette.success : null,
+                        color: null,
                       ),
                     ],
                   ),
