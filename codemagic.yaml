@@ -1,12 +1,4 @@
 # Codemagic CI/CD — IntizomAI Flutter ilovasi.
-#
-# APK yaratish uchun:
-# 1. codemagic.io da loyihani bog'lang
-# 2. Environment variables qo'shing: API_BASE_URL
-# 3. Build boshlang — APK avtomatik yaratiladi
-#
-# Yangilash: versiya oshirib push qilsangiz, yangi APK yaratiladi.
-# Eski APK ustiga o'rnatiladi (qayta o'rnatish SHART EMAS).
 
 workflows:
   android-release:
@@ -14,8 +6,6 @@ workflows:
     max_build_duration: 30
     environment:
       flutter: stable
-      groups:
-        - app_credentials
       vars:
         API_BASE_URL: "https://your-app.up.railway.app"
     scripts:
@@ -37,37 +27,3 @@ workflows:
         notify:
           success: true
           failure: true
-
-  ios-release:
-    name: iOS Release
-    max_build_duration: 60
-    instance_type: mac_mini_m2
-    environment:
-      flutter: stable
-      xcode: latest
-      groups:
-        - app_credentials
-        - ios_signing
-      vars:
-        API_BASE_URL: "https://your-app.up.railway.app"
-    scripts:
-      - name: Get dependencies
-        script: flutter pub get
-
-      - name: Set up code signing
-        script: |
-          xcode-project use-profiles
-
-      - name: Build IPA
-        script: |
-          flutter build ipa --release \
-            --dart-define=API_BASE_URL=$API_BASE_URL \
-            --export-options-plist=/Users/builder/export_options.plist
-
-    artifacts:
-      - build/ios/ipa/*.ipa
-
-    publishing:
-      email:
-        recipients:
-          - your-email@example.com
