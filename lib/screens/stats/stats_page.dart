@@ -38,10 +38,30 @@ class _StatsPageState extends State<StatsPage> {
   String? _lbPremium;
   bool _lbLoading = false;
 
+  int _seenVersion = 0;
+
   @override
   void initState() {
     super.initState();
+    _seenVersion = s.plansVersion;
+    s.addListener(_onState);
     _load();
+  }
+
+  @override
+  void dispose() {
+    s.removeListener(_onState);
+    super.dispose();
+  }
+
+  /// Rejalar o'zgarsa (boshqa bo'limda) — statistika qayta hisoblanadi.
+  void _onState() {
+    if (s.plansVersion != _seenVersion) {
+      _seenVersion = s.plansVersion;
+      _load();
+    } else if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _load() async {
@@ -81,10 +101,9 @@ class _StatsPageState extends State<StatsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Statistika')),
-      body: Column(
+    return Column(
         children: [
+          const PageHeader(title: 'Statistika', subtitle: "Natijalaringiz va reyting"),
           Padding(
             padding: const EdgeInsets.fromLTRB(AppSpace.page, 4, AppSpace.page, 4),
             child: SegmentTabs<String>(
@@ -98,7 +117,6 @@ class _StatsPageState extends State<StatsPage> {
           ),
           Expanded(child: _view == 'mine' ? _mine() : _rating()),
         ],
-      ),
     );
   }
 
@@ -156,7 +174,7 @@ class _StatsPageState extends State<StatsPage> {
     final goalsDone = goals.where((g) => g.completed).length;
     final goalPct = goals.isEmpty ? 0 : (goalsDone * 100 / goals.length).round();
 
-    final chart = Theme.of(context).brightness == Brightness.dark ? AppPalette.brandOnDark : AppPalette.brandBright;
+    final chart = Theme.of(context).colorScheme.primary;
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -176,33 +194,34 @@ class _StatsPageState extends State<StatsPage> {
           _MetricGrid(
             items: [
               _Metric(LucideIcons.flame, '${st.streak}', 'Joriy streak', 'Eng uzuni: ${st.longestStreak} kun', AppPalette.ember),
-              _Metric(LucideIcons.star, '${st.totalScore}', 'Jami ball', '+$weekScore bu hafta'),
-              _Metric(LucideIcons.circleCheck, '$doneThisMonth', 'Bajarilgan', 'Bu oy'),
-              _Metric(LucideIcons.target, '${goals.where((g) => !g.completed).length}', 'Maqsadlar', 'Faol'),
+              _Metric(LucideIcons.star, '${st.totalScore}', 'Jami ball', '+$weekScore bu hafta', AppPalette.accentAmber),
+              _Metric(LucideIcons.circleCheck, '$doneThisMonth', 'Bajarilgan', 'Bu oy', AppPalette.accentBlue),
+              _Metric(LucideIcons.target, '${goals.where((g) => !g.completed).length}', 'Maqsadlar', 'Faol', AppPalette.accentTeal),
             ],
           ),
           const SectionBar(title: '30 kunlik tahlil'),
           _MetricGrid(
             items: [
-              _Metric(LucideIcons.trendingUp, '$rate%', 'Bajarish', '${done30.length}/${p30.length} reja'),
-              _Metric(LucideIcons.zap, '$avg', "O'rtacha ball", 'Faol kunda'),
+              _Metric(LucideIcons.trendingUp, '$rate%', 'Bajarish', '${done30.length}/${p30.length} reja', AppPalette.accentBlue),
+              _Metric(LucideIcons.zap, '$avg', "O'rtacha ball", 'Faol kunda', AppPalette.accentAmber),
               _Metric(
                 LucideIcons.award,
                 best == null ? '—' : shortDate(parseYmd(best.key) ?? today),
                 'Eng yaxshi kun',
                 best == null ? null : '+${best.value} ball',
+                AppPalette.accentViolet,
               ),
-              _Metric(LucideIcons.calendarDays, '${byDay.length}', 'Faol kunlar', '30 kun ichida'),
+              _Metric(LucideIcons.calendarDays, '${byDay.length}', 'Faol kunlar', '30 kun ichida', AppPalette.accentIndigo),
             ],
           ),
           if (habits.isNotEmpty) ...[
             const SectionBar(title: 'Odatlar'),
             _MetricGrid(
               items: [
-                _Metric(LucideIcons.squareCheck, '$habitsDoneToday/${dueToday.length}', 'Bugun', 'bajarildi'),
+                _Metric(LucideIcons.squareCheck, '$habitsDoneToday/${dueToday.length}', 'Bugun', 'bajarildi', AppPalette.accentBlue),
                 _Metric(LucideIcons.flame, '$bestStreak', 'Eng uzun streak', 'kun', AppPalette.ember),
-                _Metric(LucideIcons.repeat, '${habits.length}', 'Faol odatlar', 'ta'),
-                _Metric(LucideIcons.listChecks, '$habitTotal', 'Jami bajarilgan', 'marta'),
+                _Metric(LucideIcons.repeat, '${habits.length}', 'Faol odatlar', 'ta', AppPalette.accentTeal),
+                _Metric(LucideIcons.listChecks, '$habitTotal', 'Jami bajarilgan', 'marta', AppPalette.accentViolet),
               ],
             ),
           ],

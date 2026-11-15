@@ -13,6 +13,7 @@ import '../../utils/dates.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/feedback.dart';
 import '../../widgets/ui_kit.dart';
+import '../achievements/achievements_page.dart';
 
 const _referralText = "Siz intizomlimisiz?\n\n"
     "Ko'pchilik maqsad qo'yadi, reja tuzadi, lekin oxirigacha yetib bormaydi.\n\n"
@@ -209,7 +210,7 @@ class _ProfilePageState extends State<ProfilePage> {
           await Future.wait([s.refreshProfile(), s.refreshStats(), _load()]);
         },
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(AppSpace.lg, 4, AppSpace.lg, 40),
+          padding: const EdgeInsets.fromLTRB(AppSpace.page, 4, AppSpace.page, 40),
           children: [
             // ── Shaxs ──────────────────────────────
             Padding(
@@ -363,16 +364,17 @@ class _ProfilePageState extends State<ProfilePage> {
 
             // ── Yutuqlar ───────────────────────────
             const SectionBar(title: 'Yutuqlar'),
-            _Achievements(streak: st.streak, score: st.totalScore, goalsDone: s.goals.where((g) => g.completed).length),
+            AchievementGrid(items: achievementMilestones(st.streak, st.totalScore, s.goals.where((g) => g.completed).length)),
 
             // ── Hisob ──────────────────────────────
             const SectionBar(title: 'Hisob'),
             GroupCard(
               children: [
-                SettingTile(icon: LucideIcons.userRound, title: 'Ism', subtitle: p.fullName, onTap: _editName),
-                SettingTile(icon: LucideIcons.camera, title: 'Profil rasmi', subtitle: 'Galereya yoki kamera', onTap: _changePhoto),
+                SettingTile(icon: LucideIcons.userRound, accent: AppPalette.accentBlue, title: 'Ism', subtitle: p.fullName, onTap: _editName),
+                SettingTile(icon: LucideIcons.camera, accent: AppPalette.accentViolet, title: 'Profil rasmi', subtitle: 'Galereya yoki kamera', onTap: _changePhoto),
                 SettingTile(
                   icon: LucideIcons.gift,
+                  accent: AppPalette.accentRose,
                   title: "Do'stni taklif qilish",
                   subtitle: p.referralCount > 0
                       ? "${p.referralCount} ta do'st qo'shildi"
@@ -388,6 +390,7 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 SettingTile(
                   icon: LucideIcons.moon,
+                  accent: AppPalette.accentIndigo,
                   title: 'Tungi rejim',
                   trailing: Switch(
                     value: dark,
@@ -396,6 +399,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 SettingTile(
                   icon: LucideIcons.bell,
+                  accent: AppPalette.accentAmber,
                   title: 'Eslatmalar',
                   subtitle: 'Reja va odat vaqtida Telegram xabari',
                   trailing: Switch(value: p.notificationsEnabled, onChanged: _setNotifications),
@@ -409,18 +413,21 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 SettingTile(
                   icon: LucideIcons.megaphone,
+                  accent: AppPalette.accentBlue,
                   title: 'Telegram kanal',
                   subtitle: 'Yangiliklar va maslahatlar',
                   onTap: () => _open('https://t.me/Intizom_AI'),
                 ),
                 SettingTile(
                   icon: LucideIcons.messageCircle,
+                  accent: AppPalette.accentTeal,
                   title: "Qo'llab-quvvatlash",
                   subtitle: 'Savol va takliflar',
                   onTap: () => _open('https://t.me/IntizomAI_Admin_bot'),
                 ),
                 SettingTile(
                   icon: LucideIcons.atSign,
+                  accent: AppPalette.accentRose,
                   title: 'Instagram',
                   subtitle: '@intizomai.uz',
                   onTap: () => _open('https://www.instagram.com/intizomai.uz'),
@@ -538,65 +545,6 @@ class _SubscriptionCard extends StatelessWidget {
           ],
         ],
       ),
-    );
-  }
-}
-
-class _Achievements extends StatelessWidget {
-  const _Achievements({required this.streak, required this.score, required this.goalsDone});
-
-  final int streak;
-  final int score;
-  final int goalsDone;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final list = [
-      (LucideIcons.flame, '3 kun', 'Seriya', streak >= 3, streak / 3),
-      (LucideIcons.zap, '7 kun', 'Seriya', streak >= 7, streak / 7),
-      (LucideIcons.gem, '30 kun', 'Seriya', streak >= 30, streak / 30),
-      (LucideIcons.target, '10 ta', 'Maqsad', goalsDone >= 10, goalsDone / 10),
-      (LucideIcons.trophy, '100', 'Ball', score >= 100, score / 100),
-      (LucideIcons.crown, '500', 'Ball', score >= 500, score / 500),
-    ];
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 1,
-      children: [
-        for (final (icon, value, label, unlocked, progress) in list)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerLowest,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(color: scheme.outlineVariant),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(icon, size: 20, color: unlocked ? scheme.primary : scheme.outline),
-                const Spacer(),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -.4,
-                    color: unlocked ? scheme.onSurface : scheme.onSurfaceVariant,
-                  ),
-                ),
-                Text(label, style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant)),
-                const SizedBox(height: 8),
-                AppProgressBar(value: progress.clamp(0, 1).toDouble(), height: 3, color: unlocked ? AppPalette.success : null),
-              ],
-            ),
-          ),
-      ],
     );
   }
 }

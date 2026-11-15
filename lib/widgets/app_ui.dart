@@ -97,14 +97,20 @@ class AppIconTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final accent = _accent;
-    final bg = accent != null ? accent.withValues(alpha: dark ? .18 : .1) : (background ?? scheme.surfaceContainerLow);
+    final bg = accent != null ? accent.withValues(alpha: dark ? .16 : .09) : (background ?? scheme.surfaceContainerLow);
     final fg = accent != null
-        ? (dark ? Color.lerp(accent, Colors.white, .3)! : accent)
+        ? (dark ? Color.lerp(accent, Colors.white, .35)! : accent)
         : (color ?? scheme.onSurfaceVariant);
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(size * .3)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(size >= 44 ? AppRadius.md : AppRadius.sm),
+        border: Border.all(
+          color: accent != null ? accent.withValues(alpha: dark ? .22 : .14) : scheme.outlineVariant.withValues(alpha: .7),
+        ),
+      ),
       child: Icon(icon, size: iconSize ?? size * .48, color: fg),
     );
   }
@@ -176,7 +182,7 @@ class ScoreRing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final c = color ?? (Theme.of(context).brightness == Brightness.dark ? AppPalette.brandOnDark : AppPalette.brandBright);
+    final c = color ?? scheme.primary;
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: value / 100),
       duration: AppMotion.slow,
@@ -289,19 +295,42 @@ class HabitGlyph extends StatelessWidget {
   final double size;
   final bool done;
 
+  static const _accents = [
+    AppPalette.accentBlue,
+    AppPalette.accentTeal,
+    AppPalette.accentViolet,
+    AppPalette.accentAmber,
+    AppPalette.accentRose,
+    AppPalette.accentIndigo,
+  ];
+
+  /// Har bir belgi uchun doimiy rang (MyFit kategoriya aksentlari).
+  static Color accentFor(String icon) {
+    final k = icon.trim();
+    var h = 0;
+    for (final c in k.runes) {
+      h = (h * 31 + c) & 0x7fffffff;
+    }
+    return _accents[h % _accents.length];
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final glyph = habitGlyphs[icon.trim()];
-    final fg = done ? AppPalette.success : scheme.onSurface;
+    final accent = accentFor(icon);
+    final fg = done ? scheme.onPrimary : (dark ? Color.lerp(accent, Colors.white, .35)! : accent);
+    final radius = BorderRadius.circular(size >= 44 ? AppRadius.md : AppRadius.sm);
     return AnimatedContainer(
       duration: AppMotion.base,
       width: size,
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: done ? AppPalette.success.withValues(alpha: .1) : scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(size * .3),
+        color: done ? scheme.primary : accent.withValues(alpha: dark ? .16 : .09),
+        borderRadius: radius,
+        border: Border.all(color: done ? scheme.primary : accent.withValues(alpha: dark ? .22 : .14)),
       ),
       child: glyph != null
           ? Icon(glyph, size: size * .48, color: fg)

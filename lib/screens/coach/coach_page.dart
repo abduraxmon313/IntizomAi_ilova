@@ -94,9 +94,15 @@ class _CoachPageState extends State<CoachPage> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpace.page, 12, 10, 12),
+          padding: EdgeInsets.fromLTRB(Navigator.of(context).canPop() ? 6 : AppSpace.page, 12, 10, 12),
           child: Row(
             children: [
+              if (Navigator.of(context).canPop())
+                IconButton(
+                  tooltip: 'Orqaga',
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: Icon(LucideIcons.chevronLeft, color: scheme.onSurface),
+                ),
               const BrandMark(size: 34),
               const SizedBox(width: 12),
               Expanded(

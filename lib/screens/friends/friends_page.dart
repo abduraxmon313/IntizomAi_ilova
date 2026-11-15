@@ -1071,20 +1071,21 @@ class _GroupMonogram extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final t = name.trim();
+    final accent = HabitGlyph.accentFor(t);
     return Container(
       width: 40,
       height: 40,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: scheme.outlineVariant),
+        color: accent.withValues(alpha: dark ? .16 : .09),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: accent.withValues(alpha: dark ? .22 : .14)),
       ),
       child: Text(
         t.isEmpty ? '#' : t.characters.first.toUpperCase(),
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: dark ? Color.lerp(accent, Colors.white, .35) : accent),
       ),
     );
   }
@@ -1102,4 +1103,32 @@ class _ItemGlyph extends StatelessWidget {
         ? Icon(g, size: 17, color: Theme.of(context).colorScheme.onSurfaceVariant)
         : Text(icon, style: const TextStyle(fontSize: 15));
   }
+}
+
+/// Do'stlar bo'limi alohida sahifa sifatida (Asosiy → Tezkor kirish).
+/// Orqaga: a'zo → guruh → ro'yxat → Asosiy.
+class FriendsRoute extends StatefulWidget {
+  const FriendsRoute({super.key, required this.state});
+
+  final AppState state;
+
+  @override
+  State<FriendsRoute> createState() => _FriendsRouteState();
+}
+
+class _FriendsRouteState extends State<FriendsRoute> {
+  final _key = GlobalKey<FriendsPageState>();
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: false,
+    onPopInvokedWithResult: (didPop, _) {
+      if (didPop) return;
+      if (_key.currentState?.handleBack() ?? false) return;
+      Navigator.of(context).pop();
+    },
+    child: Scaffold(
+      body: SafeArea(child: FriendsPage(key: _key, state: widget.state, active: true)),
+    ),
+  );
 }
