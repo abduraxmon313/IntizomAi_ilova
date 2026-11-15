@@ -7,10 +7,7 @@ import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 
-/// Telegram orqali kirish.
-///
-/// Tugma bosilganda bot ochiladi; foydalanuvchi botda "Tasdiqlash"ni bosadi,
-/// ilova esa tasdiqni o'zi kutib oladi (token nusxalash shart emas).
+/// Telegram orqali kirish — logo rasm bilan (emoji o'rniga).
 class LoginPage extends StatefulWidget {
   const LoginPage({
     super.key,
@@ -50,7 +47,6 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  // Telegram'dan qaytganda darhol tekshiramiz.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _nonce != null) _pollOnce();
@@ -79,7 +75,8 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   Future<void> _pollOnce() async {
     final nonce = _nonce;
     if (nonce == null || _polling) return;
-    if (_startedAt != null && DateTime.now().difference(_startedAt!) > _giveUpAfter) {
+    if (_startedAt != null &&
+        DateTime.now().difference(_startedAt!) > _giveUpAfter) {
       _stop('Vaqt tugadi. Qaytadan urinib ko\'ring.');
       return;
     }
@@ -91,8 +88,6 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
         _timer?.cancel();
         widget.onLoginSuccess();
       }
-      // 'pending' va 'expired' (bot hali so'rovni yozmagan bo'lishi mumkin) —
-      // kutishda davom etamiz; 10 daqiqadan keyin to'xtaydi.
     } on ApiException catch (e) {
       if (e.statusCode != 0 && e.statusCode != 429) _stop(e.message);
     } finally {
@@ -123,25 +118,35 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
               constraints: const BoxConstraints(maxWidth: 400),
               child: Column(
                 children: [
-                  Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
-                      color: scheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(24),
+                  // Logo rasm (emoji o'rniga)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      width: 100,
+                      height: 100,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: scheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text('🎯', style: TextStyle(fontSize: 42)),
+                      ),
                     ),
-                    alignment: Alignment.center,
-                    child: const Text('🎯', style: TextStyle(fontSize: 42)),
                   ),
                   const SizedBox(height: 28),
-                  Text('IntizomAI', style: Theme.of(context).textTheme.headlineMedium),
+                  Text('IntizomAI',
+                      style: Theme.of(context).textTheme.headlineMedium),
                   const SizedBox(height: 8),
                   Text(
                     context.tr('O\'z intizomingizni nazorat qiling'),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
+                          color: scheme.onSurfaceVariant,
+                        ),
                   ),
                   const SizedBox(height: 40),
                   SizedBox(
@@ -169,7 +174,8 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                     _WaitingCard(scheme: scheme)
                   else
                     Text(
-                      context.tr('Botda «Tasdiqlash» tugmasini bosasiz — ilova o\'zi ochiladi.'),
+                      context.tr(
+                          'Botda «Tasdiqlash» tugmasini bosasiz — ilova o\'zi ochiladi.'),
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
@@ -184,7 +190,8 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                       ),
                       child: Text(
                         _error!,
-                        style: const TextStyle(fontSize: 13, color: AppPalette.danger),
+                        style: const TextStyle(
+                            fontSize: 13, color: AppPalette.danger),
                       ),
                     ),
                   ],
@@ -197,7 +204,8 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                     ],
                     selected: {AppLocalizations.of(context).languageCode},
                     showSelectedIcon: false,
-                    onSelectionChanged: (s) => widget.onLanguageChanged?.call(s.first),
+                    onSelectionChanged: (s) =>
+                        widget.onLanguageChanged?.call(s.first),
                   ),
                 ],
               ),
@@ -233,8 +241,10 @@ class _WaitingCard extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(
             child: Text(
-              context.tr('Botda «✅ Ilovaga kirishni tasdiqlash» tugmasini bosing, so\'ng shu yerga qayting.'),
-              style: TextStyle(fontSize: 13, color: scheme.onSurface, height: 1.4),
+              context.tr(
+                  'Botda «✅ Ilovaga kirishni tasdiqlash» tugmasini bosing, so\'ng shu yerga qayting.'),
+              style: TextStyle(
+                  fontSize: 13, color: scheme.onSurface, height: 1.4),
             ),
           ),
         ],
