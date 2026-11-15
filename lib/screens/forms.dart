@@ -6,6 +6,7 @@ import '../models/habit.dart';
 import '../models/plan.dart';
 import '../services/intizom_api.dart';
 import '../utils/dates.dart';
+import '../widgets/app_ui.dart';
 import '../widgets/feedback.dart';
 import '../widgets/ui_kit.dart';
 
@@ -63,6 +64,7 @@ Future<bool> showPlanForm(
           controller: title,
           autofocus: plan == null,
           textCapitalization: TextCapitalization.sentences,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500, letterSpacing: -.3),
           decoration: const InputDecoration(hintText: 'Nima qilasiz?'),
         ),
         const SizedBox(height: 10),
@@ -73,7 +75,7 @@ Future<bool> showPlanForm(
           textCapitalization: TextCapitalization.sentences,
           decoration: const InputDecoration(hintText: 'Izoh (ixtiyoriy)'),
         ),
-        const SizedBox(height: 12),
+        const FieldLabel('Qachon'),
         Row(
           children: [
             Expanded(
@@ -160,25 +162,11 @@ Future<bool> showHabitForm(
     builder: (ctx, setSheet) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const FieldLabel('Belgi'),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (final e in habitIcons)
-              ChoiceChipBox(
-                size: 40,
-                selected: e == icon,
-                onTap: () => setSheet(() => icon = e),
-                child: Text(e, style: const TextStyle(fontSize: 19)),
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
         TextField(
           controller: title,
           autofocus: habit == null,
           textCapitalization: TextCapitalization.sentences,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500, letterSpacing: -.3),
           decoration: const InputDecoration(hintText: 'Odat nomi (masalan: Kitob o\'qish)'),
         ),
         const SizedBox(height: 10),
@@ -188,6 +176,22 @@ Future<bool> showHabitForm(
           maxLines: 3,
           textCapitalization: TextCapitalization.sentences,
           decoration: const InputDecoration(hintText: 'Izoh (ixtiyoriy)'),
+        ),
+        const FieldLabel('Belgi'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final e in habitIcons)
+              ChoiceChipBox(
+                size: 42,
+                selected: e == icon,
+                onTap: () => setSheet(() => icon = e),
+                child: habitGlyphs[e] != null
+                    ? Icon(habitGlyphs[e], size: 19)
+                    : Text(e, style: const TextStyle(fontSize: 18)),
+              ),
+          ],
         ),
         const FieldLabel('Takrorlanish'),
         SegmentTabs<String>(
@@ -322,7 +326,8 @@ Future<bool> showGoalForm(
           controller: title,
           autofocus: goal == null,
           textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(hintText: 'Maqsad'),
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500, letterSpacing: -.3),
+          decoration: const InputDecoration(hintText: 'Qanday natijaga erishmoqchisiz?'),
         ),
         const SizedBox(height: 10),
         TextField(

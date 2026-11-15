@@ -203,127 +203,161 @@ class _ProfilePageState extends State<ProfilePage> {
     final st = s.stats;
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil va sozlamalar')),
+      appBar: AppBar(title: const Text('Profil')),
       body: RefreshIndicator(
         onRefresh: () async {
           await Future.wait([s.refreshProfile(), s.refreshStats(), _load()]);
         },
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+          padding: const EdgeInsets.fromLTRB(AppSpace.lg, 4, AppSpace.lg, 40),
           children: [
-            // ── Profil ─────────────────────────────
-            AppCard(
-              padding: const EdgeInsets.all(16),
-              child: Column(
+            // ── Shaxs ──────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 4, 20),
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: _changePhoto,
-                        child: Stack(
-                          children: [
-                            ProfileAvatar(url: p.avatar, telegramId: p.telegramId, name: p.fullName, size: 64),
-                            Positioned(
-                              right: 0,
-                              bottom: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: scheme.surfaceContainerLowest,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: scheme.outlineVariant),
-                                ),
-                                child: Icon(LucideIcons.camera, size: 12, color: scheme.onSurface),
-                              ),
+                  GestureDetector(
+                    onTap: _changePhoto,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        ProfileAvatar(url: p.avatar, telegramId: p.telegramId, name: p.fullName, size: 72),
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: scheme.surfaceContainerLowest,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: scheme.outlineVariant),
                             ),
-                          ],
+                            child: Icon(LucideIcons.camera, size: 13, color: scheme.onSurface),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(p.fullName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -.3)),
-                            if (p.username?.isNotEmpty == true)
-                              Text('@${p.username}', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${st.rankTitle} · ${st.level}-daraja',
-                              style: TextStyle(fontSize: 12.5, color: scheme.primary, fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 14),
-                  Divider(height: 1, color: scheme.outlineVariant),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      _HeroStat(value: '${st.streak}', label: 'Streak'),
-                      _HeroStat(value: '${st.totalScore}', label: 'Ball'),
-                      _HeroStat(value: '${st.longestStreak}', label: 'Eng uzun'),
-                      _HeroStat(value: '${st.perfectDays}', label: 'Mukammal kun'),
-                    ],
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          p.fullName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -.7, height: 1.2),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            if (p.username?.isNotEmpty == true) ...[
+                              Text('@${p.username}', style: TextStyle(fontSize: 13.5, color: scheme.onSurfaceVariant)),
+                              const SizedBox(width: 8),
+                            ],
+                            if (st.isPremium) const Pill('Premium', color: AppPalette.gold),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ],
+              ),
+            ),
+            AppCard(
+              padding: EdgeInsets.zero,
+              child: IntrinsicHeight(
+                child: Row(
+                  children: [
+                    _HeroStat(value: '${st.level}', label: st.rankTitle),
+                    VerticalDivider(width: 1, color: scheme.outlineVariant),
+                    _HeroStat(value: '${st.streak}', label: 'seriya'),
+                    VerticalDivider(width: 1, color: scheme.outlineVariant),
+                    _HeroStat(value: '${st.longestStreak}', label: 'rekord'),
+                    VerticalDivider(width: 1, color: scheme.outlineVariant),
+                    _HeroStat(value: '${st.totalScore}', label: 'ball'),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 12),
             _SubscriptionCard(sub: _sub, isPremium: st.isPremium),
 
             // ── Bugungi holat ──────────────────────
-            const SectionBar(title: 'Bugungi kayfiyat'),
-            Row(
-              children: [
-                for (final (emoji, label) in const [
-                  ('🔥', 'Olovli'),
-                  ('💪', 'Kuchli'),
-                  ('😐', 'Oddiy'),
-                  ('😴', 'Charchagan'),
-                  ('😞', 'Past'),
-                ])
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: ChoiceChipBox(
-                        selected: _checkin.mood == emoji,
-                        onTap: () => _saveCheckin(mood: emoji),
-                        child: Column(
-                          children: [
-                            Text(emoji, style: const TextStyle(fontSize: 20)),
-                            const SizedBox(height: 2),
-                            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5)),
-                          ],
+            const SectionBar(title: 'Bugungi holat'),
+            AppCard(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Kayfiyat', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      for (final (emoji, icon, label) in _moods)
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            child: ChoiceChipBox(
+                              selected: _checkin.mood == emoji,
+                              onTap: () => _saveCheckin(mood: emoji),
+                              child: Column(
+                                children: [
+                                  Icon(icon, size: 20),
+                                  const SizedBox(height: 6),
+                                  Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                    ],
                   ),
-              ],
-            ),
-            const SectionBar(title: 'Energiya darajasi'),
-            Row(
-              children: [
-                for (var e = 1; e <= 5; e++)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: ChoiceChipBox(
-                        selected: _checkin.energy == e,
-                        onTap: () => _saveCheckin(energy: e),
-                        child: Text('$e', style: const TextStyle(fontSize: 15)),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Text('Energiya', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant)),
+                      const Spacer(),
+                      Text(
+                        _checkin.energy == null ? 'Tanlanmagan' : '${_checkin.energy} / 5',
+                        style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
                       ),
-                    ),
+                    ],
                   ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 6, left: 4),
-              child: Text(
-                'AI Coach kayfiyat va energiyangizni hisobga olib maslahat beradi.',
-                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      for (var e = 1; e <= 5; e++)
+                        Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              tapFeedback();
+                              _saveCheckin(energy: e);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 3),
+                              child: AnimatedContainer(
+                                duration: AppMotion.fast,
+                                height: 14.0 + e * 6,
+                                decoration: BoxDecoration(
+                                  color: (_checkin.energy ?? 0) >= e ? scheme.primary : scheme.surfaceContainerHigh,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    "AI murabbiy holatingizni hisobga olib maslahat beradi.",
+                    style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
+                  ),
+                ],
               ),
             ),
 
@@ -331,28 +365,20 @@ class _ProfilePageState extends State<ProfilePage> {
             const SectionBar(title: 'Yutuqlar'),
             _Achievements(streak: st.streak, score: st.totalScore, goalsDone: s.goals.where((g) => g.completed).length),
 
-            // ── Taklif ─────────────────────────────
-            const SectionBar(title: "Do'stlarni taklif qilish"),
-            GroupCard(
-              children: [
-                SettingTile(
-                  icon: LucideIcons.gift,
-                  accent: AppPalette.accentRose,
-                  title: "Do'stni taklif qilish",
-                  subtitle: p.referralCount > 0
-                      ? "${p.referralCount} ta faol do'st taklif qilingan"
-                      : "Do'stingiz birinchi rejasini bajarsa — unga 3 kun, sizga har 5 do'stga 7 kun Premium",
-                  onTap: _shareInvite,
-                ),
-              ],
-            ),
-
             // ── Hisob ──────────────────────────────
             const SectionBar(title: 'Hisob'),
             GroupCard(
               children: [
-                SettingTile(icon: LucideIcons.pencil, title: 'Ismni tahrirlash', subtitle: p.fullName, onTap: _editName),
-                SettingTile(icon: LucideIcons.camera, title: 'Profil rasmini o\'zgartirish', onTap: _changePhoto),
+                SettingTile(icon: LucideIcons.userRound, title: 'Ism', subtitle: p.fullName, onTap: _editName),
+                SettingTile(icon: LucideIcons.camera, title: 'Profil rasmi', subtitle: 'Galereya yoki kamera', onTap: _changePhoto),
+                SettingTile(
+                  icon: LucideIcons.gift,
+                  title: "Do'stni taklif qilish",
+                  subtitle: p.referralCount > 0
+                      ? "${p.referralCount} ta do'st qo'shildi"
+                      : "Har 5 faol do'st uchun 7 kun Premium",
+                  onTap: _shareInvite,
+                ),
               ],
             ),
 
@@ -362,25 +388,23 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 SettingTile(
                   icon: LucideIcons.moon,
-                  accent: AppPalette.accentIndigo,
                   title: 'Tungi rejim',
-                  trailing: Switch.adaptive(
+                  trailing: Switch(
                     value: dark,
                     onChanged: (v) => widget.onAppearanceChanged(v ? 'dark' : 'light'),
                   ),
                 ),
                 SettingTile(
                   icon: LucideIcons.bell,
-                  accent: AppPalette.accentAmber,
-                  title: 'Bot eslatmalari',
+                  title: 'Eslatmalar',
                   subtitle: 'Reja va odat vaqtida Telegram xabari',
-                  trailing: Switch.adaptive(value: p.notificationsEnabled, onChanged: _setNotifications),
+                  trailing: Switch(value: p.notificationsEnabled, onChanged: _setNotifications),
                 ),
               ],
             ),
 
             // ── Aloqa ──────────────────────────────
-            const SectionBar(title: 'Aloqa'),
+            const SectionBar(title: 'Yordam'),
             GroupCard(
               children: [
                 SettingTile(
@@ -391,30 +415,31 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 SettingTile(
                   icon: LucideIcons.messageCircle,
-                  title: 'Admin bilan bog\'lanish',
-                  subtitle: 'Savol, taklif va yordam',
+                  title: "Qo'llab-quvvatlash",
+                  subtitle: 'Savol va takliflar',
                   onTap: () => _open('https://t.me/IntizomAI_Admin_bot'),
                 ),
                 SettingTile(
-                  icon: LucideIcons.camera,
-                  accent: AppPalette.accentRose,
+                  icon: LucideIcons.atSign,
                   title: 'Instagram',
                   subtitle: '@intizomai.uz',
                   onTap: () => _open('https://www.instagram.com/intizomai.uz'),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             GroupCard(
               children: [
                 SettingTile(icon: LucideIcons.logOut, title: 'Hisobdan chiqish', danger: true, onTap: _logout),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
+            const Center(child: BrandMark(size: 28)),
+            const SizedBox(height: 8),
             Text(
-              'IntizomAI · Telegram ID ${p.telegramId}',
+              'IntizomAI · ID ${p.telegramId}',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
             ),
           ],
         ),
@@ -423,6 +448,15 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 }
 
+/// Kayfiyat: serverga emoji yuboriladi (AI konteksti uchun), ilovada ikonka.
+const _moods = [
+  ('🔥', LucideIcons.flame, "A'lo"),
+  ('💪', LucideIcons.zap, 'Kuchli'),
+  ('😐', LucideIcons.meh, 'Oddiy'),
+  ('😴', LucideIcons.moon, 'Charchoq'),
+  ('😞', LucideIcons.frown, 'Past'),
+];
+
 class _HeroStat extends StatelessWidget {
   const _HeroStat({required this.value, required this.label});
   final String value;
@@ -430,16 +464,20 @@ class _HeroStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Expanded(
-    child: Column(
-      children: [
-        Text(value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
-        ),
-      ],
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+      child: Column(
+        children: [
+          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -.5, fontFeatures: tabularFigures)),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11.5, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -457,27 +495,24 @@ class _SubscriptionCard extends StatelessWidget {
     final until = parseYmd(sub?.premiumUntil);
     final days = sub?.daysLeft ?? 0;
     return AppCard(
-      onTap: openPremiumInBot,
-      padding: const EdgeInsets.all(14),
+      onTap: premium ? openPremiumInBot : () => showPremiumDialog(context, "Barcha imkoniyatlarni oching."),
+      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              AppIconTile.tinted(
-                icon: premium ? LucideIcons.crown : LucideIcons.gem,
-                accent: AppPalette.levelGold,
-                size: 38,
-              ),
+              AppIconTile.tinted(icon: premium ? LucideIcons.crown : LucideIcons.sparkles, accent: AppPalette.gold, size: 38),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      premium ? 'Premium faol' : 'Bepul rejim',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      premium ? 'Premium faol' : 'Bepul tarif',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -.2),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       premium
                           ? [
@@ -485,24 +520,22 @@ class _SubscriptionCard extends StatelessWidget {
                               '$days kun qoldi',
                               if (until != null) '${shortDate(until)} gacha',
                             ].join(' · ')
-                          : "Cheksiz reja, odat, maqsad, AI va Do'stlar",
-                      style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
+                          : "Cheklovsiz reja, AI va Do'stlar",
+                      style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                     ),
                   ],
                 ),
               ),
               Text(
-                premium ? 'Uzaytirish' : 'Olish',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: scheme.primary),
+                premium ? 'Uzaytirish' : 'Ochish',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: scheme.primary),
               ),
             ],
           ),
           if (premium && days > 0) ...[
-            const SizedBox(height: 12),
-            AppProgressBar(value: (days / 30).clamp(0, 1).toDouble(), color: AppPalette.levelGold, height: 5),
+            const SizedBox(height: 14),
+            AppProgressBar(value: (days / 30).clamp(0, 1).toDouble(), color: AppPalette.gold),
           ],
-          const SizedBox(height: 8),
-          Text('To\'lov Telegram bot orqali amalga oshiriladi.', style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant)),
         ],
       ),
     );
@@ -520,41 +553,47 @@ class _Achievements extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final list = [
-      (LucideIcons.flame, AppPalette.streakOrange, 'Olov', '3 kun streak', streak >= 3),
-      (LucideIcons.zap, AppPalette.accentAmber, 'Yashin', '7 kun streak', streak >= 7),
-      (LucideIcons.gem, AppPalette.accentViolet, 'Olmos', '30 kun streak', streak >= 30),
-      (LucideIcons.target, AppPalette.accentBlue, 'Aniq', '10 maqsad', goalsDone >= 10),
-      (LucideIcons.trophy, AppPalette.levelGold, 'Chempion', '100 ball', score >= 100),
-      (LucideIcons.crown, AppPalette.accentRose, 'Qirol', '500 ball', score >= 500),
+      (LucideIcons.flame, '3 kun', 'Seriya', streak >= 3, streak / 3),
+      (LucideIcons.zap, '7 kun', 'Seriya', streak >= 7, streak / 7),
+      (LucideIcons.gem, '30 kun', 'Seriya', streak >= 30, streak / 30),
+      (LucideIcons.target, '10 ta', 'Maqsad', goalsDone >= 10, goalsDone / 10),
+      (LucideIcons.trophy, '100', 'Ball', score >= 100, score / 100),
+      (LucideIcons.crown, '500', 'Ball', score >= 500, score / 500),
     ];
     return GridView.count(
       crossAxisCount: 3,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 8,
-      crossAxisSpacing: 8,
-      childAspectRatio: 1.05,
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 1,
       children: [
-        for (final (icon, color, title, hint, unlocked) in list)
-          Opacity(
-            opacity: unlocked ? 1 : .45,
-            child: Container(
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerLowest,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(color: scheme.outlineVariant),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  unlocked
-                      ? AppIconTile.tinted(icon: icon, accent: color, size: 36)
-                      : const AppIconTile(icon: LucideIcons.lock, size: 36),
-                  const SizedBox(height: 8),
-                  Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  Text(hint, style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
-                ],
-              ),
+        for (final (icon, value, label, unlocked, progress) in list)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, size: 20, color: unlocked ? scheme.primary : scheme.outline),
+                const Spacer(),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -.4,
+                    color: unlocked ? scheme.onSurface : scheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(label, style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant)),
+                const SizedBox(height: 8),
+                AppProgressBar(value: progress.clamp(0, 1).toDouble(), height: 3, color: unlocked ? AppPalette.success : null),
+              ],
             ),
           ),
       ],

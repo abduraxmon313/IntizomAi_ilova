@@ -3,7 +3,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../services/intizom_api.dart';
 import '../state/app_state.dart';
+import '../widgets/app_ui.dart';
 import '../widgets/feedback.dart';
+import '../widgets/ui_kit.dart';
 import 'coach/coach_page.dart';
 import 'dashboard/dashboard_page.dart';
 import 'friends/friends_page.dart';
@@ -67,7 +69,18 @@ class _HomePageState extends State<HomePage> {
       listenable: _state,
       builder: (context, _) {
         if (_state.loading) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  BrandMark(size: 56),
+                  SizedBox(height: 24),
+                  SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
+                ],
+              ),
+            ),
+          );
         }
         if (_state.profile == null) {
           return Scaffold(
@@ -85,31 +98,44 @@ class _HomePageState extends State<HomePage> {
               child: IndexedStack(
                 index: _tab,
                 children: [
-                  DashboardPage(
-                    state: _state,
-                    onLogout: widget.onLogout,
-                    onAppearanceChanged: widget.onAppearanceChanged,
-                    onLanguageChanged: widget.onLanguageChanged,
+                  TabFade(
+                    active: _tab == 0,
+                    child: DashboardPage(
+                      state: _state,
+                      onLogout: widget.onLogout,
+                      onAppearanceChanged: widget.onAppearanceChanged,
+                      onLanguageChanged: widget.onLanguageChanged,
+                    ),
                   ),
-                  GoalsPage(state: _state),
-                  CoachPage(state: _state),
-                  HabitsPage(state: _state),
-                  FriendsPage(key: _friendsKey, state: _state, active: _tab == 4),
+                  TabFade(active: _tab == 1, child: GoalsPage(state: _state)),
+                  TabFade(active: _tab == 2, child: CoachPage(state: _state)),
+                  TabFade(active: _tab == 3, child: HabitsPage(state: _state)),
+                  TabFade(
+                    active: _tab == 4,
+                    child: FriendsPage(key: _friendsKey, state: _state, active: _tab == 4),
+                  ),
                 ],
               ),
             ),
-            bottomNavigationBar: NavigationBar(
-              selectedIndex: _tab,
-              onDestinationSelected: _select,
-              height: 66,
-              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-              destinations: const [
-                NavigationDestination(icon: Icon(LucideIcons.house), label: 'Asosiy'),
-                NavigationDestination(icon: Icon(LucideIcons.target), label: 'Maqsad'),
-                NavigationDestination(icon: Icon(LucideIcons.sparkles), label: 'AI'),
-                NavigationDestination(icon: Icon(LucideIcons.squareCheck), label: 'Odat'),
-                NavigationDestination(icon: Icon(LucideIcons.users), label: "Do'stlar"),
-              ],
+            bottomNavigationBar: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+              ),
+              child: NavigationBar(
+                selectedIndex: _tab,
+                onDestinationSelected: (i) {
+                  tapFeedback();
+                  _select(i);
+                },
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                destinations: const [
+                  NavigationDestination(icon: Icon(LucideIcons.house), label: 'Bugun'),
+                  NavigationDestination(icon: Icon(LucideIcons.target), label: 'Maqsadlar'),
+                  NavigationDestination(icon: Icon(LucideIcons.sparkles), label: 'AI'),
+                  NavigationDestination(icon: Icon(LucideIcons.repeat), label: 'Odatlar'),
+                  NavigationDestination(icon: Icon(LucideIcons.users), label: "Do'stlar"),
+                ],
+              ),
             ),
           ),
         );
