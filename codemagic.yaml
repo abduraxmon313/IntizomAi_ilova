@@ -10,7 +10,8 @@ workflows:
         API_BASE_URL: "https://your-app.up.railway.app"
     scripts:
       - name: Get dependencies
-        script: flutter pub get
+        script: |
+          flutter pub get
 
       - name: Build APK
         script: |
