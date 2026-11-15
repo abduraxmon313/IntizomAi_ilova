@@ -32,7 +32,7 @@ workflows:
             exit 1
           fi
           if [ -z "$ANDROID_KEYSTORE_PASSWORD" ]; then
-            echo "XATO: 'intizomai' guruhida ANDROID_KEYSTORE_PASSWORD yo'q."
+            echo "XATO: 'IntizomAi' guruhida ANDROID_KEYSTORE_PASSWORD yo'q."
             echo "Kalitsiz yig'ilgan APK eski ilova ustiga o'rnatilmaydi."
             exit 1
           fi
