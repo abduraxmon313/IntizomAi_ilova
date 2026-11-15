@@ -75,7 +75,8 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
   void initState() {
     super.initState();
     _themeMode = widget.initialAppearance == 'dark' ? ThemeMode.dark : ThemeMode.light;
-    if (widget.initialLocale != null) _locale = Locale(widget.initialLocale!);
+    // Ilova hozircha faqat o'zbek tilida (matnlar to'liq tarjima qilinmagan).
+    _locale = const Locale('uz');
     _loggedIn = widget.loggedIn;
 
     _client = ApiClient(authStore: widget.authStore);

@@ -4,12 +4,12 @@ import 'package:flutter/services.dart';
 /// IntizomAI dizayn tokenlari. MyFit uslubidagi professional,
 /// toza ranglar — multfilm emas, jiddiy va zamonaviy.
 abstract final class AppPalette {
-  // Brend / aksent — IntizomAI uchun chuqur ko'k va yashil
+  // Brend / aksent — MyFit bilan bir xil ko'k.
   static const navy = Color(0xFF0B1324);
   static const navySoft = Color(0xFF1E293B);
-  static const primary = Color(0xFF1A73E8);       // professional ko'k
-  static const primarySoft = Color(0xFFE8F0FE);
-  static const primaryDark = Color(0xFF7AAFFF);
+  static const primary = Color(0xFF2F5BEA);
+  static const primarySoft = Color(0xFFEEF3FF);
+  static const primaryDark = Color(0xFF7FA2FF);
   static const accent = Color(0xFF16A34A);         // intizom yashili
   static const accentSoft = Color(0xFFE8F8EE);
 

@@ -1,228 +1,261 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../l10n/app_localizations.dart';
 import '../../models/goal.dart';
+import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/app_ui.dart';
+import '../../utils/dates.dart';
+import '../../widgets/feedback.dart';
+import '../../widgets/ui_kit.dart';
+import '../forms.dart';
 
-/// Mini App uslubidagi Maqsadlar sahifasi: Yillik/Oylik segment,
-/// yillar uchun horizontal year chips, oylar uchun 3x4 grid.
+/// Maqsadlar: Yillik (yillar tasmasi) / Oylik (12 oy to'ri).
 class GoalsPage extends StatefulWidget {
-  const GoalsPage({
-    super.key,
-    required this.goals,
-    required this.onToggle,
-    required this.onDelete,
-    required this.onAdd,
-    required this.onRefresh,
-  });
+  const GoalsPage({super.key, required this.state});
 
-  final List<Goal> goals;
-  final void Function(Goal goal) onToggle;
-  final void Function(Goal goal) onDelete;
-  final VoidCallback onAdd;
-  final Future<void> Function() onRefresh;
+  final AppState state;
 
   @override
   State<GoalsPage> createState() => _GoalsPageState();
 }
 
 class _GoalsPageState extends State<GoalsPage> {
-  String _period = 'yearly'; // yearly | monthly
-  late int _selectedYear;
-  late int _selectedMonth;
+  AppState get s => widget.state;
 
-  static final List<String> _uzMonths = [
-    'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
-    'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr',
-  ];
+  String _type = 'yearly';
+  late int _year = tashkentToday().year;
+  late int _month = tashkentToday().month;
 
-  @override
-  void initState() {
-    super.initState();
-    final now = DateTime.now();
-    _selectedYear = now.year;
-    _selectedMonth = now.month;
-  }
+  String get _period => _type == 'yearly' ? '$_year' : '$_year-${_month.toString().padLeft(2, '0')}';
 
-  List<Goal> get _filteredGoals {
-    if (_period == 'yearly') {
-      return widget.goals
-          .where((g) => g.goalType == 'yearly' && g.period == '$_selectedYear')
-          .toList();
+  String get _periodLabel => _type == 'yearly' ? '$_year-yil' : '${uzMonths[_month - 1]} $_year';
+
+  List<Goal> _goalsFor(String type, String period) =>
+      s.goals.where((g) => g.goalType == type && g.period == period).toList();
+
+  Future<void> _add() async {
+    if (await showGoalForm(context, api: s.api, goalType: _type, period: _period, periodLabel: _periodLabel)) {
+      await s.refreshGoals();
     }
-    final key =
-        '$_selectedYear-${_selectedMonth.toString().padLeft(2, '0')}';
-    return widget.goals
-        .where((g) => g.goalType == 'monthly' && g.period == key)
-        .toList();
   }
 
-  int _monthGoalCount(int month) {
-    final key =
-        '$_selectedYear-${month.toString().padLeft(2, '0')}';
-    return widget.goals
-        .where((g) => g.goalType == 'monthly' && g.period == key)
-        .length;
+  Future<void> _toggle(Goal g) async {
+    try {
+      await s.api.updateGoal(g.id, completed: !g.completed);
+      await s.refreshGoals();
+      if (!g.completed && mounted) toast(context, 'Maqsad bajarildi');
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    }
+  }
+
+  Future<void> _edit(Goal g) async {
+    if (await showGoalForm(context, api: s.api, goal: g)) await s.refreshGoals();
+  }
+
+  Future<void> _delete(Goal g) async {
+    if (!await confirmAction(context, title: "Maqsadni o'chirish", message: g.title)) return;
+    try {
+      await s.api.deleteGoal(g.id);
+      await s.refreshGoals();
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final now = DateTime.now();
-
-    return SafeArea(
-      child: RefreshIndicator(
-        onRefresh: widget.onRefresh,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-          children: [
-            // Header
-            Text(
-              'Maqsadlar 🎯',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+    final list = _goalsFor(_type, _period);
+    final done = list.where((g) => g.completed).length;
+    return RefreshIndicator(
+      onRefresh: s.refreshGoals,
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 28),
+        children: [
+          const PageHeader(title: 'Maqsadlar', subtitle: "Yo'lingizni rejalashtiring"),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: SegmentTabs<String>(
+              value: _type,
+              items: const [
+                ('yearly', 'Yillik', LucideIcons.calendarRange),
+                ('monthly', 'Oylik', LucideIcons.calendarDays),
+              ],
+              onChanged: (v) => setState(() => _type = v),
             ),
-            const SizedBox(height: 4),
-            Text(
-              "Yo'lingni rejalashtir",
-              style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 16),
-
-            // Segment control
-            _SegmentControl(
-              selected: _period,
-              onChanged: (v) => setState(() => _period = v),
-            ),
-            const SizedBox(height: 14),
-
-            // Yearly view: year chips
-            if (_period == 'yearly') ...[
-              SizedBox(
-                height: 60,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  reverse: true,
-                  itemCount: 5,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) {
-                    final year = now.year - i;
-                    final isActive = year == _selectedYear;
-                    final count = widget.goals
-                        .where((g) => g.goalType == 'yearly' && g.period == '$year')
-                        .length;
-                    return _YearChip(
-                      year: year,
-                      count: count,
-                      isActive: isActive,
-                      onTap: () => setState(() => _selectedYear = year),
-                    );
-                  },
+          ),
+          const SizedBox(height: 14),
+          if (_type == 'yearly') _yearStrip() else _monthGrid(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SectionBar(
+                  title: '$_periodLabel maqsadlari',
+                  count: list.isEmpty ? null : '$done/${list.length}',
+                  actionLabel: "Qo'shish",
+                  onAction: _add,
                 ),
-              ),
-              const SizedBox(height: 14),
-            ],
-
-            // Monthly view: month grid
-            if (_period == 'monthly') ...[
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 1.3,
-                ),
-                itemCount: 12,
-                itemBuilder: (_, i) {
-                  final month = i + 1;
-                  final isCurrent =
-                      month == now.month && _selectedYear == now.year;
-                  final isSelected = month == _selectedMonth;
-                  final count = _monthGoalCount(month);
-                  return _MonthCell(
-                    name: _uzMonths[i],
-                    count: count,
-                    isCurrent: isCurrent,
-                    isSelected: isSelected,
-                    onTap: () => setState(() => _selectedMonth = month),
-                  );
-                },
-              ),
-              const SizedBox(height: 14),
-            ],
-
-            // Add button
-            _GradientButton(
-              label: "Maqsad qo'shish",
-              onTap: widget.onAdd,
-            ),
-            const SizedBox(height: 14),
-
-            // Goals list
-            if (_filteredGoals.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 32),
-                child: Center(
-                  child: Column(
+                if (list.isEmpty)
+                  EmptyView(
+                    icon: LucideIcons.target,
+                    title: "Hali maqsad yo'q",
+                    message: '$_periodLabel uchun nimaga erishmoqchisiz?',
+                    actionLabel: "Maqsad qo'shish",
+                    onAction: _add,
+                  )
+                else
+                  GroupCard(
                     children: [
-                      const Text('🎯', style: TextStyle(fontSize: 36)),
-                      const SizedBox(height: 8),
-                      Text(
-                        context.tr('Hozircha maqsadlar yo\'q'),
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: scheme.onSurfaceVariant,
+                      for (final g in list)
+                        _GoalRow(
+                          goal: g,
+                          onToggle: () => _toggle(g),
+                          onEdit: () => _edit(g),
+                          onDelete: () => _delete(g),
                         ),
-                      ),
                     ],
                   ),
-                ),
-              )
-            else
-              for (final g in _filteredGoals) ...[
-                _GoalTile(
-                  goal: g,
-                  onToggle: () => widget.onToggle(g),
-                  onDelete: () => widget.onDelete(g),
-                ),
-                const SizedBox(height: 8),
               ],
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
-}
 
-class _SegmentControl extends StatelessWidget {
-  const _SegmentControl({required this.selected, required this.onChanged});
-  final String selected;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _yearStrip() {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outlineVariant),
+    final cur = tashkentToday().year;
+    final years = [for (var y = cur - 3; y <= cur + 3; y++) y];
+    return SizedBox(
+      height: 64,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: years.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        controller: ScrollController(initialScrollOffset: 2 * 88.0),
+        itemBuilder: (_, i) {
+          final y = years[i];
+          final sel = y == _year;
+          final count = _goalsFor('yearly', '$y').length;
+          return GestureDetector(
+            onTap: () => setState(() => _year = y),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: 80,
+              decoration: BoxDecoration(
+                color: sel ? scheme.primary : scheme.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: sel ? scheme.primary : scheme.outlineVariant),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '$y',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: sel ? scheme.onPrimary : (y == cur ? scheme.primary : scheme.onSurface),
+                    ),
+                  ),
+                  Text(
+                    '$count maqsad',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: sel ? scheme.onPrimary.withValues(alpha: .85) : scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
-      child: Row(
+    );
+  }
+
+  Widget _monthGrid() {
+    final scheme = Theme.of(context).colorScheme;
+    final today = tashkentToday();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
         children: [
-          _SegItem(
-            label: 'Yillik',
-            active: selected == 'yearly',
-            onTap: () => onChanged('yearly'),
+          Row(
+            children: [
+              IconButton(
+                onPressed: () => setState(() => _year--),
+                icon: const Icon(LucideIcons.chevronLeft, size: 20),
+              ),
+              Expanded(
+                child: Text(
+                  '$_year',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+              IconButton(
+                onPressed: () => setState(() => _year++),
+                icon: const Icon(LucideIcons.chevronRight, size: 20),
+              ),
+            ],
           ),
-          _SegItem(
-            label: 'Oylik',
-            active: selected == 'monthly',
-            onTap: () => onChanged('monthly'),
+          const SizedBox(height: 4),
+          GridView.count(
+            crossAxisCount: 4,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 1.25,
+            children: [
+              for (var m = 1; m <= 12; m++)
+                Builder(
+                  builder: (_) {
+                    final sel = m == _month;
+                    final isCur = m == today.month && _year == today.year;
+                    final count = _goalsFor('monthly', '$_year-${m.toString().padLeft(2, '0')}').length;
+                    return GestureDetector(
+                      onTap: () => setState(() => _month = m),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        decoration: BoxDecoration(
+                          color: sel ? scheme.primary : scheme.surfaceContainerLowest,
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          border: Border.all(
+                            color: sel ? scheme.primary : (isCur ? scheme.primary.withValues(alpha: .5) : scheme.outlineVariant),
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              uzMonthsShort[m - 1],
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: sel ? scheme.onPrimary : scheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              count == 0 ? '—' : '$count',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: sel ? scheme.onPrimary.withValues(alpha: .85) : scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+            ],
           ),
         ],
       ),
@@ -230,262 +263,60 @@ class _SegmentControl extends StatelessWidget {
   }
 }
 
-class _SegItem extends StatelessWidget {
-  const _SegItem({required this.label, required this.active, required this.onTap});
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
+class _GoalRow extends StatelessWidget {
+  const _GoalRow({required this.goal, required this.onToggle, required this.onEdit, required this.onDelete});
 
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 9),
-          decoration: BoxDecoration(
-            gradient: active
-                ? LinearGradient(colors: [scheme.primary, AppPalette.accent])
-                : null,
-            borderRadius: BorderRadius.circular(11),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: active ? Colors.white : scheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _YearChip extends StatelessWidget {
-  const _YearChip({
-    required this.year,
-    required this.count,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  final int year;
-  final int count;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 78,
-        decoration: BoxDecoration(
-          gradient: isActive
-              ? LinearGradient(colors: [scheme.primary, AppPalette.accent])
-              : null,
-          color: isActive ? null : scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(14),
-          border: isActive ? null : Border.all(color: scheme.outlineVariant),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '$year',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: isActive ? Colors.white : scheme.onSurface,
-              ),
-            ),
-            Text(
-              '$count ta',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: isActive
-                    ? Colors.white.withValues(alpha: .85)
-                    : scheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MonthCell extends StatelessWidget {
-  const _MonthCell({
-    required this.name,
-    required this.count,
-    required this.isCurrent,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String name;
-  final int count;
-  final bool isCurrent;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: isSelected
-              ? scheme.primary.withValues(alpha: .1)
-              : scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isCurrent
-                ? scheme.primary
-                : isSelected
-                    ? scheme.primary
-                    : scheme.outlineVariant,
-          ),
-        ),
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              name,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: scheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '$count ta',
-              style: TextStyle(
-                fontSize: 11,
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-            if (count > 0)
-              Container(
-                margin: const EdgeInsets.only(top: 4),
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: scheme.primary,
-                  shape: BoxShape.circle,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _GradientButton extends StatelessWidget {
-  const _GradientButton({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 52,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [scheme.primary, AppPalette.accent]),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: scheme.primary.withValues(alpha: .3),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(LucideIcons.plus, color: Colors.white, size: 18),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _GoalTile extends StatelessWidget {
-  const _GoalTile({required this.goal, required this.onToggle, required this.onDelete});
   final Goal goal;
   final VoidCallback onToggle;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return AppCard(
-      padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
-      onTap: onToggle,
-      child: Row(
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              color: goal.completed ? AppPalette.disciplineGreen : Colors.transparent,
-              borderRadius: BorderRadius.circular(7),
-              border: Border.all(
-                color: goal.completed ? AppPalette.disciplineGreen : scheme.outline,
-                width: 2,
+    return InkWell(
+      onTap: onEdit,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
+        child: Row(
+          children: [
+            CheckCircle(checked: goal.completed, color: scheme.primary, onTap: onToggle),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    goal.title,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w500,
+                      color: goal.completed ? scheme.onSurfaceVariant : scheme.onSurface,
+                      decoration: goal.completed ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                  if (goal.description?.isNotEmpty == true) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      goal.description!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
+                    ),
+                  ],
+                ],
               ),
             ),
-            child: goal.completed
-                ? const Icon(Icons.check_rounded, size: 15, color: Colors.white)
-                : null,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              goal.title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: goal.completed ? scheme.onSurfaceVariant : scheme.onSurface,
-                decoration: goal.completed ? TextDecoration.lineThrough : null,
-              ),
+            PopupMenuButton<String>(
+              icon: Icon(LucideIcons.ellipsisVertical, size: 18, color: scheme.onSurfaceVariant),
+              onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'edit', child: Text('Tahrirlash')),
+                PopupMenuItem(value: 'delete', child: Text("O'chirish", style: TextStyle(color: AppPalette.danger))),
+              ],
             ),
-          ),
-          IconButton(
-            icon: Icon(LucideIcons.trash2, size: 17, color: scheme.onSurfaceVariant),
-            onPressed: onDelete,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

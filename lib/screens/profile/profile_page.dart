@@ -1,378 +1,424 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import '../../l10n/app_localizations.dart';
-import '../../models/profile.dart';
-import '../../models/stats.dart';
+import '../../models/extras.dart';
+import '../../services/intizom_api.dart';
+import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/dates.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/feedback.dart';
+import '../../widgets/ui_kit.dart';
 
-/// Mini App uslubidagi Profil sahifasi (settings icon orqali ochiladi).
-/// Hero card, subscription, achievements, theme selector, social links, settings.
-class ProfilePage extends StatelessWidget {
+const _referralText = "Siz intizomlimisiz?\n\n"
+    "Ko'pchilik maqsad qo'yadi, reja tuzadi, lekin oxirigacha yetib bormaydi.\n\n"
+    "IntizomAI maqsad, reja va odatlaringizni kuzatib boradi, AI esa progressingizni "
+    "tahlil qilib sizga mos tavsiyalar beradi.\n\n"
+    "Bilim + Intizom = Natija";
+
+/// Profil va sozlamalar (Asosiy sahifadagi avatar yoki ⚙ tugmasidan ochiladi).
+class ProfilePage extends StatefulWidget {
   const ProfilePage({
     super.key,
-    required this.profile,
-    required this.stats,
-    required this.isDark,
+    required this.state,
     required this.onLogout,
     required this.onAppearanceChanged,
     required this.onLanguageChanged,
-    required this.onNotificationsChanged,
   });
 
-  final Profile profile;
-  final UserStats stats;
-  final bool isDark;
+  final AppState state;
   final VoidCallback onLogout;
   final ValueChanged<String> onAppearanceChanged;
   final ValueChanged<String> onLanguageChanged;
-  final ValueChanged<bool> onNotificationsChanged;
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  AppState get s => widget.state;
+
+  Subscription? _sub;
+  Checkin _checkin = const Checkin();
+
+  @override
+  void initState() {
+    super.initState();
+    s.addListener(_onState);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    s.removeListener(_onState);
+    super.dispose();
+  }
+
+  void _onState() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _load() async {
+    try {
+      final sub = await s.api.subscription();
+      if (mounted) setState(() => _sub = sub);
+    } catch (_) {}
+    try {
+      final c = await s.api.checkin();
+      if (mounted && c != null) setState(() => _checkin = c);
+    } catch (_) {}
+  }
+
+  Future<void> _saveCheckin({String? mood, int? energy}) async {
+    final prev = _checkin;
+    setState(() => _checkin = Checkin(mood: mood ?? _checkin.mood, energy: energy ?? _checkin.energy));
+    try {
+      await s.api.saveCheckin(mood: mood, energy: energy);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _checkin = prev);
+      showApiError(context, e);
+    }
+  }
+
+  Future<void> _open(String url) async {
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
+  Future<void> _shareInvite() async {
+    final link = s.profile?.referralLink;
+    if (link == null) return;
+    await _open(Uri.https('t.me', '/share/url', {'url': link, 'text': _referralText}).toString());
+  }
+
+  Future<void> _editName() async {
+    final ctrl = TextEditingController(text: s.profile?.fullName ?? '');
+    await showFormSheet<void>(
+      context,
+      title: 'Ismni tahrirlash',
+      builder: (ctx, _) => TextField(
+        controller: ctrl,
+        autofocus: true,
+        maxLength: 60,
+        textCapitalization: TextCapitalization.words,
+        decoration: const InputDecoration(hintText: 'Ismingiz', counterText: ''),
+      ),
+      onSave: () async {
+        final name = ctrl.text.trim();
+        if (name.isEmpty) return false;
+        try {
+          s.setProfile(await s.api.updateProfile(fullName: name));
+          return true;
+        } catch (e) {
+          if (mounted) showApiError(context, e);
+          return false;
+        }
+      },
+    );
+  }
+
+  Future<void> _changePhoto() async {
+    final hasCustom = s.profile?.customPhotoUrl?.isNotEmpty == true;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(LucideIcons.image),
+              title: const Text('Galereyadan tanlash'),
+              onTap: () => Navigator.pop(ctx, 'gallery'),
+            ),
+            ListTile(
+              leading: const Icon(LucideIcons.camera),
+              title: const Text('Suratga olish'),
+              onTap: () => Navigator.pop(ctx, 'camera'),
+            ),
+            if (hasCustom)
+              ListTile(
+                leading: const Icon(LucideIcons.trash2, color: AppPalette.danger),
+                title: const Text('Telegram rasmiga qaytish', style: TextStyle(color: AppPalette.danger)),
+                onTap: () => Navigator.pop(ctx, 'remove'),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (action == null) return;
+    try {
+      if (action == 'remove') {
+        s.setProfile(await s.api.updateProfile(removeCustomPhoto: true));
+        return;
+      }
+      final file = await ImagePicker().pickImage(
+        source: action == 'camera' ? ImageSource.camera : ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 80,
+      );
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      final dataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      if (dataUrl.length > 1000000) {
+        if (mounted) toast(context, 'Rasm juda katta. Boshqasini tanlang.');
+        return;
+      }
+      s.setProfile(await s.api.updateProfile(customPhotoUrl: dataUrl));
+      if (mounted) toast(context, 'Profil rasmi yangilandi');
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    }
+  }
+
+  Future<void> _setNotifications(bool v) async {
+    try {
+      s.setProfile(await s.api.updateProfile(notifications: v));
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    }
+  }
+
+  Future<void> _logout() async {
+    if (!await confirmAction(context, title: 'Hisobdan chiqish', message: 'Qayta kirish uchun Telegram orqali tasdiqlaysiz.', confirmLabel: 'Chiqish')) {
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    widget.onLogout();
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final p = s.profile!;
+    final st = s.stats;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profil 👤'),
-        leading: IconButton(
-          icon: const Icon(LucideIcons.chevronLeft),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        children: [
-          // ── Hero card ──
-          Container(
-            padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [scheme.primary, AppPalette.accent],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(22),
-              boxShadow: [
-                BoxShadow(
-                  color: scheme.primary.withValues(alpha: .25),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                // Avatar
-                _HeroAvatar(url: profile.avatar, size: 80),
-                const SizedBox(height: 10),
-                Text(
-                  profile.fullName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                if (profile.username != null)
-                  Text(
-                    '@${profile.username}',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: .85),
-                      fontSize: 12.5,
-                    ),
-                  ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _HeroStat(value: '${stats.streak}', label: 'Streak'),
-                    _HeroStat(value: '${stats.totalScore}', label: 'Ball'),
-                    _HeroStat(
-                      value: '${stats.todayDone}',
-                      label: 'Bajarilgan',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // ── Subscription status ──
-          AppCard(
-            onTap: openPremiumInBot,
-            color: AppPalette.levelGold.withValues(alpha: .07),
-            child: Row(
-              children: [
-                const Text('💎', style: TextStyle(fontSize: 26)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      appBar: AppBar(title: const Text('Profil va sozlamalar')),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await Future.wait([s.refreshProfile(), s.refreshStats(), _load()]);
+        },
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+          children: [
+            // ── Profil ─────────────────────────────
+            AppCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
                     children: [
-                      Text(
-                        stats.isPremium ? 'Premium faol' : 'Obuna holati',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: scheme.onSurface,
+                      GestureDetector(
+                        onTap: _changePhoto,
+                        child: Stack(
+                          children: [
+                            ProfileAvatar(url: p.avatar, telegramId: p.telegramId, name: p.fullName, size: 64),
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: scheme.surfaceContainerLowest,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: scheme.outlineVariant),
+                                ),
+                                child: Icon(LucideIcons.camera, size: 12, color: scheme.onSurface),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Text(
-                        stats.isPremium
-                            ? context.tr('Premium faol — uzaytirish bot orqali')
-                            : context.tr('Premium olish (bot orqali)'),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: scheme.onSurfaceVariant,
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(p.fullName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -.3)),
+                            if (p.username?.isNotEmpty == true)
+                              Text('@${p.username}', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${st.rankTitle} · ${st.level}-daraja',
+                              style: TextStyle(fontSize: 12.5, color: scheme.primary, fontWeight: FontWeight.w600),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
-                Icon(LucideIcons.chevronRight, size: 20, color: scheme.onSurfaceVariant),
-              ],
-            ),
-          ),
-
-          // ── Achievements ──
-          if (stats.achievements.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            AppSectionHeader('Yutuqlar 🏆'),
-            const SizedBox(height: 10),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 3,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: .85,
-              children: [
-                for (final a in stats.achievements)
-                  _AchTile(icon: a.icon, title: a.title),
-              ],
-            ),
-          ],
-
-          // ── Theme selector ──
-          const SizedBox(height: 20),
-          AppSectionHeader('🎨 Tema'),
-          const SizedBox(height: 10),
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 3,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 1.1,
-            children: [
-              _ThemeTile(
-                name: 'Default',
-                colors: [const Color(0xFF14b8a6), const Color(0xFF06b6d4)],
-                active: true,
-              ),
-              _ThemeTile(
-                name: 'Sprout',
-                colors: [const Color(0xFF22c55e), const Color(0xFF16a34a)],
-              ),
-              _ThemeTile(
-                name: 'Spectrum',
-                colors: [const Color(0xFFec4899), const Color(0xFF8b5cf6)],
-              ),
-              _ThemeTile(
-                name: 'Gamma',
-                colors: [const Color(0xFFa855f7), const Color(0xFF7c3aed)],
-              ),
-              _ThemeTile(
-                name: 'Atmosphere',
-                colors: [const Color(0xFF3b82f6), const Color(0xFF0ea5e9)],
-              ),
-              _ThemeTile(
-                name: 'Gold',
-                colors: [const Color(0xFFd4a017), const Color(0xFFb8860b)],
-              ),
-            ],
-          ),
-
-          // ── Invite friends ──
-          if (profile.referralLink != null) ...[
-            const SizedBox(height: 20),
-            AppSectionHeader("Do'stlarni taklif qil 🎁"),
-            const SizedBox(height: 10),
-            AppCard(
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: profile.referralLink!));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(context.tr('Taklif havolasi nusxalandi'))),
-                );
-              },
-              child: Row(
-                children: [
-                  const Text('🎁', style: TextStyle(fontSize: 22)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Do'stni taklif qil",
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: scheme.onSurface,
-                          ),
-                        ),
-                        Text(
-                          context.tr('Taklif qilinganlar: {n}', {'n': profile.referralCount}),
-                          style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
+                  const SizedBox(height: 14),
+                  Divider(height: 1, color: scheme.outlineVariant),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _HeroStat(value: '${st.streak}', label: 'Streak'),
+                      _HeroStat(value: '${st.totalScore}', label: 'Ball'),
+                      _HeroStat(value: '${st.longestStreak}', label: 'Eng uzun'),
+                      _HeroStat(value: '${st.perfectDays}', label: 'Mukammal kun'),
+                    ],
                   ),
-                  Icon(LucideIcons.share, size: 18, color: scheme.primary),
                 ],
               ),
             ),
-          ],
+            const SizedBox(height: 12),
+            _SubscriptionCard(sub: _sub, isPremium: st.isPremium),
 
-          // ── Social links ──
-          const SizedBox(height: 20),
-          _SettingTile(
-            icon: '📢',
-            title: 'Telegram kanal',
-            subtitle: 'Yangiliklar va maslahatlar',
-          ),
-          _SettingTile(
-            icon: '💬',
-            title: "Admin bilan bog'lanish",
-            subtitle: 'Savol, taklif va yordam',
-          ),
-          _SettingTile(
-            icon: '📸',
-            title: 'Instagram',
-            subtitle: '@intizomai.uz',
-          ),
-
-          // ── Settings ──
-          const SizedBox(height: 20),
-          AppSectionHeader('Sozlamalar'),
-          const SizedBox(height: 10),
-          _Panel(
-            child: Column(
+            // ── Bugungi holat ──────────────────────
+            const SectionBar(title: 'Bugungi kayfiyat'),
+            Row(
               children: [
-                _SettingRow(
-                  icon: LucideIcons.sun,
-                  label: context.tr('Ko\'rinish'),
-                  trailing: SegmentedButton<String>(
-                    showSelectedIcon: false,
-                    segments: [
-                      ButtonSegment(value: 'light', label: Text(context.tr('Yorug\''))),
-                      ButtonSegment(value: 'dark', label: Text(context.tr('Qorong\'i'))),
-                    ],
-                    selected: {isDark ? 'dark' : 'light'},
-                    onSelectionChanged: (s) => onAppearanceChanged(s.first),
-                    style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                for (final (emoji, label) in const [
+                  ('🔥', 'Olovli'),
+                  ('💪', 'Kuchli'),
+                  ('😐', 'Oddiy'),
+                  ('😴', 'Charchagan'),
+                  ('😞', 'Past'),
+                ])
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: ChoiceChipBox(
+                        selected: _checkin.mood == emoji,
+                        onTap: () => _saveCheckin(mood: emoji),
+                        child: Column(
+                          children: [
+                            Text(emoji, style: const TextStyle(fontSize: 20)),
+                            const SizedBox(height: 2),
+                            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5)),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                const Divider(height: 1),
-                _SettingRow(
-                  icon: LucideIcons.globe,
-                  label: context.tr('Til'),
-                  trailing: SegmentedButton<String>(
-                    showSelectedIcon: false,
-                    segments: const [
-                      ButtonSegment(value: 'uz', label: Text('Uz')),
-                      ButtonSegment(value: 'ru', label: Text('Ru')),
-                      ButtonSegment(value: 'en', label: Text('En')),
-                    ],
-                    selected: {AppLocalizations.of(context).languageCode},
-                    onSelectionChanged: (s) => onLanguageChanged(s.first),
-                    style: const ButtonStyle(visualDensity: VisualDensity.compact),
+              ],
+            ),
+            const SectionBar(title: 'Energiya darajasi'),
+            Row(
+              children: [
+                for (var e = 1; e <= 5; e++)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: ChoiceChipBox(
+                        selected: _checkin.energy == e,
+                        onTap: () => _saveCheckin(energy: e),
+                        child: Text('$e', style: const TextStyle(fontSize: 15)),
+                      ),
+                    ),
                   ),
-                ),
-                const Divider(height: 1),
-                _SettingRow(
-                  icon: LucideIcons.bell,
-                  label: context.tr('Bot eslatmalari'),
-                  trailing: Switch.adaptive(
-                    value: profile.notificationsEnabled,
-                    onChanged: onNotificationsChanged,
-                  ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 6, left: 4),
+              child: Text(
+                'AI Coach kayfiyat va energiyangizni hisobga olib maslahat beradi.',
+                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              ),
+            ),
+
+            // ── Yutuqlar ───────────────────────────
+            const SectionBar(title: 'Yutuqlar'),
+            _Achievements(streak: st.streak, score: st.totalScore, goalsDone: s.goals.where((g) => g.completed).length),
+
+            // ── Taklif ─────────────────────────────
+            const SectionBar(title: "Do'stlarni taklif qilish"),
+            GroupCard(
+              children: [
+                SettingTile(
+                  icon: LucideIcons.gift,
+                  accent: AppPalette.accentRose,
+                  title: "Do'stni taklif qilish",
+                  subtitle: p.referralCount > 0
+                      ? "${p.referralCount} ta faol do'st taklif qilingan"
+                      : "Do'stingiz birinchi rejasini bajarsa — unga 3 kun, sizga har 5 do'stga 7 kun Premium",
+                  onTap: _shareInvite,
                 ),
               ],
             ),
-          ),
 
-          // ── Version ──
-          const SizedBox(height: 16),
-          _SettingTile(
-            icon: 'ℹ️',
-            title: 'Versiya',
-            subtitle: 'Intizom AI v2.1 Pro',
-          ),
-
-          const SizedBox(height: 24),
-          OutlinedButton.icon(
-            onPressed: onLogout,
-            icon: const Icon(LucideIcons.logOut, size: 18, color: AppPalette.danger),
-            label: Text(context.tr('Chiqish'), style: const TextStyle(color: AppPalette.danger)),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: AppPalette.danger.withValues(alpha: .3)),
+            // ── Hisob ──────────────────────────────
+            const SectionBar(title: 'Hisob'),
+            GroupCard(
+              children: [
+                SettingTile(icon: LucideIcons.pencil, title: 'Ismni tahrirlash', subtitle: p.fullName, onTap: _editName),
+                SettingTile(icon: LucideIcons.camera, title: 'Profil rasmini o\'zgartirish', onTap: _changePhoto),
+              ],
             ),
-          ),
-        ],
+
+            // ── Sozlamalar ─────────────────────────
+            const SectionBar(title: 'Sozlamalar'),
+            GroupCard(
+              children: [
+                SettingTile(
+                  icon: LucideIcons.moon,
+                  accent: AppPalette.accentIndigo,
+                  title: 'Tungi rejim',
+                  trailing: Switch.adaptive(
+                    value: dark,
+                    onChanged: (v) => widget.onAppearanceChanged(v ? 'dark' : 'light'),
+                  ),
+                ),
+                SettingTile(
+                  icon: LucideIcons.bell,
+                  accent: AppPalette.accentAmber,
+                  title: 'Bot eslatmalari',
+                  subtitle: 'Reja va odat vaqtida Telegram xabari',
+                  trailing: Switch.adaptive(value: p.notificationsEnabled, onChanged: _setNotifications),
+                ),
+              ],
+            ),
+
+            // ── Aloqa ──────────────────────────────
+            const SectionBar(title: 'Aloqa'),
+            GroupCard(
+              children: [
+                SettingTile(
+                  icon: LucideIcons.megaphone,
+                  title: 'Telegram kanal',
+                  subtitle: 'Yangiliklar va maslahatlar',
+                  onTap: () => _open('https://t.me/Intizom_AI'),
+                ),
+                SettingTile(
+                  icon: LucideIcons.messageCircle,
+                  title: 'Admin bilan bog\'lanish',
+                  subtitle: 'Savol, taklif va yordam',
+                  onTap: () => _open('https://t.me/IntizomAI_Admin_bot'),
+                ),
+                SettingTile(
+                  icon: LucideIcons.camera,
+                  accent: AppPalette.accentRose,
+                  title: 'Instagram',
+                  subtitle: '@intizomai.uz',
+                  onTap: () => _open('https://www.instagram.com/intizomai.uz'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            GroupCard(
+              children: [
+                SettingTile(icon: LucideIcons.logOut, title: 'Hisobdan chiqish', danger: true, onTap: _logout),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'IntizomAI · Telegram ID ${p.telegramId}',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+            ),
+          ],
+        ),
       ),
-    );
-  }
-}
-
-class _HeroAvatar extends StatelessWidget {
-  const _HeroAvatar({required this.url, this.size = 80});
-  final String? url;
-  final double size;
-
-  ImageProvider? _image() {
-    final u = url;
-    if (u == null || u.isEmpty) return null;
-    if (u.startsWith('data:')) {
-      final comma = u.indexOf(',');
-      if (comma < 0) return null;
-      try {
-        return MemoryImage(base64Decode(u.substring(comma + 1)));
-      } catch (_) {
-        return null;
-      }
-    }
-    return NetworkImage(u);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final image = _image();
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
-        color: Colors.white.withValues(alpha: .2),
-        border: Border.all(color: Colors.white.withValues(alpha: .4), width: 2),
-        image: image != null
-            ? DecorationImage(image: image, fit: BoxFit.cover)
-            : null,
-      ),
-      child: image == null
-          ? Center(
-              child: Text(
-                '🙂',
-                style: TextStyle(fontSize: size * .4),
-              ),
-            )
-          : null,
     );
   }
 }
@@ -383,250 +429,194 @@ class _HeroStat extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
+  Widget build(BuildContext context) => Expanded(
+    child: Column(
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
+        Text(value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
         Text(
           label,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: .85),
-            fontSize: 10,
-            letterSpacing: 1,
-          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
+      ],
+    ),
+  );
+}
+
+class _SubscriptionCard extends StatelessWidget {
+  const _SubscriptionCard({required this.sub, required this.isPremium});
+
+  final Subscription? sub;
+  final bool isPremium;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final premium = sub?.isPremium ?? isPremium;
+    final until = parseYmd(sub?.premiumUntil);
+    final days = sub?.daysLeft ?? 0;
+    return AppCard(
+      onTap: openPremiumInBot,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AppIconTile.tinted(
+                icon: premium ? LucideIcons.crown : LucideIcons.gem,
+                accent: AppPalette.levelGold,
+                size: 38,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      premium ? 'Premium faol' : 'Bepul rejim',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      premium
+                          ? [
+                              if (sub?.planTitle != null) sub!.planTitle!,
+                              '$days kun qoldi',
+                              if (until != null) '${shortDate(until)} gacha',
+                            ].join(' · ')
+                          : "Cheksiz reja, odat, maqsad, AI va Do'stlar",
+                      style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                premium ? 'Uzaytirish' : 'Olish',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: scheme.primary),
+              ),
+            ],
+          ),
+          if (premium && days > 0) ...[
+            const SizedBox(height: 12),
+            AppProgressBar(value: (days / 30).clamp(0, 1).toDouble(), color: AppPalette.levelGold, height: 5),
+          ],
+          const SizedBox(height: 8),
+          Text('To\'lov Telegram bot orqali amalga oshiriladi.', style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+}
+
+class _Achievements extends StatelessWidget {
+  const _Achievements({required this.streak, required this.score, required this.goalsDone});
+
+  final int streak;
+  final int score;
+  final int goalsDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final list = [
+      (LucideIcons.flame, AppPalette.streakOrange, 'Olov', '3 kun streak', streak >= 3),
+      (LucideIcons.zap, AppPalette.accentAmber, 'Yashin', '7 kun streak', streak >= 7),
+      (LucideIcons.gem, AppPalette.accentViolet, 'Olmos', '30 kun streak', streak >= 30),
+      (LucideIcons.target, AppPalette.accentBlue, 'Aniq', '10 maqsad', goalsDone >= 10),
+      (LucideIcons.trophy, AppPalette.levelGold, 'Chempion', '100 ball', score >= 100),
+      (LucideIcons.crown, AppPalette.accentRose, 'Qirol', '500 ball', score >= 500),
+    ];
+    return GridView.count(
+      crossAxisCount: 3,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
+      childAspectRatio: 1.05,
+      children: [
+        for (final (icon, color, title, hint, unlocked) in list)
+          Opacity(
+            opacity: unlocked ? 1 : .45,
+            child: Container(
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: scheme.outlineVariant),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  unlocked
+                      ? AppIconTile.tinted(icon: icon, accent: color, size: 36)
+                      : const AppIconTile(icon: LucideIcons.lock, size: 36),
+                  const SizedBox(height: 8),
+                  Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text(hint, style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }
 }
 
-class _AchTile extends StatelessWidget {
-  const _AchTile({required this.icon, required this.title});
-  final String icon;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [scheme.primary, AppPalette.accent]),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            alignment: Alignment.center,
-            child: Text(icon, style: const TextStyle(fontSize: 20)),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ThemeTile extends StatelessWidget {
-  const _ThemeTile({
-    required this.name,
-    required this.colors,
-    this.active = false,
-  });
-
-  final String name;
-  final List<Color> colors;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: active ? scheme.primary : scheme.outlineVariant,
-          width: active ? 2 : 1,
-        ),
-      ),
-      padding: const EdgeInsets.all(10),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            height: 32,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: colors),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            name,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SettingTile extends StatelessWidget {
-  const _SettingTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final String icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: .1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.center,
-            child: Text(icon, style: const TextStyle(fontSize: 18)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: scheme.onSurface,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-          Icon(LucideIcons.chevronRight, size: 18, color: scheme.onSurfaceVariant),
-        ],
-      ),
-    );
-  }
-}
-
-class _Panel extends StatelessWidget {
-  const _Panel({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .7)),
-      ),
-      child: child,
-    );
-  }
-}
-
-class _SettingRow extends StatelessWidget {
-  const _SettingRow({required this.icon, required this.label, required this.trailing});
-  final IconData icon;
-  final String label;
-  final Widget trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: scheme.onSurfaceVariant),
-          const SizedBox(width: 12),
-          Expanded(child: Text(label, style: TextStyle(fontSize: 14, color: scheme.onSurface))),
-          trailing,
-        ],
-      ),
-    );
-  }
-}
-
-/// Telegram rasmi (URL) yoki Mini App'da yuklangan rasm (data:base64).
+/// Profil rasmi: maxsus rasm (URL/base64) → Telegram rasmi (bot proksi) → bosh harf.
 class ProfileAvatar extends StatelessWidget {
-  const ProfileAvatar({super.key, required this.url, this.size = 36});
+  const ProfileAvatar({
+    super.key,
+    required this.url,
+    required this.telegramId,
+    required this.name,
+    this.size = 36,
+  });
+
   final String? url;
+  final int telegramId;
+  final String name;
   final double size;
 
   ImageProvider? _image() {
     final u = url;
-    if (u == null || u.isEmpty) return null;
-    if (u.startsWith('data:')) {
+    if (u != null && u.startsWith('data:')) {
       final comma = u.indexOf(',');
-      if (comma < 0) return null;
-      try {
-        return MemoryImage(base64Decode(u.substring(comma + 1)));
-      } catch (_) {
-        return null;
+      if (comma > 0) {
+        try {
+          return MemoryImage(base64Decode(u.substring(comma + 1)));
+        } catch (_) {}
       }
     }
-    return NetworkImage(u);
+    final abs = IntizomApi.absoluteUrl(u) ?? (telegramId > 0 ? IntizomApi.telegramAvatar(telegramId) : null);
+    return abs == null ? null : NetworkImage(abs);
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
     final image = _image();
-    return CircleAvatar(
-      radius: size / 2,
-      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-      backgroundImage: image,
-      onBackgroundImageError: image == null ? null : (_, __) {},
-      child: image == null ? Text('🙂', style: TextStyle(fontSize: size * .45)) : null,
+    return ClipOval(
+      child: Container(
+        width: size,
+        height: size,
+        color: scheme.primaryContainer,
+        alignment: Alignment.center,
+        child: image == null
+            ? _initial(initial, scheme)
+            : Image(
+                image: image,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _initial(initial, scheme),
+              ),
+      ),
     );
   }
+
+  Widget _initial(String initial, ColorScheme scheme) => Text(
+    initial,
+    style: TextStyle(fontSize: size * .42, fontWeight: FontWeight.w700, color: scheme.onPrimaryContainer),
+  );
 }
