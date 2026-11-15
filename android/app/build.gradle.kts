@@ -45,6 +45,12 @@ android {
         }
     }
 
+    // Release oldidan plaginlar ichida ishlaydigan lint (lintVital) o'chirilgan:
+    // u Flutter kodimizni tekshirmaydi, faqat JDK mos kelmasa build'ni yiqitadi.
+    lint {
+        checkReleaseBuilds = false
+    }
+
     buildTypes {
         release {
             // key.properties bo'lmasa (lokal sinov) — vaqtinchalik debug kalit.
