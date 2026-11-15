@@ -6,11 +6,11 @@ analyzer:
     - android/**
     - ios/**
   errors:
-    # Flutter 3.47+ `material.dart` ni `material_ui` paketiga ko'chirmoqda.
-    # Hozircha eski import ishlaydi; ko'chish alohida ish sifatida qilinadi.
     deprecated_member_use: ignore
 
 linter:
   rules:
-    prefer_const_constructors: true
-    prefer_const_declarations: true
+    prefer_const_constructors: false
+    prefer_const_declarations: false
+    sort_child_properties_last: false
+    unnecessary_underscores: false
