@@ -1,67 +1,48 @@
-/// Odat modeli.
+/// Odat — server: bot/services/habit_service.py (habit_snapshot).
 class Habit {
   const Habit({
     required this.id,
-    required this.userId,
     required this.title,
     this.description,
     this.icon = '✅',
     this.reminderTime,
     this.frequency = 'daily',
-    this.weekdays,
-    this.durationType = 'permanent',
-    this.targetDays,
-    this.startDate,
-    this.sortOrder = 0,
-    this.archived = false,
-    this.todayDone = false,
-    this.currentStreak = 0,
+    this.weekdays = const [],
+    this.dueToday = true,
+    this.doneToday = false,
+    this.finished = false,
+    this.streak = 0,
+    this.totalDone = 0,
   });
 
   final int id;
-  final int userId;
   final String title;
   final String? description;
   final String icon;
-  final String? reminderTime; // "HH:MM"
-  final String frequency; // "daily" | "weekly"
-  final String? weekdays; // "0,1,2,3,4" (Mon=0)
-  final String durationType; // "permanent" | "days"
-  final int? targetDays;
-  final String? startDate;
-  final int sortOrder;
-  final bool archived;
-  final bool todayDone;
-  final int currentStreak;
+  final String? reminderTime;
+  final String frequency; // daily | weekly
+  final List<int> weekdays; // 0=Dushanba .. 6=Yakshanba
+  final bool dueToday;
+  final bool doneToday;
+  final bool finished;
+  final int streak;
+  final int totalDone;
 
-  factory Habit.fromJson(Map<String, dynamic> json) {
-    return Habit(
-      id: json['id'] as int,
-      userId: json['user_id'] as int,
-      title: json['title'] as String,
-      description: json['description'] as String?,
-      icon: json['icon'] as String? ?? '✅',
-      reminderTime: json['reminder_time'] as String?,
-      frequency: json['frequency'] as String? ?? 'daily',
-      weekdays: json['weekdays'] as String?,
-      durationType: json['duration_type'] as String? ?? 'permanent',
-      targetDays: json['target_days'] as int?,
-      startDate: json['start_date'] as String?,
-      sortOrder: json['sort_order'] as int? ?? 0,
-      archived: json['archived'] as bool? ?? false,
-      todayDone: json['today_done'] as bool? ?? false,
-      currentStreak: json['current_streak'] as int? ?? 0,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'title': title,
-    'description': description,
-    'icon': icon,
-    'reminder_time': reminderTime,
-    'frequency': frequency,
-    'weekdays': weekdays,
-    'duration_type': durationType,
-    'target_days': targetDays,
-  };
+  factory Habit.fromJson(Map<String, dynamic> json) => Habit(
+    id: json['id'] as int,
+    title: json['title'] as String? ?? '',
+    description: json['description'] as String?,
+    icon: json['icon'] as String? ?? '✅',
+    reminderTime: json['reminder_time'] as String?,
+    frequency: json['frequency'] as String? ?? 'daily',
+    weekdays: (json['weekdays'] as List? ?? const [])
+        .whereType<num>()
+        .map((e) => e.toInt())
+        .toList(),
+    dueToday: json['due_today'] as bool? ?? true,
+    doneToday: json['done_today'] as bool? ?? false,
+    finished: json['finished'] as bool? ?? false,
+    streak: json['streak'] as int? ?? 0,
+    totalDone: json['total_done'] as int? ?? 0,
+  );
 }

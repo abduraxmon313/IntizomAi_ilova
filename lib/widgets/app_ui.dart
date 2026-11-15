@@ -87,7 +87,7 @@ class AppIconTile extends StatelessWidget {
     this.size = 40,
     this.iconSize,
   }) : _tinted = true,
-       _accent = accent,
+       _accent = accent, // ignore: prefer_initializing_formals
        color = null,
        background = null;
 
@@ -106,11 +106,12 @@ class AppIconTile extends StatelessWidget {
     final iSize = iconSize ?? size * .46;
     final radius = size >= 44 ? AppRadius.md : AppRadius.sm;
 
+    final accent = _accent;
     Color bg;
     Color fg;
-    if (_tinted && _accent != null) {
-      bg = _accent!.withValues(alpha: dark ? .16 : .09);
-      fg = dark ? Color.lerp(_accent!, Colors.white, .35)! : _accent!;
+    if (_tinted && accent != null) {
+      bg = accent.withValues(alpha: dark ? .16 : .09);
+      fg = dark ? Color.lerp(accent, Colors.white, .35)! : accent;
     } else {
       bg = background ?? scheme.surfaceContainerLow;
       fg = color ?? scheme.onSurfaceVariant;
@@ -180,7 +181,7 @@ class AppSectionHeader extends StatelessWidget {
             ],
           ),
         ),
-        if (trailing != null) trailing!,
+        ?trailing,
       ],
     );
   }

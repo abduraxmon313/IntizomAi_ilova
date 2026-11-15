@@ -3,30 +3,29 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'theme/app_theme.dart';
 import 'l10n/app_localizations.dart';
-import 'services/appearance_store.dart';
-import 'services/locale_store.dart';
-import 'services/auth_store.dart';
-import 'services/user_service.dart';
-import 'models/user_profile.dart';
 import 'screens/auth/login_page.dart';
 import 'screens/home_page.dart';
+import 'services/api_client.dart';
+import 'services/appearance_store.dart';
+import 'services/auth_service.dart';
+import 'services/auth_store.dart';
+import 'services/intizom_api.dart';
+import 'services/locale_store.dart';
+import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   final appearanceStore = AppearanceStore();
-  final initialAppearance = await appearanceStore.load();
   final localeStore = LocaleStore();
-  final initialLocale = await localeStore.load();
   final authStore = AuthStore();
-  final isLoggedIn = await authStore.isLoggedIn();
+
+  final initialAppearance = await appearanceStore.load();
+  final initialLocale = await localeStore.load();
+  final loggedIn = await authStore.isLoggedIn();
 
   SystemChrome.setSystemUIOverlayStyle(
-    AppTheme.systemOverlay(
-      initialAppearance == 'dark' ? AppTheme.dark : AppTheme.light,
-    ),
+    AppTheme.systemOverlay(initialAppearance == 'dark' ? AppTheme.dark : AppTheme.light),
   );
 
   runApp(
@@ -36,7 +35,7 @@ Future<void> main() async {
       authStore: authStore,
       initialAppearance: initialAppearance,
       initialLocale: initialLocale,
-      isLoggedIn: isLoggedIn,
+      loggedIn: loggedIn,
     ),
   );
 }
@@ -49,7 +48,7 @@ class IntizomAiApp extends StatefulWidget {
     required this.authStore,
     this.initialAppearance,
     this.initialLocale,
-    this.isLoggedIn = false,
+    this.loggedIn = false,
   });
 
   final AppearanceStore appearanceStore;
@@ -57,78 +56,54 @@ class IntizomAiApp extends StatefulWidget {
   final AuthStore authStore;
   final String? initialAppearance;
   final String? initialLocale;
-  final bool isLoggedIn;
+  final bool loggedIn;
 
   @override
   State<IntizomAiApp> createState() => _IntizomAiAppState();
 }
 
 class _IntizomAiAppState extends State<IntizomAiApp> {
-  Locale? _locale;
   late ThemeMode _themeMode;
-  bool _isLoggedIn = false;
-  UserProfile? _profile;
-  bool _loading = false;
+  Locale? _locale;
+  late bool _loggedIn;
+
+  late final ApiClient _client;
+  late final AuthService _auth;
+  late final IntizomApi _api;
 
   @override
   void initState() {
     super.initState();
-    _themeMode = widget.initialAppearance == 'dark'
-        ? ThemeMode.dark
-        : ThemeMode.light;
-    if (widget.initialLocale != null) {
-      _locale = Locale(widget.initialLocale!);
-    }
-    _isLoggedIn = widget.isLoggedIn;
-    if (_isLoggedIn) {
-      _loadProfile();
-    }
-  }
+    _themeMode = widget.initialAppearance == 'dark' ? ThemeMode.dark : ThemeMode.light;
+    if (widget.initialLocale != null) _locale = Locale(widget.initialLocale!);
+    _loggedIn = widget.loggedIn;
 
-  Future<void> _loadProfile() async {
-    setState(() => _loading = true);
-    try {
-      final profile = await UserService().getProfile();
-      if (mounted) {
-        setState(() {
-          _profile = profile;
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _loading = false);
-    }
+    _client = ApiClient(authStore: widget.authStore);
+    _auth = AuthService(api: _client, store: widget.authStore);
+    _api = IntizomApi(client: _client);
+
+    // Token eskirsa (401) — login sahifasiga qaytamiz.
+    ApiClient.onUnauthorized = () {
+      if (mounted && _loggedIn) setState(() => _loggedIn = false);
+    };
   }
 
   void _setTheme(String mode) {
     final next = mode == 'dark' ? ThemeMode.dark : ThemeMode.light;
-    if (_themeMode == next) return;
+    if (next == _themeMode) return;
     setState(() => _themeMode = next);
-    unawaited(
-      widget.appearanceStore.save(mode).catchError((Object _) {}),
-    );
+    unawaited(widget.appearanceStore.save(mode).catchError((Object _) {}));
   }
 
   void _setLocale(String code) {
-    final next = Locale(code);
-    if (_locale == next) return;
-    setState(() => _locale = next);
-    unawaited(
-      widget.localeStore.save(code).catchError((Object _) {}),
-    );
+    if (_locale?.languageCode == code) return;
+    setState(() => _locale = Locale(code));
+    unawaited(widget.localeStore.save(code).catchError((Object _) {}));
   }
 
-  void _onLoginSuccess() {
-    setState(() => _isLoggedIn = true);
-    _loadProfile();
-  }
-
-  void _onLogout() async {
-    await widget.authStore.clear();
-    setState(() {
-      _isLoggedIn = false;
-      _profile = null;
-    });
+  Future<void> _logout() async {
+    await _auth.signOut();
+    if (mounted) setState(() => _loggedIn = false);
   }
 
   @override
@@ -147,29 +122,20 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
         value: AppTheme.systemOverlay(Theme.of(context)),
         child: child!,
       ),
-      home: _buildHome(),
-    );
-  }
-
-  Widget _buildHome() {
-    if (!_isLoggedIn) {
-      return LoginPage(
-        onLoginSuccess: _onLoginSuccess,
-        onLanguageChanged: _setLocale,
-      );
-    }
-
-    if (_loading || _profile == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return HomePage(
-      profile: _profile!,
-      onLogout: _onLogout,
-      onAppearanceChanged: _setTheme,
-      onLanguageChanged: _setLocale,
+      home: _loggedIn
+          ? HomePage(
+              key: const ValueKey('home'),
+              api: _api,
+              onLogout: _logout,
+              onAppearanceChanged: _setTheme,
+              onLanguageChanged: _setLocale,
+            )
+          : LoginPage(
+              key: const ValueKey('login'),
+              authService: _auth,
+              onLoginSuccess: () => setState(() => _loggedIn = true),
+              onLanguageChanged: _setLocale,
+            ),
     );
   }
 }

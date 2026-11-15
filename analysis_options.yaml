@@ -1,7 +1,16 @@
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+  errors:
+    # Flutter 3.47+ `material.dart` ni `material_ui` paketiga ko'chirmoqda.
+    # Hozircha eski import ishlaydi; ko'chish alohida ish sifatida qilinadi.
+    deprecated_member_use: ignore
+
 linter:
   rules:
     prefer_const_constructors: true
     prefer_const_declarations: true
-    avoid_print: false
