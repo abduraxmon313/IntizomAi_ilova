@@ -17,6 +17,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/dates.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/feedback.dart';
+import '../../widgets/reminder_setup.dart';
 import '../../widgets/ui_kit.dart';
 
 /// Profil va sozlamalar (Bugun sahifasidagi avatar ortida).
@@ -319,6 +320,12 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       ],
                     ),
+
+                    // ── Eslatmalar ishonchliligi ───────────
+                    if (_phoneReminders) ...[
+                      SectionBar(title: context.tr("Eslatmalar o'z vaqtida kelishi uchun")),
+                      const ReminderHealthCard(),
+                    ],
 
                     // ── Yordam ─────────────────────────────
                      SectionBar(title: context.tr("Yordam va aloqa")),

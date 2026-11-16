@@ -11,6 +11,7 @@ import '../l10n/app_localizations.dart';
 import '../models/habit.dart';
 import '../models/plan.dart';
 import 'api_client.dart';
+import 'device_settings.dart';
 import 'intizom_api.dart';
 import 'locale_store.dart';
 
@@ -43,7 +44,10 @@ class ReminderService {
   static const _iosCategory = 'intizom_reminder';
   static const _enabledKey = 'intizom_ai.reminders.enabled.v1';
   static const _doneAtKey = 'intizom_ai.reminders.done_at.v1';
-  static const _promptedKey = 'intizom_ai.reminders.prompted.v1';
+  // v2: sozlash sahifasiga batareya/Autostart qadamlari qo'shildi — mavjud
+  // foydalanuvchilarga ham bir marta qayta ko'rsatiladi (sozlama to'liq bo'lmasa).
+  static const _promptedKey = 'intizom_ai.reminders.prompted.v2';
+  static const _testId = 2100000001;
   // Internet yo'q bo'lsa "Bajarildi" shu yerda navbatga qo'yiladi (keyin yuboriladi).
   static const _pendingKey = 'intizom_ai.reminders.pending_done.v1';
 
@@ -52,6 +56,7 @@ class ReminderService {
   bool _ready = false;
   bool _syncing = false;
   AndroidScheduleMode _scheduleMode = AndroidScheduleMode.inexactAllowWhileIdle;
+  bool? _syncedExact; // oxirgi sync qaysi rejimda rejalashtirgan (null — hali sync bo'lmagan)
   int _seenDoneAt = 0;
   int _scheduled = 0; // joriy sync'da rejalashtirilgan bildirishnomalar soni (budjet uchun)
 
@@ -118,9 +123,58 @@ class ReminderService {
     return (await _ios?.checkPermissions())?.isEnabled ?? false;
   }
 
+  /// Eslatmalar ilova yopiq bo'lsa ham o'z vaqtida kelishi uchun hammasi
+  /// sozlanganmi: ruxsat + aniq vaqt + (Android) batareya cheklovisiz.
   Future<bool> _hasFullAccess() async {
     if (!await hasPermission()) return false;
+    if (!await canScheduleExact()) return false;
+    return DeviceSettings.isIgnoringBatteryOptimizations();
+  }
+
+  /// Android 12+: "Signallar va eslatmalar" (aniq vaqt) ruxsati. Usiz tizim
+  /// eslatmani telefon uxlayotganda kechiktiradi. iOS'da har doim true.
+  Future<bool> canScheduleExact() async {
+    await init();
+    if (!_ready) return true;
     return await _android?.canScheduleExactNotifications() ?? true;
+  }
+
+  /// Aniq vaqt ruxsati sahifasini ochadi; qaytgach natijani beradi.
+  Future<bool> requestExact() async {
+    await init();
+    final android = _android;
+    if (!_ready || android == null) return true;
+    if (await android.canScheduleExactNotifications() ?? true) return true;
+    await android.requestExactAlarmsPermission();
+    return await android.canScheduleExactNotifications() ?? false;
+  }
+
+  /// Ruxsat holati oxirgi sync'dan beri o'zgarganmi (masalan foydalanuvchi
+  /// sozlamalarda aniq vaqtni yoqib qaytdi) — unda qayta rejalashtirish kerak.
+  Future<bool> scheduleModeStale() async {
+    final synced = _syncedExact;
+    if (synced == null) return false;
+    return (await canScheduleExact()) != synced;
+  }
+
+  /// Sinov eslatmasi: [delay]dan keyin keladi. Ilovani yopib (yoki telefonni
+  /// o'chirib-yoqib) haqiqatan kelishini tekshirish uchun.
+  Future<bool> scheduleTest(AppLocalizations t, Duration delay) async {
+    await init();
+    if (!_ready || !await hasPermission()) return false;
+    final exact = await canScheduleExact();
+    final at = tz.TZDateTime.now(_zone).add(delay);
+    final body = t.text("Eslatmalar ishlayapti. Reja va odatlaringiz ham shu tarzda o'z vaqtida keladi.");
+    await _plugin.zonedSchedule(
+      id: _testId,
+      scheduledDate: at,
+      notificationDetails: _details(t, body: body),
+      androidScheduleMode: exact ? AndroidScheduleMode.exactAllowWhileIdle : AndroidScheduleMode.inexactAllowWhileIdle,
+      title: t.text('Sinov eslatmasi'),
+      body: body,
+      payload: 'test:0',
+    );
+    return true;
   }
 
   /// Ruxsat sahifasini ko'rsatish kerakmi: kirishdan so'ng har doim,
@@ -270,18 +324,23 @@ class ReminderService {
   /// Serverdagi odat va rejalardan telefon eslatmalarini qayta tuzadi.
   /// Internet yo'q bo'lsa, avval rejalashtirilganlari o'zgarishsiz qoladi.
   Future<void> sync({required IntizomApi api, required List<Habit> habits, required Locale locale}) async {
-    if (!_supported || _syncing) return;
+    if (!_supported) return;
+    if (_syncing) {
+      // Sync davomida kelgan so'rovni tashlab yubormaymiz — oxirgisini keyin bajaramiz.
+      _again = () => sync(api: api, habits: habits, locale: locale);
+      return;
+    }
     _syncing = true;
     try {
       await init();
       if (!await isEnabled()) {
-        await _plugin.cancelAllPendingNotifications();
+        await _cancelPendingExceptTest();
         return;
       }
       // Internet bor bo'lsa — oflaynda navbatga tushgan "Bajarildi"larni yuboramiz.
       await _flushPendingDone(api);
 
-      final exact = await _android?.canScheduleExactNotifications() ?? false;
+      final exact = await canScheduleExact();
       _scheduleMode = exact ? AndroidScheduleMode.exactAllowWhileIdle : AndroidScheduleMode.inexactAllowWhileIdle;
       final now = tz.TZDateTime.now(_zone);
       final today = DateTime(now.year, now.month, now.day);
@@ -292,7 +351,8 @@ class ReminderService {
         return;
       }
       final t = AppLocalizations(locale);
-      await _plugin.cancelAllPendingNotifications();
+      await _cancelPendingExceptTest();
+      _syncedExact = exact;
 
       _scheduled = 0;
       final budget = defaultTargetPlatform == TargetPlatform.iOS ? _iosBudget : 480;
@@ -313,6 +373,20 @@ class ReminderService {
       debugPrint('Eslatmalarni rejalashtirib bo\'lmadi: $e');
     } finally {
       _syncing = false;
+      final again = _again;
+      _again = null;
+      if (again != null) await again();
+    }
+  }
+
+  Future<void> Function()? _again;
+
+  /// Barcha kutilayotgan eslatmalarni bekor qiladi, faqat sinov eslatmasi qoladi
+  /// (foydalanuvchi uni kutayotgan bo'lishi mumkin).
+  Future<void> _cancelPendingExceptTest() async {
+    final pending = await _plugin.pendingNotificationRequests();
+    for (final r in pending) {
+      if (r.id != _testId) await _plugin.cancel(id: r.id);
     }
   }
 
