@@ -1,4 +1,5 @@
 const interfaceTranslations = <String, (String, String)>{
+  "Oflayn — saqlangan ma'lumot ko'rsatilmoqda": ('Офлайн — показаны сохранённые данные', 'Offline — showing saved data'),
   "1 ta bepul xabar qoldi · Premium": ('Осталось 1 бесплатное сообщение · Премиум', '1 free message left · Premium'),
   '10 ta maqsad': ('10 целей', '10 goals'),
   '100 ball': ('100 баллов', '100 points'),

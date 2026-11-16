@@ -2,6 +2,7 @@ import '../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../services/api_client.dart';
 import '../services/intizom_api.dart';
 import '../services/reminder_service.dart';
 import '../state/app_state.dart';
@@ -75,7 +76,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refreshAfterNotificationAction();
+    if (state != AppLifecycleState.resumed) return;
+    _refreshAfterNotificationAction();
+    // Oflayn bo'lsa — qaytganda qayta urinamiz (internet tiklangan bo'lishi mumkin).
+    if (ApiClient.offline.value && !_state.loading) _state.loadAll();
   }
 
   /// Bildirishnomadan "Bajarildi" bosilgan bo'lsa, ro'yxatlarni yangilaymiz.
@@ -164,9 +168,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             resizeToAvoidBottomInset: _tab == 4,
             body: SafeArea(
               bottom: false,
-              child: IndexedStack(
-                index: _tab,
+              child: Column(
                 children: [
+                  const _OfflineBanner(),
+                  Expanded(
+                    child: IndexedStack(
+                      index: _tab,
+                      children: [
                   TabFade(
                     active: _tab == 0,
                     child: TodayPage(
@@ -187,6 +195,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   TabFade(
                     active: _tab == 4,
                     child: _opened.contains(4) ? CoachPage(state: _state) : const SizedBox.shrink(),
+                  ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -265,6 +276,43 @@ class _NavBar extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Internet yo'q yoki server javob bermaganda — oxirgi saqlangan ma'lumot
+/// ko'rsatilayotganini bildiradigan ingichka chiziq.
+class _OfflineBanner extends StatelessWidget {
+  const _OfflineBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: ApiClient.offline,
+      builder: (context, offline, _) {
+        if (!offline) return const SizedBox.shrink();
+        final scheme = Theme.of(context).colorScheme;
+        return Container(
+          width: double.infinity,
+          color: scheme.surfaceContainerHighest,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(LucideIcons.cloudOff, size: 14, color: scheme.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  context.tr("Oflayn — saqlangan ma'lumot ko'rsatilmoqda"),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppType.caption.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
