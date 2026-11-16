@@ -112,6 +112,7 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
   }
 
   Future<void> _onLoginSuccess() async {
+    await ApiClient.clearCache(); // yangi hisob — eski saqlangan ma'lumotni tozalaymiz
     final ask = await ReminderService.instance.needsPrompt(afterLogin: true);
     if (mounted) {
       setState(() {
@@ -124,6 +125,7 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
   Future<void> _logout() async {
     await _auth.signOut();
     await ReminderService.instance.cancelAll();
+    await ApiClient.clearCache();
     if (mounted) setState(() => _loggedIn = false);
   }
 
