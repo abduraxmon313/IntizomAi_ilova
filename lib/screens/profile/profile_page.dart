@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../auth/language_page.dart';
+import '../../config/app_config.dart';
 import '../../config/store_policy.dart';
 import '../../models/extras.dart';
 import '../../services/intizom_api.dart';
@@ -342,6 +343,12 @@ class _ProfilePageState extends State<ProfilePage> {
                           subtitle: '@intizomai.uz',
                           onTap: () => _open('https://www.instagram.com/intizomai.uz'),
                         ),
+                        if (kApiBaseUrl.isNotEmpty)
+                          SettingTile(
+                            icon: LucideIcons.shield,
+                            title: context.tr("Maxfiylik siyosati"),
+                            onTap: () => _open('$kApiBaseUrl/privacy'),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 24),

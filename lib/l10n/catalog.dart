@@ -9,6 +9,7 @@ const interfaceTranslations = <String, (String, String)>{
   "Odatni bajarish vaqti keldi — belgilash uchun bosing.": ('Время выполнить привычку — нажмите, чтобы отметить.', 'Time for your habit — tap to mark it done.'),
   "{v0} kunlik seriya — bugun ham davom eting.": ('Серия {v0} дней — продолжите и сегодня.', '{v0}-day streak — keep it going today.'),
   "Rejangiz vaqti keldi — bajarib, belgilab qo'ying.": ('Время вашего плана — выполните и отметьте.', "It's time for your plan — do it and mark it done."),
+  "Maxfiylik siyosati": ('Политика конфиденциальности', 'Privacy policy'),
   "1 ta bepul xabar qoldi · Premium": ('Осталось 1 бесплатное сообщение · Премиум', '1 free message left · Premium'),
   '10 ta maqsad': ('10 целей', '10 goals'),
   '100 ball': ('100 баллов', '100 points'),
