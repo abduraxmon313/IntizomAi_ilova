@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Bildirishnoma ikonkasi (@drawable/ic_stat_notification) faqat Dart kodidan
+  matn sifatida ishlatiladi — resurs shrinker (R8) uni "ishlatilmagan" deb
+  o'chirib yuborishi mumkin. Shu sababli saqlab qolishni majburlaymiz.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_notification" />

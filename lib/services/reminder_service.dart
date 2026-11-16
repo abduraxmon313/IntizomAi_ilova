@@ -58,7 +58,8 @@ class ReminderService {
     final t = AppLocalizations(Locale(await _savedLanguage()));
     await _plugin.initialize(
       settings: InitializationSettings(
-        android: const AndroidInitializationSettings('@mipmap/ic_launcher'),
+        // Status-bar ikonkasi oq siluet bo'lishi shart (aks holda oq kvadrat chiqadi).
+        android: const AndroidInitializationSettings('@drawable/ic_stat_notification'),
         iOS: DarwinInitializationSettings(
           requestAlertPermission: false,
           requestBadgePermission: false,

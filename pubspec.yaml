@@ -26,6 +26,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
@@ -44,3 +45,15 @@ flutter:
           weight: 600
         - asset: assets/fonts/inter/Inter-Bold.ttf
           weight: 700
+
+# Ilova ikonkasi (launcher + adaptiv + iOS). Manba rasmlar assets/icon/ da —
+# ular logo.png dan tool bilan yaratilgan (tool/gen_icons.py). Qayta yaratish:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/icon.png"
+  remove_alpha_ios: true
+  adaptive_icon_background: "assets/icon/background.png"
+  adaptive_icon_foreground: "assets/icon/foreground.png"
+  adaptive_icon_monochrome: "assets/icon/monochrome.png"
