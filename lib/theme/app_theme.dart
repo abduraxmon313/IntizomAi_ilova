@@ -1,100 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// IntizomAI dizayn tizimi — "Quyosh" (Sun).
+/// IntizomAI dizayn tizimi.
 ///
-/// Oq va iliq krem yuzalar, deyarli qora siyoh matn, bitta brend rangi —
-/// quyosh sarig'i. Sariq faqat to'ldirish uchun (tugma, belgi, halqa,
-/// progress); matn va havolalar uchun o'qiladigan chuqur oltin tus.
-/// Ma'no ranglari (muvaffaqiyat, ogohlantirish, xato) faqat ma'no tashiganda.
+/// Logodagi ko'k rang — yagona brend rangi. Yuzalar sovuq-neytral: och kulrang
+/// fon ustida chegarasiz oq yuzalar (qorong'ida — ingichka chiziqli grafit).
+/// Rang faqat ma'no tashiydi: brend — amal va progress, yashil — bajarildi,
+/// olov — seriya, qizil — xavf. Bezak uchun rang ishlatilmaydi.
 abstract final class AppPalette {
-  // ── Brend ────────────────────────────────────────────
-  static const brand = Color(0xFFF5B800); // asosiy to'ldirish: tugma, belgi, halqa
-  static const brandBright = Color(0xFFFFC933); // qorong'i rejimdagi brend
-  static const brandInk = Color(0xFF8A6100); // sariq ustidagi emas — krem ustidagi matn/havola
-  static const brandDeep = Color(0xFF5C4100);
-  static const brandTint = Color(0xFFFFF3C4); // tanlangan holat foni
-  static const brandOnDark = Color(0xFFFFC933);
-  static const gold = Color(0xFFB8860B); // Premium, nishonlar
+  // ── Brend (logodan) ──────────────────────────────────
+  static const brand = Color(0xFF0B7C9B); // tugma, belgi — oq matn bilan AA
+  static const brandBright = Color(0xFF12B5D8); // halqa, progress, diagramma
+  static const brandInk = Color(0xFF0A7592); // och fon ustidagi havola/matn
+  static const brandDeep = Color(0xFF0A4F63);
+  static const brandTint = Color(0xFFE2F4F9); // tanlangan holat foni
+  static const brandOnDark = Color(0xFF2CC4E4); // qorong'i rejimdagi brend
+  static const onBrandDark = Color(0xFF04222B);
+  static const gold = Color(0xFFB7791F); // faqat Premium
 
-  // ── Neytral (yorug') — iliq krem ─────────────────────
-  static const ink = Color(0xFF1A1814);
-  static const ink2 = Color(0xFF68625A);
-  static const ink3 = Color(0xFF9A948A);
-  static const line = Color(0xFFEDE7DB);
-  static const lineStrong = Color(0xFFDAD2C2);
-  static const canvas = Color(0xFFFAF7F0);
+  // ── Neytral (yorug') ─────────────────────────────────
+  static const ink = Color(0xFF0B1720);
+  static const ink2 = Color(0xFF56636F);
+  static const ink3 = Color(0xFF8793A0);
+  static const line = Color(0xFFE6EAEE);
+  static const lineStrong = Color(0xFFCBD3DB);
+  static const canvas = Color(0xFFF4F6F8);
   static const paper = Color(0xFFFFFFFF);
-  static const paper2 = Color(0xFFF5F1E8);
-  static const paper3 = Color(0xFFEEE8DC);
+  static const paper2 = Color(0xFFEFF2F5);
+  static const paper3 = Color(0xFFE5E9EE);
 
-  // ── Neytral (qorong'i) — iliq grafit ─────────────────
-  static const darkCanvas = Color(0xFF0E0E0C);
-  static const darkPaper = Color(0xFF171614);
-  static const darkPaper2 = Color(0xFF1F1E1B);
-  static const darkPaper3 = Color(0xFF282623);
-  static const darkLine = Color(0xFF2B2926);
-  static const darkLineStrong = Color(0xFF3D3A35);
-  static const darkInk = Color(0xFFF5F2EB);
-  static const darkInk2 = Color(0xFFAAA498);
-  static const darkInk3 = Color(0xFF77726A);
+  // ── Neytral (qorong'i) ───────────────────────────────
+  static const darkCanvas = Color(0xFF0A0F14);
+  static const darkPaper = Color(0xFF121920);
+  static const darkPaper2 = Color(0xFF19222B);
+  static const darkPaper3 = Color(0xFF222D38);
+  static const darkLine = Color(0xFF222C36);
+  static const darkLineStrong = Color(0xFF364452);
+  static const darkInk = Color(0xFFEEF3F7);
+  static const darkInk2 = Color(0xFF9BA8B4);
+  static const darkInk3 = Color(0xFF6B7884);
 
   // ── Ma'no ranglari ───────────────────────────────────
-  static const success = Color(0xFF1E8A4C);
-  static const warning = Color(0xFFD97706);
-  static const danger = Color(0xFFD14343);
-  static const info = Color(0xFF2F6FDB);
+  static const success = Color(0xFF18794E);
+  static const warning = Color(0xFFB45309);
+  static const danger = Color(0xFFCF3F3A);
+  static const info = brand;
   static const ember = Color(0xFFE8590C); // seriya (olov)
-
-  /// "Bugun" kartasi — siyoh yuza (yorug' rejimda ham).
-  static const heroStart = Color(0xFF1A1814);
-  static const heroEnd = Color(0xFF26231D);
-
-  // ── Ikonka plitalari uchun bosiq aksentlar ───────────
-  static const accentBlue = Color(0xFF2F6FDB);
-  static const accentTeal = Color(0xFF0F8A7E);
-  static const accentAmber = Color(0xFFC98A00);
-  static const accentViolet = Color(0xFF6D5BD0);
-  static const accentRose = Color(0xFFC94B65);
-  static const accentGreen = Color(0xFF2E8B57);
-  static const accentIndigo = Color(0xFF4A5BC9);
-  static const accentSlate = Color(0xFF68625A);
-
-  // ── Eski nomlar (mavjud kod uchun) ───────────────────
-  static const primary = brand;
-  static const primarySoft = brandTint;
-  static const primaryDark = brandOnDark;
-  static const accent = brandBright;
-  static const disciplineGreen = success;
-  static const streakOrange = ember;
-  static const levelGold = gold;
-  static const xpBlue = brand;
-  static const navy = ink;
-  static const navySoft = ink2;
-  static const text = ink;
-  static const textSecondary = ink2;
-  static const textTertiary = ink3;
-  static const background = canvas;
-  static const surface = paper;
-  static const surfaceMuted = paper2;
-  static const surfaceSunken = paper3;
-  static const border = line;
-  static const borderStrong = lineStrong;
-  static const darkBackground = darkCanvas;
-  static const darkSurface = darkPaper;
-  static const darkSurfaceMuted = darkPaper2;
-  static const darkSurfaceSunken = darkPaper3;
-  static const darkBorder = darkLine;
-  static const darkText = darkInk;
-  static const darkTextSecondary = darkInk2;
 }
 
 abstract final class AppRadius {
   static const xs = 6.0;
   static const sm = 8.0;
-  static const md = 10.0;
-  static const lg = 12.0;
-  static const xl = 16.0;
+  static const md = 12.0;
+  static const lg = 16.0;
+  static const xl = 22.0;
 }
 
 /// 4 pt panjara.
@@ -106,20 +65,33 @@ abstract final class AppSpace {
   static const xl = 24.0;
   static const xxl = 32.0;
 
-  /// Ekran chetidan gorizontal masofa.
+  /// Ekran chetidan gorizontal masofa (barcha sahifalarda bir xil).
   static const page = 20.0;
+
+  /// Pastki navigatsiya va "+" tugmasi ostida qoladigan joy.
+  static const bottomInset = 96.0;
 }
 
 abstract final class AppShadows {
-  /// Deyarli sezilmaydigan ko'tarilish — faqat suzuvchi elementlar uchun.
-  static const card = [
-    BoxShadow(color: Color(0x080B1324), blurRadius: 2, offset: Offset(0, 1)),
-    BoxShadow(color: Color(0x050B1324), blurRadius: 8, offset: Offset(0, 2)),
-  ];
+  /// Faqat suzuvchi elementlar uchun ("+" tugmasi, xabar yozish maydoni).
   static const raised = [
-    BoxShadow(color: Color(0x0F0B1324), blurRadius: 4, offset: Offset(0, 2)),
-    BoxShadow(color: Color(0x140B1324), blurRadius: 24, offset: Offset(0, 10)),
+    BoxShadow(color: Color(0x140B1720), blurRadius: 18, offset: Offset(0, 8)),
+    BoxShadow(color: Color(0x0A0B1720), blurRadius: 3, offset: Offset(0, 1)),
   ];
+}
+
+/// Matn o'lchamlari — butun ilovada faqat shu shkala.
+abstract final class AppType {
+  static const display = TextStyle(fontSize: 28, height: 1.15, fontWeight: FontWeight.w700, letterSpacing: -.8);
+  static const title = TextStyle(fontSize: 22, height: 1.2, fontWeight: FontWeight.w700, letterSpacing: -.5);
+  static const heading = TextStyle(fontSize: 17, height: 1.25, fontWeight: FontWeight.w600, letterSpacing: -.3);
+  static const body = TextStyle(fontSize: 15, height: 1.4, fontWeight: FontWeight.w400, letterSpacing: -.1);
+  static const bodyStrong = TextStyle(fontSize: 15, height: 1.3, fontWeight: FontWeight.w600, letterSpacing: -.15);
+  static const label = TextStyle(fontSize: 13, height: 1.35, fontWeight: FontWeight.w500, letterSpacing: 0);
+  static const caption = TextStyle(fontSize: 12, height: 1.35, fontWeight: FontWeight.w500, letterSpacing: 0);
+
+  /// Bo'lim ustidagi kichik sarlavha (BUGUN, REJALAR ...).
+  static const overline = TextStyle(fontSize: 11.5, height: 1.2, fontWeight: FontWeight.w600, letterSpacing: .7);
 }
 
 abstract final class AppMotion {
@@ -153,41 +125,47 @@ abstract final class AppTheme {
     final dark = brightness == Brightness.dark;
     final canvas = dark ? AppPalette.darkCanvas : AppPalette.canvas;
     final paper = dark ? AppPalette.darkPaper : AppPalette.paper;
+    final paper2 = dark ? AppPalette.darkPaper2 : AppPalette.paper2;
+    final paper3 = dark ? AppPalette.darkPaper3 : AppPalette.paper3;
     final ink = dark ? AppPalette.darkInk : AppPalette.ink;
     final ink2 = dark ? AppPalette.darkInk2 : AppPalette.ink2;
+    final ink3 = dark ? AppPalette.darkInk3 : AppPalette.ink3;
     final line = dark ? AppPalette.darkLine : AppPalette.line;
-    final brand = dark ? AppPalette.brandBright : AppPalette.brand;
-    final brandText = dark ? AppPalette.brandBright : AppPalette.brandInk;
+    final lineStrong = dark ? AppPalette.darkLineStrong : AppPalette.lineStrong;
+    final brand = dark ? AppPalette.brandOnDark : AppPalette.brand;
+    final brandText = dark ? AppPalette.brandOnDark : AppPalette.brandInk;
 
+    // Rollar: primary — to'ldirish (tugma, belgi), tertiary — matn/havola,
+    // outline — nofaol ikonka va boshqaruv chegarasi, outlineVariant — ajratgich.
     final scheme = ColorScheme(
       brightness: brightness,
       primary: brand,
-      onPrimary: AppPalette.ink,
-      primaryContainer: dark ? const Color(0xFF3A3018) : AppPalette.brandTint,
-      onPrimaryContainer: dark ? const Color(0xFFFFE7A3) : AppPalette.brandDeep,
+      onPrimary: dark ? AppPalette.onBrandDark : Colors.white,
+      primaryContainer: dark ? const Color(0xFF0E2F3A) : AppPalette.brandTint,
+      onPrimaryContainer: dark ? const Color(0xFFBFEFFA) : AppPalette.brandDeep,
       secondary: ink2,
       onSecondary: paper,
-      secondaryContainer: dark ? AppPalette.darkPaper2 : AppPalette.paper2,
+      secondaryContainer: paper2,
       onSecondaryContainer: ink,
       tertiary: brandText,
-      onTertiary: dark ? AppPalette.ink : Colors.white,
-      error: dark ? const Color(0xFFF07A7A) : AppPalette.danger,
+      onTertiary: dark ? AppPalette.onBrandDark : Colors.white,
+      error: dark ? const Color(0xFFF2817B) : AppPalette.danger,
       onError: Colors.white,
-      errorContainer: dark ? const Color(0xFF3A1A1C) : const Color(0xFFFCEBEB),
-      onErrorContainer: dark ? const Color(0xFFFFD6D6) : const Color(0xFF8A1F1F),
+      errorContainer: dark ? const Color(0xFF3A1B1B) : const Color(0xFFFBEBEA),
+      onErrorContainer: dark ? const Color(0xFFFFD9D6) : const Color(0xFF8C2420),
       surface: canvas,
       onSurface: ink,
       onSurfaceVariant: ink2,
       surfaceContainerLowest: paper,
-      surfaceContainerLow: dark ? AppPalette.darkPaper2 : AppPalette.paper2,
-      surfaceContainer: dark ? AppPalette.darkPaper2 : AppPalette.paper2,
-      surfaceContainerHigh: dark ? AppPalette.darkPaper3 : AppPalette.paper3,
-      surfaceContainerHighest: dark ? const Color(0xFF33302B) : const Color(0xFFE6DFD0),
-      outline: dark ? AppPalette.darkLineStrong : AppPalette.lineStrong,
+      surfaceContainerLow: paper2,
+      surfaceContainer: paper2,
+      surfaceContainerHigh: paper3,
+      surfaceContainerHighest: dark ? const Color(0xFF2C3946) : const Color(0xFFD9DFE6),
+      outline: ink3,
       outlineVariant: line,
       inverseSurface: dark ? AppPalette.darkInk : AppPalette.ink,
       onInverseSurface: dark ? AppPalette.ink : Colors.white,
-      inversePrimary: AppPalette.brandInk,
+      inversePrimary: dark ? AppPalette.brand : AppPalette.brandOnDark,
       surfaceTint: Colors.transparent,
       shadow: Colors.black,
       scrim: Colors.black,
@@ -197,6 +175,10 @@ abstract final class AppTheme {
     final t = base.textTheme.apply(fontFamily: fontFamily, bodyColor: ink, displayColor: ink);
     final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md));
     const buttonText = TextStyle(fontFamily: fontFamily, fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -.1);
+    OutlineInputBorder inputBorder(Color c, [double w = 1]) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      borderSide: BorderSide(color: c, width: w),
+    );
 
     return base.copyWith(
       colorScheme: scheme,
@@ -205,23 +187,23 @@ abstract final class AppTheme {
       dividerColor: line,
       splashFactory: InkSparkle.splashFactory,
       highlightColor: ink.withValues(alpha: .04),
-      splashColor: brand.withValues(alpha: .10),
+      splashColor: ink.withValues(alpha: .05),
       hoverColor: ink.withValues(alpha: .03),
       iconTheme: IconThemeData(color: ink2, size: 20),
       dividerTheme: DividerThemeData(color: line, thickness: 1, space: 1),
       textTheme: t.copyWith(
-        displaySmall: t.displaySmall?.copyWith(fontSize: 34, fontWeight: FontWeight.w700, letterSpacing: -1.2),
-        headlineMedium: t.headlineMedium?.copyWith(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -.9),
-        headlineSmall: t.headlineSmall?.copyWith(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -.6),
-        titleLarge: t.titleLarge?.copyWith(fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: -.35),
-        titleMedium: t.titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: -.2),
-        titleSmall: t.titleSmall?.copyWith(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: -.1),
-        bodyLarge: t.bodyLarge?.copyWith(fontSize: 16, height: 1.45, letterSpacing: -.15),
-        bodyMedium: t.bodyMedium?.copyWith(fontSize: 14.5, height: 1.45, letterSpacing: -.1),
-        bodySmall: t.bodySmall?.copyWith(fontSize: 13, color: ink2, height: 1.4),
-        labelLarge: t.labelLarge?.copyWith(fontWeight: FontWeight.w600),
-        labelMedium: t.labelMedium?.copyWith(fontWeight: FontWeight.w500, color: ink2),
-        labelSmall: t.labelSmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: .4, color: ink2),
+        displaySmall: t.displaySmall?.merge(AppType.display),
+        headlineMedium: t.headlineMedium?.merge(AppType.display),
+        headlineSmall: t.headlineSmall?.merge(AppType.title),
+        titleLarge: t.titleLarge?.merge(AppType.title),
+        titleMedium: t.titleMedium?.merge(AppType.heading),
+        titleSmall: t.titleSmall?.merge(AppType.bodyStrong),
+        bodyLarge: t.bodyLarge?.merge(AppType.body),
+        bodyMedium: t.bodyMedium?.merge(AppType.body),
+        bodySmall: t.bodySmall?.merge(AppType.label).copyWith(color: ink2),
+        labelLarge: t.labelLarge?.merge(AppType.bodyStrong),
+        labelMedium: t.labelMedium?.merge(AppType.label).copyWith(color: ink2),
+        labelSmall: t.labelSmall?.merge(AppType.caption).copyWith(color: ink2),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: canvas,
@@ -229,32 +211,33 @@ abstract final class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleTextStyle: TextStyle(fontFamily: fontFamily, fontSize: 17, fontWeight: FontWeight.w600, letterSpacing: -.3, color: ink),
+        titleTextStyle: AppType.heading.copyWith(fontFamily: fontFamily, color: ink),
       ),
       cardTheme: CardThemeData(
         color: paper,
         elevation: 0,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg), side: BorderSide(color: line)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          side: dark ? BorderSide(color: line) : BorderSide.none,
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: paper,
-        hintStyle: TextStyle(color: dark ? AppPalette.darkInk2 : AppPalette.ink3, fontSize: 15),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md), borderSide: BorderSide(color: line)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md), borderSide: BorderSide(color: line)),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide(color: brandText, width: 1.5),
-        ),
+        fillColor: paper2,
+        hintStyle: TextStyle(color: ink3, fontSize: 15, fontWeight: FontWeight.w400, letterSpacing: -.1),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        border: inputBorder(Colors.transparent),
+        enabledBorder: inputBorder(Colors.transparent),
+        focusedBorder: inputBorder(brandText, 1.5),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: brand,
           foregroundColor: scheme.onPrimary,
-          disabledBackgroundColor: ink.withValues(alpha: .08),
-          minimumSize: const Size(0, 48),
+          disabledBackgroundColor: paper3,
+          disabledForegroundColor: ink3,
+          minimumSize: const Size(0, 50),
           padding: const EdgeInsets.symmetric(horizontal: 20),
           shape: shape,
           textStyle: buttonText,
@@ -265,7 +248,7 @@ abstract final class AppTheme {
           backgroundColor: brand,
           foregroundColor: scheme.onPrimary,
           elevation: 0,
-          minimumSize: const Size(0, 48),
+          minimumSize: const Size(0, 50),
           shape: shape,
           textStyle: buttonText,
         ),
@@ -273,8 +256,8 @@ abstract final class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: ink,
-          side: BorderSide(color: dark ? AppPalette.darkLineStrong : AppPalette.lineStrong),
-          minimumSize: const Size(0, 48),
+          side: BorderSide(color: lineStrong),
+          minimumSize: const Size(0, 50),
           padding: const EdgeInsets.symmetric(horizontal: 20),
           shape: shape,
           textStyle: buttonText,
@@ -283,80 +266,74 @@ abstract final class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: brandText,
+          minimumSize: const Size(0, 44),
           shape: shape,
           textStyle: buttonText.copyWith(fontSize: 14),
         ),
       ),
-      iconButtonTheme: IconButtonThemeData(style: IconButton.styleFrom(foregroundColor: ink2)),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(foregroundColor: ink2, minimumSize: const Size(44, 44)),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: brand,
+        foregroundColor: scheme.onPrimary,
+        elevation: 3,
+        focusElevation: 3,
+        hoverElevation: 3,
+        highlightElevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg + 2)),
+      ),
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((s) => Colors.white),
+        thumbColor: WidgetStateProperty.all(Colors.white),
         trackColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? brand : (dark ? AppPalette.darkPaper3 : AppPalette.lineStrong),
+          (s) => s.contains(WidgetState.selected) ? brand : (dark ? AppPalette.darkLineStrong : AppPalette.lineStrong),
         ),
         trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
       ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: paper,
-        surfaceTintColor: Colors.transparent,
-        indicatorColor: scheme.primaryContainer,
-        indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
-        elevation: 0,
-        height: 68,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        iconTheme: WidgetStateProperty.resolveWith(
-          (s) => IconThemeData(size: 21, color: s.contains(WidgetState.selected) ? (dark ? brand : ink) : ink2),
-        ),
-        labelTextStyle: WidgetStateProperty.resolveWith((s) {
-          final sel = s.contains(WidgetState.selected);
-          return TextStyle(
-            fontFamily: fontFamily,
-            fontSize: 11.5,
-            fontWeight: sel ? FontWeight.w600 : FontWeight.w500,
-            color: sel ? ink : ink2,
-          );
-        }),
-      ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: paper,
+        modalBackgroundColor: paper,
         surfaceTintColor: Colors.transparent,
-        dragHandleColor: dark ? AppPalette.darkLineStrong : AppPalette.lineStrong,
-        dragHandleSize: const Size(36, 4),
+        showDragHandle: false,
+        modalBarrierColor: Colors.black.withValues(alpha: dark ? .6 : .32),
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: paper,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
-        titleTextStyle: TextStyle(fontFamily: fontFamily, fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: -.3, color: ink),
-        contentTextStyle: TextStyle(fontFamily: fontFamily, fontSize: 14.5, height: 1.45, color: ink2),
+        titleTextStyle: AppType.heading.copyWith(fontFamily: fontFamily, color: ink),
+        contentTextStyle: AppType.body.copyWith(fontFamily: fontFamily, color: ink2),
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: paper,
         surfaceTintColor: Colors.transparent,
-        elevation: 6,
-        shadowColor: Colors.black.withValues(alpha: .2),
+        elevation: 8,
+        shadowColor: Colors.black.withValues(alpha: .18),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          side: BorderSide(color: line),
+          side: dark ? BorderSide(color: lineStrong) : BorderSide.none,
         ),
-        textStyle: TextStyle(fontFamily: fontFamily, fontSize: 14.5, color: ink),
+        textStyle: AppType.body.copyWith(fontFamily: fontFamily, color: ink),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
+        elevation: 0,
         backgroundColor: dark ? AppPalette.darkPaper3 : AppPalette.ink,
-        contentTextStyle: TextStyle(fontFamily: fontFamily, fontSize: 14, color: dark ? AppPalette.darkInk : Colors.white),
+        contentTextStyle: TextStyle(fontFamily: fontFamily, fontSize: 14, fontWeight: FontWeight.w500, color: dark ? AppPalette.darkInk : Colors.white),
+        actionTextColor: AppPalette.brandOnDark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
         insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       ),
       textSelectionTheme: TextSelectionThemeData(
         cursorColor: brandText,
-        selectionColor: brand.withValues(alpha: .35),
+        selectionColor: brand.withValues(alpha: .25),
         selectionHandleColor: brandText,
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: brand,
-        linearTrackColor: scheme.surfaceContainerHigh,
-        circularTrackColor: scheme.surfaceContainerHigh,
+        linearTrackColor: paper3,
+        circularTrackColor: Colors.transparent,
       ),
       datePickerTheme: DatePickerThemeData(
         backgroundColor: paper,
@@ -368,12 +345,6 @@ abstract final class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
       ),
       listTileTheme: ListTileThemeData(iconColor: ink2, textColor: ink),
-      chipTheme: ChipThemeData(
-        backgroundColor: paper,
-        selectedColor: scheme.primaryContainer,
-        side: BorderSide(color: line),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)),
-      ),
     );
   }
 }

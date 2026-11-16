@@ -6,80 +6,28 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/ui_kit.dart';
 
-/// Mini App'dagi yutuq bosqichlari (streak, maqsad, ball).
+/// Mini App'dagi yutuq bosqichlari (seriya, maqsad, ball).
 class AchievementMilestone {
-  const AchievementMilestone(this.icon, this.accent, this.value, this.label, this.current, this.target);
+  const AchievementMilestone(this.icon, this.title, this.current, this.target, this.unit);
 
   final IconData icon;
-  final Color accent;
-  final String value;
-  final String label;
+  final String title;
   final int current;
   final int target;
+  final String unit;
 
   bool get unlocked => current >= target;
   double get progress => (current / target).clamp(0, 1).toDouble();
 }
 
-const kAchievementCount = 6;
-
 List<AchievementMilestone> achievementMilestones(int streak, int score, int goalsDone) => [
-  AchievementMilestone(LucideIcons.flame, AppPalette.ember, '3 kun', 'Seriya', streak, 3),
-  AchievementMilestone(LucideIcons.zap, AppPalette.accentAmber, '7 kun', 'Seriya', streak, 7),
-  AchievementMilestone(LucideIcons.gem, AppPalette.accentViolet, '30 kun', 'Seriya', streak, 30),
-  AchievementMilestone(LucideIcons.target, AppPalette.accentTeal, '10 ta', 'Maqsad', goalsDone, 10),
-  AchievementMilestone(LucideIcons.trophy, AppPalette.accentBlue, '100', 'Ball', score, 100),
-  AchievementMilestone(LucideIcons.crown, AppPalette.accentRose, '500', 'Ball', score, 500),
+  AchievementMilestone(LucideIcons.flame, '3 kunlik seriya', streak, 3, 'kun'),
+  AchievementMilestone(LucideIcons.flame, '7 kunlik seriya', streak, 7, 'kun'),
+  AchievementMilestone(LucideIcons.flame, '30 kunlik seriya', streak, 30, 'kun'),
+  AchievementMilestone(LucideIcons.target, '10 ta maqsad', goalsDone, 10, 'ta'),
+  AchievementMilestone(LucideIcons.star, '100 ball', score, 100, 'ball'),
+  AchievementMilestone(LucideIcons.star, '500 ball', score, 500, 'ball'),
 ];
-
-/// 3 ustunli yutuqlar panjarasi (Yutuqlar sahifasi va Profil).
-class AchievementGrid extends StatelessWidget {
-  const AchievementGrid({super.key, required this.items});
-
-  final List<AchievementMilestone> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: .95,
-      children: [
-        for (final a in items)
-          AppCard(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Opacity(
-                  opacity: a.unlocked ? 1 : .45,
-                  child: AppIconTile.tinted(icon: a.icon, accent: a.unlocked ? a.accent : AppPalette.accentSlate, size: 34),
-                ),
-                const Spacer(),
-                Text(
-                  a.value,
-                  maxLines: 1,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -.4,
-                    color: a.unlocked ? scheme.onSurface : scheme.onSurfaceVariant,
-                  ),
-                ),
-                Text(a.label, maxLines: 1, style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant)),
-                const SizedBox(height: 8),
-                AppProgressBar(value: a.progress, height: 3, color: a.unlocked ? a.accent : null),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
 
 /// Yutuqlar: daraja, bosqichlar, serverdan kelgan qo'lga kiritilgan nishonlar.
 class AchievementsPage extends StatelessWidget {
@@ -99,71 +47,92 @@ class AchievementsPage extends StatelessWidget {
         return RefreshIndicator(
           onRefresh: state.refreshStats,
           child: ListView(
-            padding: const EdgeInsets.only(bottom: 32),
+            padding: const EdgeInsets.only(bottom: 40),
             children: [
-              const PageHeader(title: 'Yutuqlar', subtitle: 'Seriya, maqsad va ball bosqichlari'),
+              const PageHeader(title: 'Yutuqlar'),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    AppCard(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                    Container(
+                      decoration: surfaceDecoration(context),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Text(
-                                '$unlocked',
-                                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -.8, fontFeatures: tabularFigures),
-                              ),
-                              Text(
-                                ' / ${items.length} bosqich',
-                                style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
-                              ),
-                              const Spacer(),
-                              Text(
-                                '${st.perfectDays} mukammal kun',
-                                style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
-                              ),
-                            ],
-                          ),
+                          Text('${items.length} bosqichdan $unlocked tasi ochildi', style: AppType.heading),
+                          const SizedBox(height: 12),
+                          AppProgressBar(value: unlocked / items.length),
                           const SizedBox(height: 10),
-                          AppProgressBar(value: unlocked / items.length, height: 6),
-                          const SizedBox(height: 8),
                           Text(
                             _nextHint(items),
-                            style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant, height: 1.35),
+                            style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant, height: 1.4),
                           ),
                         ],
                       ),
                     ),
-                    const SectionBar(title: 'Bosqichlar', top: 24),
-                    AchievementGrid(items: items),
+                    const SectionBar(title: 'Bosqichlar'),
+                    GroupCard(
+                      indent: 68,
+                      children: [
+                        for (final a in items)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                            child: Row(
+                              children: [
+                                AppIconTile(icon: a.icon, tone: a.unlocked ? scheme.primary : null, size: 40),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        a.title,
+                                        style: AppType.body.copyWith(
+                                          fontWeight: FontWeight.w500,
+                                          color: a.unlocked ? scheme.onSurface : scheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      if (a.unlocked)
+                                        Text('Ochildi', style: AppType.caption.copyWith(color: scheme.tertiary, fontWeight: FontWeight.w600))
+                                      else
+                                        Row(
+                                          children: [
+                                            Expanded(child: AppProgressBar(value: a.progress, height: 4)),
+                                            const SizedBox(width: 10),
+                                            Text(
+                                              '${a.current}/${a.target} ${a.unit}',
+                                              style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
+                                            ),
+                                          ],
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                if (a.unlocked) ...[
+                                  const SizedBox(width: 10),
+                                  Icon(LucideIcons.circleCheck, size: 20, color: scheme.tertiary),
+                                ],
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                     if (st.achievements.isNotEmpty) ...[
-                      SectionBar(title: "Qo'lga kiritilgan", count: '${st.achievements.length}', top: 24),
+                      SectionBar(title: 'Nishonlar', count: '${st.achievements.length}'),
                       GroupCard(
-                        indent: 64,
                         children: [
                           for (final a in st.achievements)
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                              padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
                               child: Row(
                                 children: [
-                                  AppIconTile.tinted(
-                                    icon: habitGlyphs[a.icon.trim()] ?? LucideIcons.medal,
-                                    accent: _rarityColor(a.rarity),
-                                    size: 34,
-                                  ),
+                                  Text(a.icon, style: const TextStyle(fontSize: 20)),
                                   const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Text(
-                                      a.title,
-                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, letterSpacing: -.15),
-                                    ),
-                                  ),
-                                  Pill(_rarityLabel(a.rarity), color: _rarityColor(a.rarity)),
+                                  Expanded(child: Text(a.title, style: AppType.body.copyWith(fontWeight: FontWeight.w500))),
+                                  Pill(_rarityLabel(a.rarity), muted: a.rarity == 'common', color: a.rarity == 'legendary' ? AppPalette.gold : null),
                                 ],
                               ),
                             ),
@@ -185,15 +154,8 @@ class AchievementsPage extends StatelessWidget {
     final locked = items.where((a) => !a.unlocked).toList()..sort((a, b) => b.progress.compareTo(a.progress));
     if (locked.isEmpty) return 'Barcha bosqichlar ochildi. Ajoyib natija!';
     final n = locked.first;
-    return 'Keyingisi: ${n.value} ${n.label.toLowerCase()} — yana ${n.target - n.current} qoldi.';
+    return 'Eng yaqini: ${n.title} — yana ${n.target - n.current} ${n.unit} qoldi.';
   }
-
-  static Color _rarityColor(String r) => switch (r) {
-    'legendary' => AppPalette.accentAmber,
-    'epic' => AppPalette.accentViolet,
-    'rare' => AppPalette.accentBlue,
-    _ => AppPalette.accentTeal,
-  };
 
   static String _rarityLabel(String r) => switch (r) {
     'legendary' => 'Afsonaviy',

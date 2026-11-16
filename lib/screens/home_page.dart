@@ -3,18 +3,26 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../services/intizom_api.dart';
 import '../state/app_state.dart';
+import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
 import '../widgets/feedback.dart';
 import '../widgets/ui_kit.dart';
-import 'dashboard/dashboard_page.dart';
+import 'coach/coach_page.dart';
 import 'habits/habits_page.dart';
 import 'plans/plans_page.dart';
 import 'stats/stats_page.dart';
+import 'today/today_page.dart';
 
-/// Asosiy oyna (MyFit kabi 4 bo'lim): Asosiy | Rejalar | Odatlar | Statistika.
-/// Maqsadlar, Do'stlar, AI chat va Yutuqlar — Asosiy sahifadagi "Tezkor kirish"da.
+/// Ilova qobig'i. Har bir imkoniyatning bitta aniq joyi bor:
 ///
-/// Orqaga tugmasi: ichki sahifa → Asosiy bo'lim → ilovadan chiqish.
+/// * Bugun — bugungi ishlar (reja + odat), kun holati.
+/// * Rejalar — rejalashtirish: kun rejalari, oy va yil maqsadlari.
+/// * Odatlar — odatlar va haftalik jadval.
+/// * Natijalar — shaxsiy tahlil, do'stlar, reyting.
+/// * Murabbiy — AI suhbat.
+///
+/// Profil va sozlamalar — Bugun sahifasidagi avatar ortida.
+/// Orqaga tugmasi: boshqa bo'lim → Bugun → ilovadan chiqish.
 class HomePage extends StatefulWidget {
   const HomePage({
     super.key,
@@ -35,10 +43,22 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late final AppState _state = AppState(widget.api);
+  final _todayKey = GlobalKey<TodayPageState>();
+  final _plansKey = GlobalKey<PlansPageState>();
+  final _habitsKey = GlobalKey<HabitsPageState>();
+
   int _tab = 0;
 
-  /// Statistika birinchi ochilganda yuklanadi.
-  bool _statsOpened = false;
+  /// Natijalar va Murabbiy birinchi ochilganda quriladi.
+  final _opened = <int>{0, 1, 2};
+
+  static const _tabs = [
+    (LucideIcons.sun, 'Bugun'),
+    (LucideIcons.calendarDays, 'Rejalar'),
+    (LucideIcons.repeat, 'Odatlar'),
+    (LucideIcons.chartNoAxesColumn, 'Natijalar'),
+    (LucideIcons.sparkles, 'Murabbiy'),
+  ];
 
   @override
   void initState() {
@@ -54,17 +74,25 @@ class _HomePageState extends State<HomePage> {
 
   void _select(int i) {
     if (i == _tab) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _tab = i;
-      if (i == 3) _statsOpened = true;
+      _opened.add(i);
     });
   }
 
-  bool get _canExit => _tab == 0;
-
-  void _handleBack() {
-    if (_tab != 0) setState(() => _tab = 0);
+  void _openGoals() {
+    _plansKey.currentState?.showView(PlansView.month);
+    _select(1);
   }
+
+  /// Joriy bo'limning yagona "qo'shish" amali (Natijalar va Murabbiyda yo'q).
+  (String, VoidCallback)? get _add => switch (_tab) {
+    0 => ("Reja qo'shish", () => _todayKey.currentState?.addPlan()),
+    1 => ("Qo'shish", () => _plansKey.currentState?.add()),
+    2 => ("Odat qo'shish", () => _habitsKey.currentState?.add()),
+    _ => null,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -76,11 +104,7 @@ class _HomePageState extends State<HomePage> {
             body: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  BrandMark(size: 56),
-                  SizedBox(height: 24),
-                  SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
-                ],
+                children: [BrandMark(size: 64), SizedBox(height: 28), LoadingView(padding: 0)],
               ),
             ),
           );
@@ -90,12 +114,15 @@ class _HomePageState extends State<HomePage> {
             body: ErrorRetry(message: _state.error ?? 'Xatolik yuz berdi', onRetry: _state.loadAll),
           );
         }
+        final add = _add;
         return PopScope(
-          canPop: _canExit,
+          canPop: _tab == 0,
           onPopInvokedWithResult: (didPop, _) {
-            if (!didPop) _handleBack();
+            if (!didPop) _select(0);
           },
           child: Scaffold(
+            // Murabbiyda klaviatura ochilganda yozish maydoni ko'tariladi.
+            resizeToAvoidBottomInset: _tab == 4,
             body: SafeArea(
               bottom: false,
               child: IndexedStack(
@@ -103,47 +130,104 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   TabFade(
                     active: _tab == 0,
-                    child: DashboardPage(
+                    child: TodayPage(
+                      key: _todayKey,
                       state: _state,
                       onLogout: widget.onLogout,
                       onAppearanceChanged: widget.onAppearanceChanged,
-                      onLanguageChanged: widget.onLanguageChanged,
-                      onOpenPlans: () => _select(1),
-                      onOpenHabits: () => _select(2),
-                      onOpenStats: () => _select(3),
+                      onOpenGoals: _openGoals,
                     ),
                   ),
-                  TabFade(active: _tab == 1, child: PlansPage(state: _state)),
-                  TabFade(active: _tab == 2, child: HabitsPage(state: _state)),
+                  TabFade(active: _tab == 1, child: PlansPage(key: _plansKey, state: _state)),
+                  TabFade(active: _tab == 2, child: HabitsPage(key: _habitsKey, state: _state)),
                   TabFade(
                     active: _tab == 3,
-                    child: _statsOpened ? StatsPage(state: _state) : const SizedBox.shrink(),
+                    child: _opened.contains(3) ? StatsPage(state: _state) : const SizedBox.shrink(),
+                  ),
+                  TabFade(
+                    active: _tab == 4,
+                    child: _opened.contains(4) ? CoachPage(state: _state) : const SizedBox.shrink(),
                   ),
                 ],
               ),
             ),
-            bottomNavigationBar: DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
-              ),
-              child: NavigationBar(
-                selectedIndex: _tab,
-                onDestinationSelected: (i) {
-                  tapFeedback();
-                  _select(i);
-                },
-                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-                destinations: const [
-                  NavigationDestination(icon: Icon(LucideIcons.house), label: 'Asosiy'),
-                  NavigationDestination(icon: Icon(LucideIcons.calendarCheck), label: 'Rejalar'),
-                  NavigationDestination(icon: Icon(LucideIcons.repeat), label: 'Odatlar'),
-                  NavigationDestination(icon: Icon(LucideIcons.chartColumn), label: 'Statistika'),
-                ],
-              ),
+            floatingActionButton: AnimatedScale(
+              scale: add == null ? 0 : 1,
+              duration: AppMotion.fast,
+              curve: AppMotion.curve,
+              child: add == null
+                  ? const SizedBox(width: 56, height: 56)
+                  : AddFab(heroTag: 'add', tooltip: add.$1, onTap: add.$2),
             ),
+            bottomNavigationBar: _NavBar(index: _tab, items: _tabs, onSelect: _select),
           ),
         );
       },
+    );
+  }
+}
+
+/// Pastki navigatsiya: faqat ikonka va yorliq, tanlangani — brend rangda.
+class _NavBar extends StatelessWidget {
+  const _NavBar({required this.index, required this.items, required this.onSelect});
+
+  final int index;
+  final List<(IconData, String)> items;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            children: [
+              for (var i = 0; i < items.length; i++)
+                Expanded(
+                  child: Semantics(
+                    button: true,
+                    selected: i == index,
+                    label: items[i].$2,
+                    excludeSemantics: true,
+                    child: InkResponse(
+                      radius: 40,
+                      onTap: () {
+                        if (i != index) tapFeedback();
+                        onSelect(i);
+                      },
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(items[i].$1, size: 22, color: i == index ? scheme.tertiary : scheme.outline),
+                          const SizedBox(height: 4),
+                          Text(
+                            items[i].$2,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              height: 1.2,
+                              letterSpacing: 0,
+                              fontWeight: i == index ? FontWeight.w600 : FontWeight.w500,
+                              color: i == index ? scheme.tertiary : scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

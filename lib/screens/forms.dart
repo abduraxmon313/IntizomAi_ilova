@@ -5,6 +5,7 @@ import '../models/goal.dart';
 import '../models/habit.dart';
 import '../models/plan.dart';
 import '../services/intizom_api.dart';
+import '../theme/app_theme.dart';
 import '../utils/dates.dart';
 import '../widgets/app_ui.dart';
 import '../widgets/feedback.dart';
@@ -64,7 +65,7 @@ Future<bool> showPlanForm(
           controller: title,
           autofocus: plan == null,
           textCapitalization: TextCapitalization.sentences,
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500, letterSpacing: -.3),
+          style: AppType.heading.copyWith(fontWeight: FontWeight.w500),
           decoration: const InputDecoration(hintText: 'Nima qilasiz?'),
         ),
         const SizedBox(height: 10),
@@ -95,7 +96,7 @@ Future<bool> showPlanForm(
                 icon: LucideIcons.calendar,
                 text: relativeDay(date),
                 onTap: plan != null
-                    ? () => toast(ctx, "Sanani o'zgartirib bo'lmaydi")
+                    ? null
                     : () async {
                         final d = await showDatePicker(
                           context: ctx,
@@ -111,6 +112,18 @@ Future<bool> showPlanForm(
         ),
       ],
     ),
+    onDelete: plan == null || onSubmit != null
+        ? null
+        : () async {
+            try {
+              await api.deletePlan(plan.id);
+              saved = true;
+              return true;
+            } catch (e) {
+              if (context.mounted) showApiError(context, e);
+              return false;
+            }
+          },
     onSave: () async {
       final t = title.text.trim();
       if (t.isEmpty) {
@@ -166,7 +179,7 @@ Future<bool> showHabitForm(
           controller: title,
           autofocus: habit == null,
           textCapitalization: TextCapitalization.sentences,
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500, letterSpacing: -.3),
+          style: AppType.heading.copyWith(fontWeight: FontWeight.w500),
           decoration: const InputDecoration(hintText: 'Odat nomi (masalan: Kitob o\'qish)'),
         ),
         const SizedBox(height: 10),
@@ -184,7 +197,7 @@ Future<bool> showHabitForm(
           children: [
             for (final e in habitIcons)
               ChoiceChipBox(
-                size: 42,
+                size: 44,
                 selected: e == icon,
                 onTap: () => setSheet(() => icon = e),
                 child: habitGlyphs[e] != null
@@ -196,7 +209,7 @@ Future<bool> showHabitForm(
         const FieldLabel('Takrorlanish'),
         SegmentTabs<String>(
           value: freq,
-          items: const [('daily', 'Har kuni', null), ('weekly', 'Tanlangan kunlar', null)],
+          items: const [('daily', 'Har kuni'), ('weekly', 'Tanlangan kunlar')],
           onChanged: (v) => setSheet(() => freq = v),
         ),
         if (freq == 'weekly') ...[
@@ -220,7 +233,7 @@ Future<bool> showHabitForm(
         const FieldLabel('Davomiylik'),
         SegmentTabs<String>(
           value: duration,
-          items: const [('permanent', 'Doimiy', null), ('days', 'Muddatli', null)],
+          items: const [('permanent', 'Doimiy'), ('days', 'Muddatli')],
           onChanged: (v) => setSheet(() => duration = v),
         ),
         if (duration == 'days') ...[
@@ -255,6 +268,24 @@ Future<bool> showHabitForm(
         ),
       ],
     ),
+    onDelete: habit == null || onSubmit != null
+        ? null
+        : () async {
+            final ok = await confirmAction(
+              context,
+              title: "Odatni o'chirish",
+              message: "«${habit.title}» va uning butun tarixi o'chiriladi.",
+            );
+            if (!ok) return false;
+            try {
+              await api.deleteHabit(habit.id);
+              saved = true;
+              return true;
+            } catch (e) {
+              if (context.mounted) showApiError(context, e);
+              return false;
+            }
+          },
     onSave: () async {
       final t = title.text.trim();
       if (t.isEmpty) {
@@ -315,18 +346,15 @@ Future<bool> showGoalForm(
   await showFormSheet<void>(
     context,
     title: goal == null ? 'Yangi maqsad' : 'Maqsadni tahrirlash',
+    subtitle: periodLabel,
     builder: (ctx, setSheet) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (goal == null && periodLabel != null) ...[
-          MetaTag(icon: LucideIcons.calendarRange, text: periodLabel),
-          const SizedBox(height: 12),
-        ],
         TextField(
           controller: title,
           autofocus: goal == null,
           textCapitalization: TextCapitalization.sentences,
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500, letterSpacing: -.3),
+          style: AppType.heading.copyWith(fontWeight: FontWeight.w500),
           decoration: const InputDecoration(hintText: 'Qanday natijaga erishmoqchisiz?'),
         ),
         const SizedBox(height: 10),
@@ -339,6 +367,18 @@ Future<bool> showGoalForm(
         ),
       ],
     ),
+    onDelete: goal == null
+        ? null
+        : () async {
+            try {
+              await api.deleteGoal(goal.id);
+              saved = true;
+              return true;
+            } catch (e) {
+              if (context.mounted) showApiError(context, e);
+              return false;
+            }
+          },
     onSave: () async {
       final t = title.text.trim();
       if (t.isEmpty) {
