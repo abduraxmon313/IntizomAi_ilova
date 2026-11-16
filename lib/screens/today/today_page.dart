@@ -214,6 +214,12 @@ class TodayPageState extends State<TodayPage> {
           _DayCard(loaded: _loaded, done: done, total: total, streak: st.streak, discipline: st.disciplineScore),
           ?_insight(),
 
+          // ── Bugungi holat ────────────────────────────
+          if (_checkinLoaded) ...[
+            SectionBar(title: context.tr("Bugungi holat")),
+            _CheckinCard(checkin: _checkin, onSave: _saveCheckin),
+          ],
+
           // ── Rejalar ──────────────────────────────────
           SectionBar(title: context.tr("Rejalar"), count: plans.isEmpty ? null : '$plansDone/${plans.length}'),
           if (!_loaded)
@@ -270,12 +276,6 @@ class TodayPageState extends State<TodayPage> {
           if (monthGoals.isNotEmpty) ...[
             SectionBar(title: context.tr("{v0} maqsadlari", {'v0': context.tr(uzMonths[today.month - 1])})),
             _GoalsCard(goals: monthGoals, onTap: widget.onOpenGoals),
-          ],
-
-          // ── Kunlik holat ─────────────────────────────
-          if (_checkinLoaded) ...[
-             SectionBar(title: context.tr("Bugungi holat")),
-            _CheckinCard(checkin: _checkin, onSave: _saveCheckin),
           ],
         ],
       ),
