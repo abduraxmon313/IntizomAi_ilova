@@ -1019,6 +1019,7 @@ void toast(BuildContext context, String message, {String? actionLabel, VoidCallb
       SnackBar(
         content: Text(message),
         actionOverflowThreshold: .4,
+        persist: false,
         duration: Duration(milliseconds: actionLabel == null ? 1800 : 4000),
         action: actionLabel == null ? null : SnackBarAction(label: actionLabel, onPressed: onAction ?? () {}),
       ),
