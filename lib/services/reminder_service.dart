@@ -52,7 +52,10 @@ class ReminderService {
   static const _pendingKey = 'intizom_ai.reminders.pending_done.v1';
 
   final _plugin = FlutterLocalNotificationsPlugin();
-  late final tz.Location _zone;
+  // `final` emas: init() birinchi urinishda yiqilsa (_ready=false), qayta
+  // chaqirilganda qayta o'rnatiladi. `late final` bo'lsa ikkinchi init
+  // LateInitializationError berib, eslatmalar butunlay ishlamay qolardi.
+  late tz.Location _zone;
   bool _ready = false;
   bool _syncing = false;
   AndroidScheduleMode _scheduleMode = AndroidScheduleMode.inexactAllowWhileIdle;
