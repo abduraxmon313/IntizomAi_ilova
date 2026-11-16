@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'catalog.dart';
+
 /// IntizomAI localization — qo'lda tarjima (MyFit uslubida).
 /// Kalit so'zlar o'zbekcha yoziladi, shu kalit = uz tarjima.
 class AppLocalizations {
@@ -24,13 +26,14 @@ class AppLocalizations {
 
   String get languageCode => locale.languageCode;
 
-  String text(String key, [Map<String, Object>? values]) {
+  String text(String key, [Map<String, Object?>? values]) {
     final map = _translations[languageCode];
-    String result = map?[key] ?? _translations['uz']?[key] ?? key;
+    final entry = interfaceTranslations[key];
+    String result = (languageCode == 'ru' ? entry?.$1 : languageCode == 'en' ? entry?.$2 : null)
+        ?? map?[key] ?? key;
     if (values != null) {
-      for (final entry in values.entries) {
-        result = result.replaceAll('{${entry.key}}', '${entry.value}');
-      }
+      result = result.replaceAllMapped(RegExp(r'\{(\w+)\}'), (match) =>
+        values.containsKey(match[1]) ? '${values[match[1]] ?? ''}' : match[0]!);
     }
     return result;
   }
@@ -234,6 +237,6 @@ class _Delegate extends LocalizationsDelegate<AppLocalizations> {
 
 /// Qisqa yordamchi — context.tr('Rejalar').
 extension AppLocalizationsX on BuildContext {
-  String tr(String key, [Map<String, Object>? values]) =>
+  String tr(String key, [Map<String, Object?>? values]) =>
       AppLocalizations.of(this).text(key, values);
 }

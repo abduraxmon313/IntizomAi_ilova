@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'l10n/app_localizations.dart';
 import 'screens/auth/login_page.dart';
+import 'screens/auth/language_page.dart';
 import 'screens/home_page.dart';
 import 'services/api_client.dart';
 import 'services/appearance_store.dart';
@@ -75,8 +76,7 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
   void initState() {
     super.initState();
     _themeMode = widget.initialAppearance == 'dark' ? ThemeMode.dark : ThemeMode.light;
-    // Ilova hozircha faqat o'zbek tilida (matnlar to'liq tarjima qilinmagan).
-    _locale = const Locale('uz');
+    _locale = widget.initialLocale == null ? null : Locale(widget.initialLocale!);
     _loggedIn = widget.loggedIn;
 
     _client = ApiClient(authStore: widget.authStore);
@@ -123,7 +123,9 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
         value: AppTheme.systemOverlay(Theme.of(context)),
         child: child!,
       ),
-      home: _loggedIn
+      home: _locale == null
+          ? LanguagePage(onSelected: _setLocale)
+          : _loggedIn
           ? HomePage(
               key: const ValueKey('home'),
               api: _api,

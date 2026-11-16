@@ -1,3 +1,4 @@
+import '../../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -49,7 +50,7 @@ class AchievementsPage extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.only(bottom: 40),
             children: [
-              const PageHeader(title: 'Yutuqlar'),
+               PageHeader(title: context.tr("Yutuqlar")),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
                 child: Column(
@@ -61,18 +62,18 @@ class AchievementsPage extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('${items.length} bosqichdan $unlocked tasi ochildi', style: AppType.heading),
+                          Text(context.tr("{v0} bosqichdan {v1} tasi ochildi", {'v0': items.length, 'v1': unlocked}), style: AppType.heading),
                           const SizedBox(height: 12),
                           AppProgressBar(value: unlocked / items.length),
                           const SizedBox(height: 10),
                           Text(
-                            _nextHint(items),
+                            _nextHint(context, items),
                             style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant, height: 1.4),
                           ),
                         ],
                       ),
                     ),
-                    const SectionBar(title: 'Bosqichlar'),
+                     SectionBar(title: context.tr("Bosqichlar")),
                     GroupCard(
                       indent: 68,
                       children: [
@@ -88,7 +89,7 @@ class AchievementsPage extends StatelessWidget {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        a.title,
+                                        context.tr(a.title),
                                         style: AppType.body.copyWith(
                                           fontWeight: FontWeight.w500,
                                           color: a.unlocked ? scheme.onSurface : scheme.onSurfaceVariant,
@@ -96,14 +97,14 @@ class AchievementsPage extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 6),
                                       if (a.unlocked)
-                                        Text('Ochildi', style: AppType.caption.copyWith(color: scheme.tertiary, fontWeight: FontWeight.w600))
+                                        Text(context.tr("Ochildi"), style: AppType.caption.copyWith(color: scheme.tertiary, fontWeight: FontWeight.w600))
                                       else
                                         Row(
                                           children: [
                                             Expanded(child: AppProgressBar(value: a.progress, height: 4)),
                                             const SizedBox(width: 10),
                                             Text(
-                                              '${a.current}/${a.target} ${a.unit}',
+                                              '${a.current}/${a.target} ${context.tr(a.unit)}',
                                               style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
                                             ),
                                           ],
@@ -121,7 +122,7 @@ class AchievementsPage extends StatelessWidget {
                       ],
                     ),
                     if (st.achievements.isNotEmpty) ...[
-                      SectionBar(title: 'Nishonlar', count: '${st.achievements.length}'),
+                      SectionBar(title: context.tr("Nishonlar"), count: '${st.achievements.length}'),
                       GroupCard(
                         children: [
                           for (final a in st.achievements)
@@ -132,7 +133,7 @@ class AchievementsPage extends StatelessWidget {
                                   Text(a.icon, style: AppType.title.copyWith(fontSize: 20, height: 1)),
                                   const SizedBox(width: 14),
                                   Expanded(child: Text(a.title, style: AppType.body.copyWith(fontWeight: FontWeight.w500))),
-                                  Pill(_rarityLabel(a.rarity), muted: a.rarity == 'common', color: a.rarity == 'legendary' ? AppPalette.gold : null),
+                                  Pill(context.tr(_rarityLabel(a.rarity)), muted: a.rarity == 'common', color: a.rarity == 'legendary' ? AppPalette.gold : null),
                                 ],
                               ),
                             ),
@@ -150,11 +151,11 @@ class AchievementsPage extends StatelessWidget {
   }
 
   /// Eng yaqin ochilmagan bosqich haqida izoh.
-  static String _nextHint(List<AchievementMilestone> items) {
+  static String _nextHint(BuildContext context, List<AchievementMilestone> items) {
     final locked = items.where((a) => !a.unlocked).toList()..sort((a, b) => b.progress.compareTo(a.progress));
-    if (locked.isEmpty) return 'Barcha bosqichlar ochildi. Ajoyib natija!';
+    if (locked.isEmpty) return context.tr("Barcha bosqichlar ochildi. Ajoyib natija!");
     final n = locked.first;
-    return 'Eng yaqini: ${n.title} — yana ${n.target - n.current} ${n.unit} qoldi.';
+    return context.tr('Eng yaqini: {v0} — yana {v1} {v2} qoldi.', {'v0': context.tr(n.title), 'v1': n.target - n.current, 'v2': context.tr(n.unit)});
   }
 
   static String _rarityLabel(String r) => switch (r) {

@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../l10n/app_localizations.dart';
+import '../auth/language_page.dart';
 import '../../models/extras.dart';
 import '../../services/intizom_api.dart';
 import '../../state/app_state.dart';
@@ -14,12 +16,6 @@ import '../../widgets/app_ui.dart';
 import '../../widgets/feedback.dart';
 import '../../widgets/ui_kit.dart';
 
-const _referralText = "Siz intizomlimisiz?\n\n"
-    "Ko'pchilik maqsad qo'yadi, reja tuzadi, lekin oxirigacha yetib bormaydi.\n\n"
-    "IntizomAI maqsad, reja va odatlaringizni kuzatib boradi, AI esa progressingizni "
-    "tahlil qilib sizga mos tavsiyalar beradi.\n\n"
-    "Bilim + Intizom = Natija";
-
 /// Profil va sozlamalar (Bugun sahifasidagi avatar ortida).
 class ProfilePage extends StatefulWidget {
   const ProfilePage({
@@ -27,11 +23,13 @@ class ProfilePage extends StatefulWidget {
     required this.state,
     required this.onLogout,
     required this.onAppearanceChanged,
+    required this.onLanguageChanged,
   });
 
   final AppState state;
   final VoidCallback onLogout;
   final ValueChanged<String> onAppearanceChanged;
+  final ValueChanged<String> onLanguageChanged;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -75,20 +73,20 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _shareInvite() async {
     final link = s.profile?.referralLink;
     if (link == null) return;
-    await _open(Uri.https('t.me', '/share/url', {'url': link, 'text': _referralText}).toString());
+    await _open(Uri.https('t.me', '/share/url', {'url': link, 'text': context.tr('Birga intizomli bo‘laylik! IntizomAI bilan reja va odatlaringizni kuzating.')}).toString());
   }
 
   Future<void> _editName() async {
     final ctrl = TextEditingController(text: s.profile?.fullName ?? '');
     await showFormSheet<void>(
       context,
-      title: 'Ismni tahrirlash',
+      title: context.tr("Ismni tahrirlash"),
       builder: (ctx, _) => TextField(
         controller: ctrl,
         autofocus: true,
         maxLength: 60,
         textCapitalization: TextCapitalization.words,
-        decoration: const InputDecoration(hintText: 'Ismingiz', counterText: ''),
+        decoration:  InputDecoration(hintText: context.tr("Ismingiz"), counterText: ''),
       ),
       onSave: () async {
         final name = ctrl.text.trim();
@@ -115,18 +113,18 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 8),
             ListTile(
               leading: const Icon(LucideIcons.image),
-              title: const Text('Galereyadan tanlash'),
+              title:  Text(context.tr("Galereyadan tanlash")),
               onTap: () => Navigator.pop(ctx, 'gallery'),
             ),
             ListTile(
               leading: const Icon(LucideIcons.camera),
-              title: const Text('Suratga olish'),
+              title:  Text(context.tr("Suratga olish")),
               onTap: () => Navigator.pop(ctx, 'camera'),
             ),
             if (hasCustom)
               ListTile(
                 leading: Icon(LucideIcons.trash2, color: Theme.of(ctx).colorScheme.error),
-                title: Text('Telegram rasmiga qaytish', style: AppType.body.copyWith(color: Theme.of(ctx).colorScheme.error)),
+                title: Text(context.tr("Telegram rasmiga qaytish"), style: AppType.body.copyWith(color: Theme.of(ctx).colorScheme.error)),
                 onTap: () => Navigator.pop(ctx, 'remove'),
               ),
             const SizedBox(height: 8),
@@ -150,11 +148,11 @@ class _ProfilePageState extends State<ProfilePage> {
       final bytes = await file.readAsBytes();
       final dataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
       if (dataUrl.length > 1000000) {
-        if (mounted) toast(context, 'Rasm juda katta. Boshqasini tanlang.');
+        if (mounted) toast(context, context.tr("Rasm juda katta. Boshqasini tanlang."));
         return;
       }
       s.setProfile(await s.api.updateProfile(customPhotoUrl: dataUrl));
-      if (mounted) toast(context, 'Profil rasmi yangilandi');
+      if (mounted) toast(context, context.tr("Profil rasmi yangilandi"));
     } catch (e) {
       if (mounted) showApiError(context, e);
     }
@@ -169,7 +167,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _logout() async {
-    if (!await confirmAction(context, title: 'Hisobdan chiqish', message: 'Qayta kirish uchun Telegram orqali tasdiqlaysiz.', confirmLabel: 'Chiqish')) {
+    if (!await confirmAction(context, title: context.tr("Hisobdan chiqish"), message: context.tr("Qayta kirish uchun Telegram orqali tasdiqlaysiz."), confirmLabel: context.tr("Chiqish"))) {
       return;
     }
     if (!mounted) return;
@@ -192,7 +190,7 @@ class _ProfilePageState extends State<ProfilePage> {
           child: ListView(
             padding: const EdgeInsets.only(bottom: 40),
             children: [
-              const PageHeader(title: 'Profil'),
+               PageHeader(title: context.tr("Profil")),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
                 child: Column(
@@ -205,7 +203,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         children: [
                           Semantics(
                             button: true,
-                            label: "Profil rasmini o'zgartirish",
+                            label: context.tr("Profil rasmini o'zgartirish"),
                             child: GestureDetector(
                               onTap: _changePhoto,
                               child: Stack(
@@ -249,7 +247,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                       ),
                                       const SizedBox(width: 8),
                                     ],
-                                    if (st.isPremium) const Pill('Premium', color: AppPalette.gold),
+                                    if (st.isPremium)  Pill(context.tr("Premium"), color: AppPalette.gold),
                                   ],
                                 ),
                               ],
@@ -261,30 +259,36 @@ class _ProfilePageState extends State<ProfilePage> {
                     _SubscriptionCard(sub: _sub, isPremium: st.isPremium),
 
                     // ── Hisob ──────────────────────────────
-                    const SectionBar(title: 'Hisob'),
+                     SectionBar(title: context.tr("Hisob")),
                     GroupCard(
                       indent: 50,
                       children: [
-                        SettingTile(icon: LucideIcons.userRound, title: 'Ism', subtitle: p.fullName, onTap: _editName),
+                        SettingTile(icon: LucideIcons.userRound, title: context.tr("Ism"), subtitle: p.fullName, onTap: _editName),
                         SettingTile(
                           icon: LucideIcons.gift,
-                          title: "Do'stni taklif qilish",
+                          title: context.tr("Do'stni taklif qilish"),
                           subtitle: p.referralCount > 0
-                              ? "${p.referralCount} ta do'st qo'shildi"
-                              : "Har 5 faol do'st uchun 7 kun Premium",
+                              ? context.tr("{v0} ta do'st qo'shildi", {'v0': p.referralCount})
+                              : context.tr("Har 5 faol do'st uchun 7 kun Premium"),
                           onTap: _shareInvite,
                         ),
                       ],
                     ),
 
                     // ── Sozlamalar ─────────────────────────
-                    const SectionBar(title: 'Sozlamalar'),
+                     SectionBar(title: context.tr("Sozlamalar")),
                     GroupCard(
                       indent: 50,
                       children: [
                         SettingTile(
+                          icon: LucideIcons.languages,
+                          title: context.tr('Til'),
+                          subtitle: languageNames[Localizations.localeOf(context).languageCode],
+                          onTap: () => showLanguagePicker(context, widget.onLanguageChanged),
+                        ),
+                        SettingTile(
                           icon: LucideIcons.moon,
-                          title: 'Tungi rejim',
+                          title: context.tr("Tungi rejim"),
                           trailing: Switch(
                             value: dark,
                             onChanged: (v) => widget.onAppearanceChanged(v ? 'dark' : 'light'),
@@ -292,28 +296,28 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         SettingTile(
                           icon: LucideIcons.bell,
-                          title: 'Eslatmalar',
-                          subtitle: 'Reja va odat vaqtida Telegram xabari',
+                          title: context.tr("Eslatmalar"),
+                          subtitle: context.tr("Reja va odat vaqtida Telegram xabari"),
                           trailing: Switch(value: p.notificationsEnabled, onChanged: _setNotifications),
                         ),
                       ],
                     ),
 
                     // ── Yordam ─────────────────────────────
-                    const SectionBar(title: 'Yordam va aloqa'),
+                     SectionBar(title: context.tr("Yordam va aloqa")),
                     GroupCard(
                       indent: 50,
                       children: [
                         SettingTile(
                           icon: LucideIcons.messageCircle,
-                          title: "Qo'llab-quvvatlash",
-                          subtitle: 'Savol va takliflar',
+                          title: context.tr("Qo'llab-quvvatlash"),
+                          subtitle: context.tr("Savol va takliflar"),
                           onTap: () => _open('https://t.me/IntizomAI_Admin_bot'),
                         ),
                         SettingTile(
                           icon: LucideIcons.megaphone,
-                          title: 'Telegram kanal',
-                          subtitle: 'Yangiliklar va maslahatlar',
+                          title: context.tr("Telegram kanal"),
+                          subtitle: context.tr("Yangiliklar va maslahatlar"),
                           onTap: () => _open('https://t.me/Intizom_AI'),
                         ),
                         SettingTile(
@@ -327,7 +331,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     const SizedBox(height: 24),
                     GroupCard(
                       children: [
-                        SettingTile(icon: LucideIcons.logOut, title: 'Hisobdan chiqish', danger: true, onTap: _logout),
+                        SettingTile(icon: LucideIcons.logOut, title: context.tr("Hisobdan chiqish"), danger: true, onTap: _logout),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -360,7 +364,7 @@ class _SubscriptionCard extends StatelessWidget {
     final until = parseYmd(sub?.premiumUntil);
     final days = sub?.daysLeft ?? 0;
     return AppCard(
-      onTap: premium ? openPremiumInBot : () => showPremiumDialog(context, "Barcha imkoniyatlarni oching."),
+      onTap: premium ? openPremiumInBot : () => showPremiumDialog(context, context.tr("Barcha imkoniyatlarni oching.")),
       padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -374,7 +378,7 @@ class _SubscriptionCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      premium ? 'Premium faol' : 'Bepul tarif',
+                      premium ? context.tr("Premium faol") : context.tr("Bepul tarif"),
                       style: AppType.bodyStrong,
                     ),
                     const SizedBox(height: 2),
@@ -382,10 +386,10 @@ class _SubscriptionCard extends StatelessWidget {
                       premium
                           ? [
                               if (sub?.planTitle != null) sub!.planTitle!,
-                              '$days kun qoldi',
-                              if (until != null) '${shortDate(until).replaceAll('-', '\u2011')}\u00a0gacha',
+                              context.tr("{v0} kun qoldi", {'v0': days}),
+                              if (until != null) context.tr("{v0} gacha", {'v0': shortDate(context, until).replaceAll('-', '\u2011')}),
                             ].join(' · ')
-                          : "Cheklovsiz reja, murabbiy va do'stlar",
+                          : context.tr("Cheklovsiz reja, murabbiy va do'stlar"),
                       style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
                     ),
                   ],
@@ -393,7 +397,7 @@ class _SubscriptionCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                premium ? 'Uzaytirish' : 'Ochish',
+                premium ? context.tr("Uzaytirish") : context.tr("Ochish"),
                 style: AppType.label.copyWith(fontWeight: FontWeight.w600, color: scheme.tertiary),
               ),
             ],

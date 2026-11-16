@@ -1,3 +1,4 @@
+import '../../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -94,15 +95,15 @@ class _CoachPageState extends State<CoachPage> {
     return Column(
       children: [
         PageHeader(
-          title: 'Murabbiy',
+          title: context.tr("Murabbiy"),
           actions: [
             if (_remaining >= 0)
               Padding(
                 padding: const EdgeInsets.only(right: 6),
-                child: Pill(_limit > 0 ? 'Bugun $_remaining/$_limit' : '$_remaining', muted: true),
+                child: Pill(_limit > 0 ? context.tr("Bugun {v0}/{v1}", {'v0': _remaining, 'v1': _limit}) : '$_remaining', muted: true),
               ),
             if (_messages.isNotEmpty)
-              HeaderIconButton(icon: LucideIcons.squarePen, tooltip: 'Yangi suhbat', onTap: _clear),
+              HeaderIconButton(icon: LucideIcons.squarePen, tooltip: context.tr("Yangi suhbat"), onTap: _clear),
           ],
         ),
         Expanded(
@@ -127,7 +128,7 @@ class _CoachPageState extends State<CoachPage> {
             child: TextButton(
               onPressed: openPremiumInBot,
               style: TextButton.styleFrom(minimumSize: const Size(0, 36)),
-              child: Text(_remaining == 0 ? 'Bugungi bepul xabarlar tugadi · Premium' : '1 ta bepul xabar qoldi · Premium'),
+              child: Text(_remaining == 0 ? context.tr("Bugungi bepul xabarlar tugadi · Premium") : context.tr("1 ta bepul xabar qoldi · Premium")),
             ),
           ),
         Padding(
@@ -145,8 +146,8 @@ class _CoachPageState extends State<CoachPage> {
                     maxLines: 5,
                     textCapitalization: TextCapitalization.sentences,
                     style: AppType.body,
-                    decoration: const InputDecoration(
-                      hintText: 'Savolingizni yozing…',
+                    decoration:  InputDecoration(
+                      hintText: context.tr("Savolingizni yozing…"),
                       filled: false,
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -170,7 +171,7 @@ class _CoachPageState extends State<CoachPage> {
                           color: ready ? scheme.primary : scheme.surfaceContainerLow,
                         ),
                         child: IconButton(
-                          tooltip: 'Yuborish',
+                          tooltip: context.tr("Yuborish"),
                           padding: EdgeInsets.zero,
                           onPressed: ready ? () => _send() : null,
                           icon: Icon(LucideIcons.arrowUp, size: 20, color: ready ? scheme.onPrimary : scheme.outline),
@@ -203,22 +204,22 @@ class _Welcome extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(AppSpace.page, 8, AppSpace.page, 20),
       children: [
         Text(
-          name.isEmpty ? 'Bugun nimada yordam beray?' : '$name, bugun nimada yordam beray?',
+          name.isEmpty ? context.tr("Bugun nimada yordam beray?") : context.tr("{v0}, bugun nimada yordam beray?", {'v0': name}),
           style: AppType.title,
         ),
         const SizedBox(height: 8),
         Text(
-          "Reja, odat va maqsadlaringizni ko'rib turaman — maslahatlarim aynan sizning holatingizga mos bo'ladi.",
+          context.tr("Reja, odat va maqsadlaringizni ko'rib turaman — maslahatlarim aynan sizning holatingizga mos bo'ladi."),
           style: AppType.body.copyWith(color: scheme.onSurfaceVariant, height: 1.45),
         ),
-        const SectionBar(title: 'Shundan boshlash mumkin', top: 24),
+         SectionBar(title: context.tr("Shundan boshlash mumkin"), top: 24),
         GroupCard(
           children: [
             for (final (label, prompt) in suggestions)
               InkWell(
                 onTap: () {
                   tapFeedback();
-                  onPick(prompt);
+                  onPick(context.tr(prompt));
                 },
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(minHeight: 52),
@@ -226,7 +227,7 @@ class _Welcome extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Row(
                       children: [
-                        Expanded(child: Text(label, style: AppType.body.copyWith(fontWeight: FontWeight.w500))),
+                        Expanded(child: Text(context.tr(label), style: AppType.body.copyWith(fontWeight: FontWeight.w500))),
                         Icon(LucideIcons.arrowUp, size: 17, color: scheme.outline),
                       ],
                     ),

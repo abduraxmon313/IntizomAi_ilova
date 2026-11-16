@@ -1,3 +1,4 @@
+import '../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -32,7 +33,7 @@ class PageHeader extends StatelessWidget {
         children: [
           if (canPop)
             IconButton(
-              tooltip: 'Orqaga',
+              tooltip: context.tr("Orqaga"),
               onPressed: onBack ?? () => Navigator.of(context).maybePop(),
               icon: Icon(LucideIcons.arrowLeft, size: 22, color: scheme.onSurface),
             ),
@@ -171,7 +172,7 @@ class SegmentTabs<T> extends StatelessWidget {
                                 ),
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 4),
-                                  child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  child: Text(context.tr(label), maxLines: 1, overflow: TextOverflow.ellipsis),
                                 ),
                               ),
                             ),
@@ -447,7 +448,7 @@ class PeriodStepper extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
-        IconButton(tooltip: 'Oldingi', onPressed: onPrev, icon: const Icon(LucideIcons.chevronLeft, size: 20)),
+        IconButton(tooltip: context.tr("Oldingi"), onPressed: onPrev, icon: const Icon(LucideIcons.chevronLeft, size: 20)),
         Expanded(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -462,12 +463,12 @@ class PeriodStepper extends StatelessWidget {
                   style: AppType.bodyStrong.copyWith(fontFeatures: tabularFigures),
                 ),
                 if (!isCurrent && onReset != null)
-                  Text(resetLabel, style: AppType.caption.copyWith(color: scheme.tertiary, fontWeight: FontWeight.w600)),
+                  Text(context.tr(resetLabel), style: AppType.caption.copyWith(color: scheme.tertiary, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
         ),
-        IconButton(tooltip: 'Keyingi', onPressed: onNext, icon: const Icon(LucideIcons.chevronRight, size: 20)),
+        IconButton(tooltip: context.tr("Keyingi"), onPressed: onNext, icon: const Icon(LucideIcons.chevronRight, size: 20)),
       ],
     );
   }
@@ -608,7 +609,7 @@ class PremiumGate extends StatelessWidget {
           FilledButton(
             onPressed: onOpen,
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            child: const Text('Premium haqida'),
+            child:  Text(context.tr("Premium haqida")),
           ),
         ],
       ),
@@ -744,7 +745,7 @@ class SheetScaffold extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Yopish',
+                  tooltip: context.tr("Yopish"),
                   onPressed: () => Navigator.pop(context),
                   icon: Icon(LucideIcons.x, size: 20, color: scheme.onSurfaceVariant),
                 ),
@@ -804,14 +805,14 @@ Future<T?> showFormSheet<T>(
                   onPressed: busy ? null : () => run(onSave),
                   child: busy
                       ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(saveLabel),
+                      : Text(context.tr(saveLabel)),
                 ),
                 if (onDelete != null) ...[
                   const SizedBox(height: 4),
                   TextButton(
                     onPressed: busy ? null : () => run(onDelete),
                     style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
-                    child: Text(deleteLabel),
+                    child: Text(context.tr(deleteLabel)),
                   ),
                 ],
               ],
@@ -992,7 +993,7 @@ Future<bool> confirmAction(
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
           style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.onSurfaceVariant),
-          child: const Text('Bekor qilish'),
+          child:  Text(context.tr("Bekor qilish")),
         ),
         FilledButton(
           style: FilledButton.styleFrom(
@@ -1001,7 +1002,7 @@ Future<bool> confirmAction(
             minimumSize: const Size(0, 44),
           ),
           onPressed: () => Navigator.pop(ctx, true),
-          child: Text(confirmLabel),
+          child: Text(context.tr(confirmLabel)),
         ),
       ],
     ),

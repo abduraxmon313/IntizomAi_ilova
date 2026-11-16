@@ -1,6 +1,9 @@
 /// Sana yordamchilari. Server Toshkent vaqtida ishlaydi (UTC+5).
 library;
 
+import 'package:flutter/widgets.dart';
+import '../l10n/app_localizations.dart';
+
 const uzMonths = [
   'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
   'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr',
@@ -34,20 +37,20 @@ DateTime? parseYmd(String? s) {
 bool sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
 
 /// "15-noyabr, dushanba"
-String longDate(DateTime d) => '${d.day}-${uzMonths[d.month - 1].toLowerCase()}, ${uzWeekdays[d.weekday - 1].toLowerCase()}';
+String longDate(BuildContext context, DateTime d) => '${d.day} ${context.tr(uzMonths[d.month - 1])}, ${context.tr(uzWeekdays[d.weekday - 1])}';
 
 /// "15-noy"
-String shortDate(DateTime d) => '${d.day}-${uzMonthsShort[d.month - 1].toLowerCase()}';
+String shortDate(BuildContext context, DateTime d) => '${d.day} ${context.tr(uzMonthsShort[d.month - 1])}';
 
 /// Haftaning dushanbasi.
 DateTime weekStart(DateTime d) => dateOnly(d).subtract(Duration(days: d.weekday - 1));
 
 /// Bugun / Ertaga / Kecha yoki to'liq sana.
-String relativeDay(DateTime d) {
+String relativeDay(BuildContext context, DateTime d) {
   final t = tashkentToday();
   final diff = dateOnly(d).difference(t).inDays;
-  if (diff == 0) return 'Bugun';
-  if (diff == 1) return 'Ertaga';
-  if (diff == -1) return 'Kecha';
-  return longDate(d);
+  if (diff == 0) return context.tr('Bugun');
+  if (diff == 1) return context.tr('Ertaga');
+  if (diff == -1) return context.tr('Kecha');
+  return longDate(context, d);
 }

@@ -1,3 +1,4 @@
+import '../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -55,27 +56,27 @@ Future<void> showPremiumDialog(BuildContext context, String message) {
         ),
       );
       return SheetScaffold(
-        title: 'IntizomAI Premium',
+        title: context.tr("IntizomAI Premium"),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(message, style: AppType.body.copyWith(color: scheme.onSurfaceVariant)),
             const SizedBox(height: 12),
-            row(LucideIcons.infinity, 'Cheklovsiz', "Reja, odat, maqsad va AI murabbiy — chegarasiz"),
-            row(LucideIcons.chartColumn, 'Chuqur tahlil', "Batafsil statistika va umumiy reyting"),
-            row(LucideIcons.users, "Do'stlar bilan", "Guruhlar va Telegram hisobotlari"),
+            row(LucideIcons.infinity, context.tr("Cheklovsiz"), context.tr("Reja, odat, maqsad va AI murabbiy — chegarasiz")),
+            row(LucideIcons.chartColumn, context.tr("Chuqur tahlil"), context.tr("Batafsil statistika va umumiy reyting")),
+            row(LucideIcons.users, context.tr("Do'stlar bilan"), context.tr("Guruhlar va Telegram hisobotlari")),
             const SizedBox(height: 18),
             FilledButton(
               onPressed: () {
                 Navigator.pop(ctx);
                 openPremiumInBot();
               },
-              child: const Text('Tarifni tanlash'),
+              child:  Text(context.tr("Tarifni tanlash")),
             ),
             const SizedBox(height: 10),
             Text(
-              "To'lov IntizomAI Telegram boti orqali amalga oshiriladi.",
+              context.tr("To'lov IntizomAI Telegram boti orqali amalga oshiriladi."),
               textAlign: TextAlign.center,
               style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400),
             ),
@@ -104,7 +105,7 @@ class ErrorRetry extends StatelessWidget {
           children: [
             Icon(LucideIcons.cloudOff, size: 30, color: scheme.outline),
             const SizedBox(height: 14),
-            const Text("Ma'lumot yuklanmadi", style: AppType.bodyStrong),
+             Text(context.tr("Ma'lumot yuklanmadi"), style: AppType.bodyStrong),
             const SizedBox(height: 4),
             Text(
               message,
@@ -115,7 +116,7 @@ class ErrorRetry extends StatelessWidget {
             OutlinedButton(
               onPressed: onRetry,
               style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
-              child: const Text('Qayta urinish'),
+              child:  Text(context.tr("Qayta urinish")),
             ),
           ],
         ),

@@ -1,7 +1,9 @@
+import '../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../services/intizom_api.dart';
+import '../services/reminder_service.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
@@ -60,14 +62,40 @@ class _HomePageState extends State<HomePage> {
     (LucideIcons.sparkles, 'Murabbiy'),
   ];
 
+  Object? _reminderKey;
+  bool _askedNotificationPermission = false;
+
   @override
   void initState() {
     super.initState();
+    _state.addListener(_syncReminders);
     _state.loadAll();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncReminders();
+  }
+
+  void _syncReminders() {
+    if (!mounted || _state.loading || _state.profile == null) return;
+    final locale = Localizations.localeOf(context);
+    final key = (identityHashCode(_state.habits), _state.plansVersion, locale.languageCode);
+    if (key == _reminderKey) return;
+    _reminderKey = key;
+    () async {
+      if (!_askedNotificationPermission) {
+        _askedNotificationPermission = true;
+        await ReminderService.instance.requestPermission();
+      }
+      await ReminderService.instance.sync(api: _state.api, habits: _state.habits, locale: locale);
+    }();
+  }
+
+  @override
   void dispose() {
+    _state.removeListener(_syncReminders);
     _state.dispose();
     super.dispose();
   }
@@ -88,9 +116,9 @@ class _HomePageState extends State<HomePage> {
 
   /// Joriy bo'limning yagona "qo'shish" amali (Natijalar va Murabbiyda yo'q).
   (String, VoidCallback)? get _add => switch (_tab) {
-    0 => ("Reja qo'shish", () => _todayKey.currentState?.addPlan()),
-    1 => ("Qo'shish", () => _plansKey.currentState?.add()),
-    2 => ("Odat qo'shish", () => _habitsKey.currentState?.add()),
+    0 => (context.tr("Reja qo'shish"), () => _todayKey.currentState?.addPlan()),
+    1 => (context.tr("Qo'shish"), () => _plansKey.currentState?.add()),
+    2 => (context.tr("Odat qo'shish"), () => _habitsKey.currentState?.add()),
     _ => null,
   };
 
@@ -111,7 +139,7 @@ class _HomePageState extends State<HomePage> {
         }
         if (_state.profile == null) {
           return Scaffold(
-            body: ErrorRetry(message: _state.error ?? 'Xatolik yuz berdi', onRetry: _state.loadAll),
+            body: ErrorRetry(message: _state.error ?? context.tr("Xatolik yuz berdi"), onRetry: _state.loadAll),
           );
         }
         final add = _add;
@@ -135,6 +163,7 @@ class _HomePageState extends State<HomePage> {
                       state: _state,
                       onLogout: widget.onLogout,
                       onAppearanceChanged: widget.onAppearanceChanged,
+                      onLanguageChanged: widget.onLanguageChanged,
                       onOpenGoals: _openGoals,
                     ),
                   ),
@@ -194,7 +223,7 @@ class _NavBar extends StatelessWidget {
                   child: Semantics(
                     button: true,
                     selected: i == index,
-                    label: items[i].$2,
+                    label: context.tr(items[i].$2),
                     excludeSemantics: true,
                     child: InkResponse(
                       radius: 40,
@@ -208,7 +237,7 @@ class _NavBar extends StatelessWidget {
                           Icon(items[i].$1, size: 22, color: i == index ? scheme.tertiary : scheme.outline),
                           const SizedBox(height: 4),
                           Text(
-                            items[i].$2,
+                            context.tr(items[i].$2),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AppType.micro.copyWith(
