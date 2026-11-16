@@ -78,6 +78,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
     _refreshAfterNotificationAction();
+    // Sozlamalarda aniq vaqt ruxsati yoqilgan/o'chirilgan bo'lsa — eslatmalarni
+    // yangi rejimda qayta rejalashtiramiz (aks holda eski, kechikadigan rejimda qoladi).
+    ReminderService.instance.scheduleModeStale().then((stale) {
+      if (stale && mounted) {
+        _reminderKey = null;
+        _syncReminders();
+      }
+    });
     // Oflayn bo'lsa — qaytganda qayta urinamiz (internet tiklangan bo'lishi mumkin).
     if (ApiClient.offline.value && !_state.loading) _state.loadAll();
   }

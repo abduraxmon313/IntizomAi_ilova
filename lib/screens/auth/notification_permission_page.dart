@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../services/device_settings.dart';
 import '../../services/reminder_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_ui.dart';
+import '../../widgets/reminder_setup.dart';
 import '../../widgets/ui_kit.dart';
 
 /// Kirishdan keyin, Bugun sahifasidan oldin: telefon bildirishnomalariga ruxsat.
@@ -20,13 +24,36 @@ class NotificationPermissionPage extends StatefulWidget {
 class _NotificationPermissionPageState extends State<NotificationPermissionPage> {
   bool _busy = false;
 
+  /// Ketma-ket: bildirishnoma → aniq vaqt → batareya cheklovi → Autostart.
+  /// Shularning hammasi bo'lsa eslatma ilova yopiq bo'lsa ham, telefon
+  /// o'chirib-yoqilsa ham o'z vaqtida keladi.
   Future<void> _finish({required bool allow}) async {
     if (_busy) return;
     setState(() => _busy = true);
     final reminders = ReminderService.instance;
-    if (allow) await reminders.requestPermission();
+    // requestPermission() aniq vaqt ruxsatini ham so'raydi (Android 12+).
+    if (allow && await reminders.requestPermission()) {
+      if (DeviceSettings.isAndroid && !await DeviceSettings.isIgnoringBatteryOptimizations()) {
+        final r = await DeviceSettings.requestIgnoreBatteryOptimizations();
+        // Tizim oynasi ochildi — foydalanuvchi qaytguncha kutamiz.
+        if (r == 'oem' || r == 'app') await _waitForResume();
+      }
+      final maker = await DeviceSettings.manufacturer();
+      if (mounted && DeviceSettings.hasAutostart(maker)) {
+        await showAutostartGuide(context, maker);
+      }
+    }
     await reminders.markPrompted();
     if (mounted) widget.onDone();
+  }
+
+  Future<void> _waitForResume() async {
+    final done = Completer<void>();
+    final listener = AppLifecycleListener(onResume: () {
+      if (!done.isCompleted) done.complete();
+    });
+    await done.future.timeout(const Duration(minutes: 2), onTimeout: () {});
+    listener.dispose();
   }
 
   @override
@@ -66,6 +93,7 @@ class _NotificationPermissionPageState extends State<NotificationPermissionPage>
                               indent: 50,
                               children: [
                                 SettingTile(icon: LucideIcons.alarmClock, title: context.tr("Aynan belgilangan vaqtda")),
+                                SettingTile(icon: LucideIcons.power, title: context.tr("Ilova yopiq bo'lsa va telefon o'chirib-yoqilsa ham")),
                                 SettingTile(icon: LucideIcons.smartphone, title: context.tr("Qulflangan ekranda ham ko'rinadi")),
                                 SettingTile(icon: LucideIcons.circleCheck, title: context.tr("Bildirishnomaning o'zidan «Bajarildi» deb belgilash")),
                               ],
