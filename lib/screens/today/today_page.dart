@@ -324,7 +324,7 @@ class TodayPageState extends State<TodayPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: AppType.bodyStrong.copyWith(fontSize: 14)),
+                  Text(title, style: AppType.bodyStrong),
                   const SizedBox(height: 2),
                   Text(text, style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant, height: 1.4)),
                 ],
@@ -358,6 +358,7 @@ class _Header extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final first = name.trim().isEmpty ? '' : name.trim().split(' ').first;
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: Column(
@@ -373,9 +374,9 @@ class _Header extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 first.isEmpty ? _greeting() : '${_greeting()}, $first',
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: AppType.display.copyWith(fontSize: 26),
+                style: AppType.title,
               ),
             ],
           ),
@@ -436,18 +437,20 @@ class _DayCard extends StatelessWidget {
     Widget stat(IconData icon, Color color, String value, String label) => Expanded(
       child: Row(
         children: [
-          Icon(icon, size: 17, color: color),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(text: value, style: AppType.bodyStrong.copyWith(fontFeatures: tabularFigures)),
-                  TextSpan(text: ' $label', style: AppType.label.copyWith(color: scheme.onSurfaceVariant)),
-                ],
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(value, maxLines: 1, style: AppType.bodyStrong.copyWith(fontFeatures: tabularFigures)),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppType.caption.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ],
             ),
           ),
         ],
@@ -641,7 +644,7 @@ class _CheckinCardState extends State<_CheckinCard> {
 
     return Container(
       decoration: surfaceDecoration(context),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -657,16 +660,18 @@ class _CheckinCardState extends State<_CheckinCard> {
               for (final (i, (emoji, icon, label)) in _moods.indexed)
                 Expanded(
                   child: Padding(
-                    padding: EdgeInsets.only(left: i == 0 ? 0 : 6),
+                    padding: EdgeInsets.only(left: i == 0 ? 0 : 4),
                     child: ChoiceChipBox(
                       selected: c.mood == emoji,
                       onTap: () => widget.onSave(mood: emoji),
+                      scaleToFit: false,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Icon(icon, size: 20),
                           const SizedBox(height: 5),
-                          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+                          FittedBox(fit: BoxFit.scaleDown, child: Text(label, style: AppType.micro)),
                         ],
                       ),
                     ),
@@ -701,7 +706,7 @@ class _CheckinCardState extends State<_CheckinCard> {
                         if (mounted) setState(() => _editing = false);
                       },
                       child: Padding(
-                        padding: EdgeInsets.only(left: e == 1 ? 0 : 6, top: 10, bottom: 10),
+                        padding: EdgeInsets.only(left: e == 1 ? 0 : 4, top: 10, bottom: 10),
                         child: AnimatedContainer(
                           duration: AppMotion.fast,
                           height: 10,

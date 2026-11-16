@@ -125,8 +125,8 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             if (hasCustom)
               ListTile(
-                leading: const Icon(LucideIcons.trash2, color: AppPalette.danger),
-                title: const Text('Telegram rasmiga qaytish', style: TextStyle(color: AppPalette.danger)),
+                leading: Icon(LucideIcons.trash2, color: Theme.of(ctx).colorScheme.error),
+                title: Text('Telegram rasmiga qaytish', style: AppType.body.copyWith(color: Theme.of(ctx).colorScheme.error)),
                 onTap: () => Navigator.pop(ctx, 'remove'),
               ),
             const SizedBox(height: 8),
@@ -334,7 +334,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     Text(
                       'IntizomAI · ID ${p.telegramId}',
                       textAlign: TextAlign.center,
-                      style: AppType.caption.copyWith(color: scheme.outline, fontWeight: FontWeight.w400, fontFeatures: tabularFigures),
+                      style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400, fontFeatures: tabularFigures),
                     ),
                   ],
                 ),
@@ -383,7 +383,7 @@ class _SubscriptionCard extends StatelessWidget {
                           ? [
                               if (sub?.planTitle != null) sub!.planTitle!,
                               '$days kun qoldi',
-                              if (until != null) '${shortDate(until)} gacha',
+                              if (until != null) '${shortDate(until).replaceAll('-', '\u2011')}\u00a0gacha',
                             ].join(' · ')
                           : "Cheklovsiz reja, murabbiy va do'stlar",
                       style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
@@ -463,6 +463,6 @@ class ProfileAvatar extends StatelessWidget {
 
   Widget _initial(String initial, ColorScheme scheme) => Text(
     initial,
-    style: TextStyle(fontSize: size * .42, fontWeight: FontWeight.w700, color: scheme.onPrimaryContainer),
+    style: AppType.bodyStrong.copyWith(fontSize: size * .42, height: 1, fontWeight: FontWeight.w700, color: scheme.onPrimaryContainer),
   );
 }

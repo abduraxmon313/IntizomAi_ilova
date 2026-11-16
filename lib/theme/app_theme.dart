@@ -17,6 +17,7 @@ abstract final class AppPalette {
   static const brandOnDark = Color(0xFF2CC4E4); // qorong'i rejimdagi brend
   static const onBrandDark = Color(0xFF04222B);
   static const gold = Color(0xFFB7791F); // faqat Premium
+  static const bronze = Color(0xFFA9714B); // reytingda 3-o'rin
 
   // ── Neytral (yorug') ─────────────────────────────────
   static const ink = Color(0xFF0B1720);
@@ -46,6 +47,20 @@ abstract final class AppPalette {
   static const danger = Color(0xFFCF3F3A);
   static const info = brand;
   static const ember = Color(0xFFE8590C); // seriya (olov)
+
+  /// Yorug' fonda kichik matn uchun to'qroq tonlar (WCAG AA ≥ 4.5:1).
+  static const emberInk = Color(0xFFC2410C);
+  static const goldInk = Color(0xFF8A5A12);
+  static const bronzeInk = Color(0xFF8F5A34);
+
+  /// Ma'no rangidagi kichik matn: yorug' rejimda olov/oltin to'qroq tonda.
+  static Color textTone(Color c, Brightness b) {
+    if (b == Brightness.dark) return c;
+    if (c == ember) return emberInk;
+    if (c == gold) return goldInk;
+    if (c == bronze) return bronzeInk;
+    return c;
+  }
 }
 
 abstract final class AppRadius {
@@ -73,6 +88,9 @@ abstract final class AppSpace {
 }
 
 abstract final class AppShadows {
+  /// Segment tanlagichdagi siljuvchi bo'lak.
+  static const thumb = [BoxShadow(color: Color(0x140B1720), blurRadius: 4, offset: Offset(0, 1))];
+
   /// Faqat suzuvchi elementlar uchun ("+" tugmasi, xabar yozish maydoni).
   static const raised = [
     BoxShadow(color: Color(0x140B1720), blurRadius: 18, offset: Offset(0, 8)),
@@ -89,6 +107,9 @@ abstract final class AppType {
   static const bodyStrong = TextStyle(fontSize: 15, height: 1.3, fontWeight: FontWeight.w600, letterSpacing: -.15);
   static const label = TextStyle(fontSize: 13, height: 1.35, fontWeight: FontWeight.w500, letterSpacing: 0);
   static const caption = TextStyle(fontSize: 12, height: 1.35, fontWeight: FontWeight.w500, letterSpacing: 0);
+
+  /// Eng kichik yorliq: navigatsiya, belgi (Pill), diagramma o'qi.
+  static const micro = TextStyle(fontSize: 11, height: 1.2, fontWeight: FontWeight.w500, letterSpacing: .1);
 
   /// Bo'lim ustidagi kichik sarlavha (BUGUN, REJALAR ...).
   static const overline = TextStyle(fontSize: 11.5, height: 1.2, fontWeight: FontWeight.w600, letterSpacing: .7);

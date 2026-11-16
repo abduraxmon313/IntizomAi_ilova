@@ -134,7 +134,7 @@ class HabitsPageState extends State<HabitsPage> {
                   Text(
                     "Katakni bosib o'tgan kunlarni ham belgilash mumkin.",
                     textAlign: TextAlign.center,
-                    style: AppType.caption.copyWith(color: scheme.outline, fontWeight: FontWeight.w400),
+                    style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400),
                   ),
                 ],
               ),
@@ -192,7 +192,7 @@ class _HabitCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(h.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.bodyStrong),
+                            Text(h.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppType.bodyStrong),
                             const SizedBox(height: 2),
                             Text(
                               meta,
@@ -210,7 +210,7 @@ class _HabitCard extends StatelessWidget {
                         MetaTag(
                           icon: LucideIcons.flame,
                           text: '${h.streak} kun',
-                          color: h.streak > 0 ? AppPalette.ember : scheme.outline,
+                          color: h.streak > 0 ? AppPalette.ember : scheme.onSurfaceVariant,
                         ),
                     ],
                   ),
