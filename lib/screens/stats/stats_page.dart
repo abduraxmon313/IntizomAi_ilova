@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../models/extras.dart';
+import '../../models/habit.dart';
 import '../../models/plan.dart';
 import '../../services/api_client.dart';
 import '../../services/intizom_api.dart';
@@ -13,10 +14,11 @@ import '../../utils/dates.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/feedback.dart';
 import '../../widgets/ui_kit.dart';
+import '../achievements/achievements_page.dart';
+import '../friends/friends_page.dart';
 
-const _habitScore = 5;
-
-/// Statistika: Mening / Reyting.
+/// Natijalar — "qanday ketyapman?" savolining yagona joyi:
+/// Shaxsiy (o'zimning tahlilim) · Do'stlar (guruhlar) · Reyting (hammaga nisbatan).
 class StatsPage extends StatefulWidget {
   const StatsPage({super.key, required this.state});
 
@@ -102,30 +104,37 @@ class _StatsPageState extends State<StatsPage> {
   @override
   Widget build(BuildContext context) {
     return Column(
-        children: [
-          const PageHeader(title: 'Statistika', subtitle: "Natijalaringiz va reyting"),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(AppSpace.page, 4, AppSpace.page, 4),
-            child: SegmentTabs<String>(
-              value: _view,
-              items: const [('mine', 'Mening', LucideIcons.chartColumn), ('rating', 'Reyting', LucideIcons.trophy)],
-              onChanged: (v) {
-                setState(() => _view = v);
-                if (v == 'rating' && _lb == null && _lbPremium == null) _loadLb();
-              },
-            ),
+      children: [
+        const PageHeader(title: 'Natijalar'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpace.page, 0, AppSpace.page, 8),
+          child: SegmentTabs<String>(
+            value: _view,
+            items: const [('mine', 'Shaxsiy'), ('friends', "Do'stlar"), ('rating', 'Reyting')],
+            onChanged: (v) {
+              setState(() => _view = v);
+              if (v == 'rating' && _lb == null && _lbPremium == null) _loadLb();
+            },
           ),
-          Expanded(child: _view == 'mine' ? _mine() : _rating()),
-        ],
+        ),
+        Expanded(
+          child: switch (_view) {
+            'friends' => FriendsPage(state: s),
+            'rating' => _rating(),
+            _ => _mine(),
+          },
+        ),
+      ],
     );
   }
 
-  // ── Mening statistikam ─────────────────────────────
+  // ── Shaxsiy ────────────────────────────────────────
   Widget _mine() {
     if (_error != null) return ErrorRetry(message: _error!, onRetry: _load);
     final plans = _plans;
-    if (plans == null) return const Center(child: CircularProgressIndicator());
+    if (plans == null) return const LoadingView();
 
+    final scheme = Theme.of(context).colorScheme;
     final st = s.stats;
     final habits = s.habits;
     final goals = s.goals;
@@ -134,150 +143,211 @@ class _StatsPageState extends State<StatsPage> {
     final d30 = today.subtract(const Duration(days: 29));
     DateTime pd(Plan p) => parseYmd(p.planDate) ?? today;
 
-    final p30 = plans.where((p) => !pd(p).isBefore(d30)).toList();
-    final done30 = p30.where((p) => p.isDone).toList();
-
-    // Kunlik ball: bajarilgan rejalar + bajarilgan odatlar.
-    int dayScore(DateTime d) {
-      final k = ymd(d);
-      final ps = plans.where((p) => p.planDate == k && p.isDone).fold<int>(0, (a, p) => a + p.scoreValue);
-      final hs = habits.where((h) => h.logDates.contains(k)).length * _habitScore;
-      return ps + hs;
-    }
-
+    // Bir kunda bajarilgan ishlar: rejalar + odatlar.
     int dayCount(DateTime d) {
       final k = ymd(d);
       return plans.where((p) => p.planDate == k && p.isDone).length + habits.where((h) => h.logDates.contains(k)).length;
     }
 
-    final weekScore = [for (var i = 0; i < 7; i++) dayScore(d7.add(Duration(days: i)))].fold<int>(0, (a, b) => a + b);
-    final monthStart = DateTime(today.year, today.month);
-    final doneThisMonth = plans.where((p) => p.isDone && !pd(p).isBefore(monthStart)).length +
-        habits.fold<int>(0, (a, h) => a + h.logDates.where((k) => (parseYmd(k) ?? today).isAfter(monthStart.subtract(const Duration(days: 1)))).length);
+    final week = [for (var i = 0; i < 7; i++) dayCount(d7.add(Duration(days: i)))];
+    final weekTotal = week.fold<int>(0, (a, b) => a + b);
+    final prevTotal = [for (var i = 1; i <= 7; i++) dayCount(d7.subtract(Duration(days: i)))].fold<int>(0, (a, b) => a + b);
+    final diff = weekTotal - prevTotal;
+    final weekLine = weekTotal == 0
+        ? "Oxirgi 7 kunda bajarilgan ish yo'q. Bugun bittasidan boshlang."
+        : diff > 0
+        ? "Oxirgi 7 kunda $weekTotal ta ish — oldingi haftadan $diff ta ko'p."
+        : diff < 0
+        ? "Oxirgi 7 kunda $weekTotal ta ish — oldingi haftadan ${-diff} ta kam."
+        : "Oxirgi 7 kunda $weekTotal ta ish — oldingi hafta bilan bir xil.";
 
-    // 30 kunlik tahlil (Mini App: renderExtraStats).
-    final rate = p30.isEmpty ? 0 : (done30.length * 100 / p30.length).round();
-    final byDay = <String, int>{};
-    for (final p in done30) {
-      byDay[p.planDate] = (byDay[p.planDate] ?? 0) + p.scoreValue;
+    // 30 kun: rejalar bajarilishi va faol kunlar.
+    final p30 = plans.where((p) => !pd(p).isBefore(d30)).toList();
+    final done30 = p30.where((p) => p.isDone).length;
+    final rate = p30.isEmpty ? null : (done30 * 100 / p30.length).round();
+    final activeDays = [for (var i = 0; i < 30; i++) dayCount(d30.add(Duration(days: i)))].where((c) => c > 0).length;
+
+    // Odatlar: 30 kunlik bajarilish — eng sustidan boshlab (e'tibor kerak joy).
+    final habitRates = <(Habit, int, int)>[];
+    for (final h in habits.where((h) => !h.finished)) {
+      var due = 0, did = 0;
+      for (var i = 0; i < 30; i++) {
+        final d = d30.add(Duration(days: i));
+        if (!h.dueOn(d)) continue;
+        due++;
+        if (h.doneOn(d)) did++;
+      }
+      if (due > 0) habitRates.add((h, did, due));
     }
-    final avg = byDay.isEmpty ? 0 : (byDay.values.fold<int>(0, (a, b) => a + b) / byDay.length).round();
-    final best = byDay.entries.fold<MapEntry<String, int>?>(null, (m, e) => m == null || e.value > m.value ? e : m);
+    habitRates.sort((a, b) => (a.$2 / a.$3).compareTo(b.$2 / b.$3));
 
-    // Odatlar.
-    final dueToday = habits.where((h) => h.dueToday && !h.finished).toList();
-    final habitsDoneToday = dueToday.where((h) => h.doneToday).length;
-    final bestStreak = habits.fold<int>(0, (m, h) => math.max(m, h.streak));
-    final habitTotal = habits.fold<int>(0, (a, h) => a + h.totalDone);
-
-    // Maqsadlar.
-    final goalsDone = goals.where((g) => g.completed).length;
-    final goalPct = goals.isEmpty ? 0 : (goalsDone * 100 / goals.length).round();
-
-    final chart = Theme.of(context).colorScheme.primary;
+    final milestones = achievementMilestones(st.streak, st.totalScore, goals.where((g) => g.completed).length);
+    final unlocked = milestones.where((a) => a.unlocked).length;
+    final chart = Theme.of(context).brightness == Brightness.dark ? AppPalette.brandOnDark : AppPalette.brandBright;
 
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(AppSpace.page, 8, AppSpace.page, 40),
+        padding: const EdgeInsets.fromLTRB(AppSpace.page, 4, AppSpace.page, 40),
         children: [
-          _MetricGrid(
-            items: [
-              _Metric(LucideIcons.flame, '${st.streak}', 'Joriy seriya', 'Eng uzuni: ${st.longestStreak} kun', AppPalette.ember),
-              _Metric(LucideIcons.star, '${st.totalScore}', 'Jami ball', '+$weekScore bu hafta', AppPalette.accentAmber),
-              _Metric(LucideIcons.circleCheck, '$doneThisMonth', 'Bajarilgan', 'Bu oy', AppPalette.accentBlue),
-              _Metric(LucideIcons.target, '${goals.where((g) => !g.completed).length}', 'Maqsadlar', 'Faol', AppPalette.accentTeal),
-            ],
-          ),
-          const SectionBar(title: '30 kunlik tahlil'),
-          _MetricGrid(
-            items: [
-              _Metric(LucideIcons.trendingUp, '$rate%', 'Bajarish', '${done30.length}/${p30.length} reja', AppPalette.accentBlue),
-              _Metric(LucideIcons.zap, '$avg', "O'rtacha ball", 'Faol kunda', AppPalette.accentAmber),
-              _Metric(
-                LucideIcons.award,
-                best == null ? '—' : shortDate(parseYmd(best.key) ?? today),
-                'Eng yaxshi kun',
-                best == null ? null : '+${best.value} ball',
-                AppPalette.accentViolet,
-              ),
-              _Metric(LucideIcons.calendarDays, '${byDay.length}', 'Faol kunlar', '30 kun ichida', AppPalette.accentIndigo),
-            ],
-          ),
-          if (habits.isNotEmpty) ...[
-            const SectionBar(title: 'Odatlar'),
-            _MetricGrid(
-              items: [
-                _Metric(LucideIcons.squareCheck, '$habitsDoneToday/${dueToday.length}', 'Bugun', 'bajarildi', AppPalette.accentBlue),
-                _Metric(LucideIcons.flame, '$bestStreak', 'Eng uzun seriya', 'kun', AppPalette.ember),
-                _Metric(LucideIcons.repeat, '${habits.length}', 'Faol odatlar', 'ta', AppPalette.accentTeal),
-                _Metric(LucideIcons.listChecks, '$habitTotal', 'Jami bajarilgan', 'marta', AppPalette.accentViolet),
-              ],
-            ),
-          ],
-          const SectionBar(title: 'Haftalik faollik', count: 'oxirgi 7 kun'),
-          _ChartCard(
-            child: _WeekBars(
-              days: [for (var i = 0; i < 7; i++) d7.add(Duration(days: i))],
-              values: [for (var i = 0; i < 7; i++) dayCount(d7.add(Duration(days: i)))],
-              color: chart,
-            ),
-          ),
-          const SectionBar(title: 'Ball trendi', count: '30 kun'),
-          _ChartCard(
-            child: SizedBox(
-              height: 150,
-              child: CustomPaint(
-                size: Size.infinite,
-                painter: _TrendPainter(
-                  [for (var i = 0; i < 30; i++) dayScore(d30.add(Duration(days: i)))],
-                  chart,
-                  Theme.of(context).colorScheme.outlineVariant,
-                ),
-              ),
-            ),
-          ),
-          const SectionBar(title: 'Faollik xaritasi', count: '14 hafta'),
-          _ChartCard(child: _Heatmap(today: today, count: dayCount, color: chart)),
-          const SectionBar(title: 'Maqsadlar bajarilishi'),
-          _ChartCard(
+          // ── Intizom va daraja ──────────────────────
+          Container(
+            decoration: surfaceDecoration(context, radius: AppRadius.xl),
+            padding: const EdgeInsets.all(18),
             child: Row(
               children: [
-                SizedBox(
-                  width: 96,
-                  height: 96,
-                  child: CustomPaint(
-                    painter: _DonutPainter(goalPct / 100, chart, Theme.of(context).colorScheme.surfaceContainerHigh),
-                    child: Center(child: Text('$goalPct%', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -.6, fontFeatures: tabularFigures))),
+                ProgressRing(
+                  value: st.disciplineScore.clamp(0, 100) / 100,
+                  size: 84,
+                  stroke: 8,
+                  color: chart,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${st.disciplineScore.clamp(0, 100)}',
+                        style: AppType.title.copyWith(fontSize: 24, height: 1.05, fontFeatures: tabularFigures),
+                      ),
+                      Text('intizom', style: AppType.caption.copyWith(fontSize: 11, color: scheme.onSurfaceVariant)),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 18),
                 Expanded(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      for (final (type, label) in const [('yearly', 'Yillik'), ('monthly', 'Oylik')])
-                        Builder(
-                          builder: (_) {
-                            final all = goals.where((g) => g.goalType == type).length;
-                            final dn = goals.where((g) => g.goalType == type && g.completed).length;
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              child: Row(
-                                children: [
-                                  SizedBox(width: 56, child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-                                  Expanded(child: AppProgressBar(value: all == 0 ? 0 : dn / all, color: chart)),
-                                  const SizedBox(width: 10),
-                                  Text('$dn/$all', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, fontFeatures: tabularFigures)),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
+                      Text(st.rankTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.heading),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${st.level}-daraja · ${st.xpInLevel}/${st.xpNeeded} XP',
+                        style: AppType.label.copyWith(color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
+                      ),
+                      const SizedBox(height: 10),
+                      AppProgressBar(value: st.xpPercent / 100),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Keyingi darajagacha ${(st.xpNeeded - st.xpInLevel).clamp(0, 1 << 30)} XP',
+                        style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400, fontFeatures: tabularFigures),
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 10),
+          _FactGrid(
+            items: [
+              ('${st.streak} kun', 'Joriy seriya', 'Rekord: ${st.longestStreak} kun'),
+              (rate == null ? '—' : '$rate%', 'Rejalar bajarilishi', rate == null ? "30 kunda reja yo'q" : '30 kunda $done30/${p30.length}'),
+              ('$activeDays/30', 'Faol kunlar', 'Oxirgi 30 kun'),
+              ('${st.perfectDays}', 'Mukammal kunlar', 'Hammasi bajarilgan'),
+            ],
+          ),
+
+          // ── Hafta ──────────────────────────────────
+          const SectionBar(title: 'Shu hafta'),
+          Container(
+            decoration: surfaceDecoration(context),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(weekLine, style: AppType.body.copyWith(fontWeight: FontWeight.w500, height: 1.35)),
+                const SizedBox(height: 14),
+                _WeekBars(days: [for (var i = 0; i < 7; i++) d7.add(Duration(days: i))], values: week, color: chart),
+              ],
+            ),
+          ),
+
+          // ── Odatlar ────────────────────────────────
+          if (habitRates.isNotEmpty) ...[
+            const SectionBar(title: 'Odatlar', count: '30 kun'),
+            Container(
+              decoration: surfaceDecoration(context),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+              child: Column(
+                children: [
+                  for (final (h, did, due) in habitRates)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  h.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppType.body.copyWith(fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                '${(did * 100 / due).round()}%',
+                                style: AppType.label.copyWith(fontWeight: FontWeight.w600, fontFeatures: tabularFigures),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          AppProgressBar(value: did / due, color: chart),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+
+          // ── Barqarorlik ────────────────────────────
+          const SectionBar(title: 'Barqarorlik', count: '14 hafta'),
+          Container(
+            decoration: surfaceDecoration(context),
+            padding: const EdgeInsets.all(16),
+            child: _Heatmap(today: today, count: dayCount, color: chart),
+          ),
+
+          // ── Maqsad va yutuqlar ─────────────────────
+          const SectionBar(title: 'Maqsad va yutuqlar'),
+          GroupCard(
+            children: [
+              for (final (type, label) in const [('yearly', 'Yillik maqsadlar'), ('monthly', 'Oylik maqsadlar')])
+                Builder(
+                  builder: (_) {
+                    final all = goals.where((g) => g.goalType == type).length;
+                    final dn = goals.where((g) => g.goalType == type && g.completed).length;
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                      child: Row(
+                        children: [
+                          Expanded(flex: 5, child: Text(label, style: AppType.body.copyWith(fontWeight: FontWeight.w500))),
+                          Expanded(flex: 4, child: AppProgressBar(value: all == 0 ? 0 : dn / all, color: chart)),
+                          SizedBox(
+                            width: 44,
+                            child: Text(
+                              '$dn/$all',
+                              textAlign: TextAlign.end,
+                              style: AppType.label.copyWith(fontWeight: FontWeight.w600, fontFeatures: tabularFigures),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              SettingTile(
+                icon: LucideIcons.trophy,
+                title: 'Yutuqlar',
+                subtitle: '${milestones.length} bosqichdan $unlocked tasi ochilgan',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => Scaffold(body: SafeArea(child: AchievementsPage(state: s))),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -286,59 +356,52 @@ class _StatsPageState extends State<StatsPage> {
 
   // ── Reyting ────────────────────────────────────────
   Widget _rating() {
-    final scheme = Theme.of(context).colorScheme;
     final unit = _lbPeriod == 'streak' ? 'kun' : 'ball';
     return ListView(
-      padding: const EdgeInsets.fromLTRB(AppSpace.page, 12, AppSpace.page, 40),
+      padding: const EdgeInsets.fromLTRB(AppSpace.page, 4, AppSpace.page, 40),
       children: [
-        SegmentTabs<String>(
-          value: _lbPeriod,
-          items: const [('all', 'Umumiy', null), ('week', 'Haftalik', null), ('streak', 'Seriya', null)],
-          onChanged: (v) {
-            setState(() => _lbPeriod = v);
-            _loadLb();
-          },
-        ),
-        const SizedBox(height: 16),
-        if (_lbLoading && _lb == null)
-          const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()))
-        else if (_lbPremium != null)
-          AppCard(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-            child: Column(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppPalette.gold.withValues(alpha: .5))),
-                  child: const Icon(LucideIcons.trophy, size: 20, color: AppPalette.gold),
-                ),
-                const SizedBox(height: 14),
-                const Text('Reyting Premium bilan ochiladi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: -.3)),
-                const SizedBox(height: 6),
-                Text(
-                  "Natijalaringizni boshqa foydalanuvchilar bilan solishtiring.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13.5, color: scheme.onSurfaceVariant, height: 1.45),
-                ),
-                const SizedBox(height: 18),
-                FilledButton(
-                  onPressed: openPremiumInBot,
-                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(46)),
-                  child: const Text('Premium olish'),
-                ),
-              ],
+        if (_lbPremium != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: PremiumGate(
+              icon: LucideIcons.trophy,
+              title: 'Reyting Premium bilan ochiladi',
+              message: "Natijalaringizni boshqa foydalanuvchilar bilan solishtiring.",
+              onOpen: () => showPremiumDialog(context, _lbPremium!),
             ),
           )
-        else if (_lb != null) ...[
-          if (_lb!.top.isEmpty)
-            const EmptyView(icon: LucideIcons.trophy, title: "Hali reyting yo'q")
-          else
-            GroupCard(indent: 90, children: [for (final r in _lb!.top) _LeaderTile(row: r, unit: unit)]),
-          if (_lb!.me != null && !_lb!.meInTop) ...[
-            const SizedBox(height: 14),
-            const SectionBar(title: "Sizning o'rningiz", top: 14),
-            GroupCard(indent: 90, children: [_LeaderTile(row: _lb!.me!, unit: unit)]),
+        else ...[
+          Row(
+            children: [
+              for (final (v, label) in const [('all', 'Umumiy'), ('week', 'Haftalik'), ('streak', 'Seriya')])
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _FilterChip(
+                    label: label,
+                    selected: _lbPeriod == v,
+                    onTap: () {
+                      setState(() => _lbPeriod = v);
+                      _loadLb();
+                    },
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (_lb == null)
+            const LoadingView()
+          else ...[
+            AnimatedOpacity(
+              opacity: _lbLoading ? .5 : 1,
+              duration: AppMotion.fast,
+              child: _lb!.top.isEmpty
+                  ? const EmptyView(icon: LucideIcons.trophy, title: "Hali reyting yo'q")
+                  : GroupCard(indent: 96, children: [for (final r in _lb!.top) _LeaderTile(row: r, unit: unit)]),
+            ),
+            if (_lb!.me != null && !_lb!.meInTop) ...[
+              const SectionBar(title: "Sizning o'rningiz", top: 20),
+              GroupCard(children: [_LeaderTile(row: _lb!.me!, unit: unit)]),
+            ],
           ],
         ],
       ],
@@ -346,22 +409,97 @@ class _StatsPageState extends State<StatsPage> {
   }
 }
 
-class _ChartCard extends StatelessWidget {
-  const _ChartCard({required this.child});
-  final Widget child;
+/// Ikkinchi darajali filtr (segment ichidagi tanlov).
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: scheme.outlineVariant),
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        onTap: () {
+          if (selected) return;
+          tapFeedback();
+          onTap();
+        },
+        child: AnimatedContainer(
+          duration: AppMotion.fast,
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? scheme.onSurface : scheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Text(
+            label,
+            style: AppType.label.copyWith(
+              fontWeight: FontWeight.w600,
+              color: selected ? scheme.surface : scheme.onSurfaceVariant,
+            ),
+          ),
+        ),
       ),
-      child: child,
     );
+  }
+}
+
+/// 2×2 raqamlar: qiymat, nom, izoh. Bitta yuzada, ingichka ajratgichlar bilan.
+class _FactGrid extends StatelessWidget {
+  const _FactGrid({required this.items});
+  final List<(String, String, String)> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    Widget cell((String, String, String) m) => Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(m.$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.caption.copyWith(color: scheme.onSurfaceVariant)),
+          const SizedBox(height: 6),
+          Text(
+            m.$1,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppType.title.copyWith(fontFeatures: tabularFigures),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            m.$3,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppType.caption.copyWith(color: scheme.outline, fontWeight: FontWeight.w400, fontFeatures: tabularFigures),
+          ),
+        ],
+      ),
+    );
+
+    final rows = <Widget>[];
+    for (var i = 0; i < items.length; i += 2) {
+      if (i > 0) rows.add(Divider(height: 1, color: scheme.outlineVariant));
+      rows.add(
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: cell(items[i])),
+              VerticalDivider(width: 1, color: scheme.outlineVariant),
+              Expanded(child: i + 1 < items.length ? cell(items[i + 1]) : const SizedBox()),
+            ],
+          ),
+        ),
+      );
+    }
+    return Container(decoration: surfaceDecoration(context), child: Column(children: rows));
   }
 }
 
@@ -417,63 +555,6 @@ class _WeekBars extends StatelessWidget {
       ),
     );
   }
-}
-
-class _TrendPainter extends CustomPainter {
-  _TrendPainter(this.values, this.color, this.grid);
-
-  final List<int> values;
-  final Color color;
-  final Color grid;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const pad = 6.0;
-    final mx = math.max(1, values.fold<int>(0, math.max)).toDouble();
-    final gridPaint = Paint()
-      ..color = grid
-      ..strokeWidth = 1;
-    for (var i = 0; i <= 3; i++) {
-      final y = pad + (size.height - pad * 2) * i / 3;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-    if (values.length < 2) return;
-    final step = (size.width - pad * 2) / (values.length - 1);
-    final pts = [
-      for (var i = 0; i < values.length; i++)
-        Offset(pad + i * step, size.height - pad - values[i] / mx * (size.height - pad * 2)),
-    ];
-    final line = Path()..moveTo(pts.first.dx, pts.first.dy);
-    for (var i = 1; i < pts.length; i++) {
-      final cx = (pts[i - 1].dx + pts[i].dx) / 2;
-      line.cubicTo(cx, pts[i - 1].dy, cx, pts[i].dy, pts[i].dx, pts[i].dy);
-    }
-    final area = Path.from(line)
-      ..lineTo(pts.last.dx, size.height)
-      ..lineTo(pts.first.dx, size.height)
-      ..close();
-    canvas.drawPath(
-      area,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [color.withValues(alpha: .16), color.withValues(alpha: 0)],
-        ).createShader(Offset.zero & size),
-    );
-    canvas.drawPath(
-      line,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..strokeCap = StrokeCap.round,
-    );
-    canvas.drawCircle(pts.last, 3.5, Paint()..color = color);
-  }
-
-  @override
-  bool shouldRepaint(_TrendPainter old) => old.values != values || old.color != color;
 }
 
 class _Heatmap extends StatelessWidget {
@@ -548,31 +629,6 @@ class _Heatmap extends StatelessWidget {
       ],
     );
   }
-}
-
-class _DonutPainter extends CustomPainter {
-  _DonutPainter(this.progress, this.color, this.track);
-  final double progress;
-  final Color color;
-  final Color track;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const stroke = 10.0;
-    final rect = const Offset(stroke / 2, stroke / 2) & Size(size.width - stroke, size.height - stroke);
-    canvas.drawArc(rect, 0, math.pi * 2, false, Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..color = track);
-    canvas.drawArc(rect, -math.pi / 2, math.pi * 2 * progress.clamp(0, 1), false, Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round
-      ..color = color);
-  }
-
-  @override
-  bool shouldRepaint(_DonutPainter old) => old.progress != progress || old.color != color;
 }
 
 class _LeaderTile extends StatelessWidget {
@@ -659,83 +715,3 @@ class _LeaderTile extends StatelessWidget {
   }
 }
 
-class _Metric {
-  const _Metric(this.icon, this.value, this.label, this.hint, [this.accent]);
-  final IconData icon;
-  final String value;
-  final String label;
-  final String? hint;
-  final Color? accent;
-}
-
-/// 2×2 ko'rsatkichlar bitta yuzada, ingichka ajratgichlar bilan.
-class _MetricGrid extends StatelessWidget {
-  const _MetricGrid({required this.items});
-  final List<_Metric> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    Widget cell(_Metric m) => Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(m.icon, size: 14, color: m.accent ?? scheme.onSurfaceVariant),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  m.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant, fontWeight: FontWeight.w500),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            m.value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -.7, fontFeatures: tabularFigures),
-          ),
-          if (m.hint != null)
-            Text(
-              m.hint!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-            ),
-        ],
-      ),
-    );
-
-    final rows = <Widget>[];
-    for (var i = 0; i < items.length; i += 2) {
-      if (i > 0) rows.add(Divider(height: 1, color: scheme.outlineVariant));
-      rows.add(
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(child: cell(items[i])),
-              VerticalDivider(width: 1, color: scheme.outlineVariant),
-              Expanded(child: i + 1 < items.length ? cell(items[i + 1]) : const SizedBox()),
-            ],
-          ),
-        ),
-      );
-    }
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Column(children: rows),
-    );
-  }
-}

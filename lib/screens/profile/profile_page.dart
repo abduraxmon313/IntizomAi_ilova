@@ -20,20 +20,18 @@ const _referralText = "Siz intizomlimisiz?\n\n"
     "tahlil qilib sizga mos tavsiyalar beradi.\n\n"
     "Bilim + Intizom = Natija";
 
-/// Profil va sozlamalar (Asosiy sahifadagi avatar yoki ⚙ tugmasidan ochiladi).
+/// Profil va sozlamalar (Bugun sahifasidagi avatar ortida).
 class ProfilePage extends StatefulWidget {
   const ProfilePage({
     super.key,
     required this.state,
     required this.onLogout,
     required this.onAppearanceChanged,
-    required this.onLanguageChanged,
   });
 
   final AppState state;
   final VoidCallback onLogout;
   final ValueChanged<String> onAppearanceChanged;
-  final ValueChanged<String> onLanguageChanged;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -43,7 +41,6 @@ class _ProfilePageState extends State<ProfilePage> {
   AppState get s => widget.state;
 
   Subscription? _sub;
-  Checkin _checkin = const Checkin();
 
   @override
   void initState() {
@@ -67,22 +64,6 @@ class _ProfilePageState extends State<ProfilePage> {
       final sub = await s.api.subscription();
       if (mounted) setState(() => _sub = sub);
     } catch (_) {}
-    try {
-      final c = await s.api.checkin();
-      if (mounted && c != null) setState(() => _checkin = c);
-    } catch (_) {}
-  }
-
-  Future<void> _saveCheckin({String? mood, int? energy}) async {
-    final prev = _checkin;
-    setState(() => _checkin = Checkin(mood: mood ?? _checkin.mood, energy: energy ?? _checkin.energy));
-    try {
-      await s.api.saveCheckin(mood: mood, energy: energy);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _checkin = prev);
-      showApiError(context, e);
-    }
   }
 
   Future<void> _open(String url) async {
@@ -127,11 +108,11 @@ class _ProfilePageState extends State<ProfilePage> {
     final hasCustom = s.profile?.customPhotoUrl?.isNotEmpty == true;
     final action = await showModalBottomSheet<String>(
       context: context,
-      showDragHandle: true,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const SizedBox(height: 8),
             ListTile(
               leading: const Icon(LucideIcons.image),
               title: const Text('Galereyadan tanlash'),
@@ -203,244 +184,168 @@ class _ProfilePageState extends State<ProfilePage> {
     final st = s.stats;
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil')),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await Future.wait([s.refreshProfile(), s.refreshStats(), _load()]);
-        },
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(AppSpace.page, 4, AppSpace.page, 40),
-          children: [
-            // ── Shaxs ──────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 8, 4, 20),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: _changePhoto,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        ProfileAvatar(url: p.avatar, telegramId: p.telegramId, name: p.fullName, size: 72),
-                        Positioned(
-                          right: -2,
-                          bottom: -2,
-                          child: Container(
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              color: scheme.surfaceContainerLowest,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: scheme.outlineVariant),
-                            ),
-                            child: Icon(LucideIcons.camera, size: 13, color: scheme.onSurface),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          p.fullName,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -.7, height: 1.2),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            if (p.username?.isNotEmpty == true) ...[
-                              Text('@${p.username}', style: TextStyle(fontSize: 13.5, color: scheme.onSurfaceVariant)),
-                              const SizedBox(width: 8),
-                            ],
-                            if (st.isPremium) const Pill('Premium', color: AppPalette.gold),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            _SubscriptionCard(sub: _sub, isPremium: st.isPremium),
-
-            // ── Bugungi holat ──────────────────────
-            const SectionBar(title: 'Bugungi holat'),
-            AppCard(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Kayfiyat', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant)),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      for (final (emoji, icon, label) in _moods)
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 3),
-                            child: ChoiceChipBox(
-                              selected: _checkin.mood == emoji,
-                              onTap: () => _saveCheckin(mood: emoji),
-                              child: Column(
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: () async {
+            await Future.wait([s.refreshProfile(), s.refreshStats(), _load()]);
+          },
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 40),
+            children: [
+              const PageHeader(title: 'Profil'),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // ── Shaxs ──────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 20),
+                      child: Row(
+                        children: [
+                          Semantics(
+                            button: true,
+                            label: "Profil rasmini o'zgartirish",
+                            child: GestureDetector(
+                              onTap: _changePhoto,
+                              child: Stack(
+                                clipBehavior: Clip.none,
                                 children: [
-                                  Icon(icon, size: 20),
-                                  const SizedBox(height: 6),
-                                  Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+                                  ProfileAvatar(url: p.avatar, telegramId: p.telegramId, name: p.fullName, size: 72),
+                                  Positioned(
+                                    right: -2,
+                                    bottom: -2,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: scheme.surfaceContainerLowest,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: scheme.outlineVariant),
+                                      ),
+                                      child: Icon(LucideIcons.camera, size: 13, color: scheme.onSurface),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Text('Energiya', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant)),
-                      const Spacer(),
-                      Text(
-                        _checkin.energy == null ? 'Tanlanmagan' : '${_checkin.energy} / 5',
-                        style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      for (var e = 1; e <= 5; e++)
-                        Expanded(
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () {
-                              tapFeedback();
-                              _saveCheckin(energy: e);
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 3),
-                              child: AnimatedContainer(
-                                duration: AppMotion.fast,
-                                height: 14.0 + e * 6,
-                                decoration: BoxDecoration(
-                                  color: (_checkin.energy ?? 0) >= e ? scheme.primary : scheme.surfaceContainerHigh,
-                                  borderRadius: BorderRadius.circular(6),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(p.fullName, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppType.title),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    if (p.username?.isNotEmpty == true) ...[
+                                      Flexible(
+                                        child: Text(
+                                          '@${p.username}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: AppType.label.copyWith(color: scheme.onSurfaceVariant),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
+                                    if (st.isPremium) const Pill('Premium', color: AppPalette.gold),
+                                  ],
                                 ),
-                              ),
+                              ],
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                    _SubscriptionCard(sub: _sub, isPremium: st.isPremium),
+
+                    // ── Hisob ──────────────────────────────
+                    const SectionBar(title: 'Hisob'),
+                    GroupCard(
+                      indent: 50,
+                      children: [
+                        SettingTile(icon: LucideIcons.userRound, title: 'Ism', subtitle: p.fullName, onTap: _editName),
+                        SettingTile(
+                          icon: LucideIcons.gift,
+                          title: "Do'stni taklif qilish",
+                          subtitle: p.referralCount > 0
+                              ? "${p.referralCount} ta do'st qo'shildi"
+                              : "Har 5 faol do'st uchun 7 kun Premium",
+                          onTap: _shareInvite,
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    "AI murabbiy holatingizni hisobga olib maslahat beradi.",
-                    style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
-                  ),
-                ],
+                      ],
+                    ),
+
+                    // ── Sozlamalar ─────────────────────────
+                    const SectionBar(title: 'Sozlamalar'),
+                    GroupCard(
+                      indent: 50,
+                      children: [
+                        SettingTile(
+                          icon: LucideIcons.moon,
+                          title: 'Tungi rejim',
+                          trailing: Switch(
+                            value: dark,
+                            onChanged: (v) => widget.onAppearanceChanged(v ? 'dark' : 'light'),
+                          ),
+                        ),
+                        SettingTile(
+                          icon: LucideIcons.bell,
+                          title: 'Eslatmalar',
+                          subtitle: 'Reja va odat vaqtida Telegram xabari',
+                          trailing: Switch(value: p.notificationsEnabled, onChanged: _setNotifications),
+                        ),
+                      ],
+                    ),
+
+                    // ── Yordam ─────────────────────────────
+                    const SectionBar(title: 'Yordam va aloqa'),
+                    GroupCard(
+                      indent: 50,
+                      children: [
+                        SettingTile(
+                          icon: LucideIcons.messageCircle,
+                          title: "Qo'llab-quvvatlash",
+                          subtitle: 'Savol va takliflar',
+                          onTap: () => _open('https://t.me/IntizomAI_Admin_bot'),
+                        ),
+                        SettingTile(
+                          icon: LucideIcons.megaphone,
+                          title: 'Telegram kanal',
+                          subtitle: 'Yangiliklar va maslahatlar',
+                          onTap: () => _open('https://t.me/Intizom_AI'),
+                        ),
+                        SettingTile(
+                          icon: LucideIcons.atSign,
+                          title: 'Instagram',
+                          subtitle: '@intizomai.uz',
+                          onTap: () => _open('https://www.instagram.com/intizomai.uz'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    GroupCard(
+                      children: [
+                        SettingTile(icon: LucideIcons.logOut, title: 'Hisobdan chiqish', danger: true, onTap: _logout),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'IntizomAI · ID ${p.telegramId}',
+                      textAlign: TextAlign.center,
+                      style: AppType.caption.copyWith(color: scheme.outline, fontWeight: FontWeight.w400, fontFeatures: tabularFigures),
+                    ),
+                  ],
+                ),
               ),
-            ),
-
-            // ── Hisob ──────────────────────────────
-            const SectionBar(title: 'Hisob'),
-            GroupCard(
-              children: [
-                SettingTile(icon: LucideIcons.userRound, accent: AppPalette.accentBlue, title: 'Ism', subtitle: p.fullName, onTap: _editName),
-                SettingTile(icon: LucideIcons.camera, accent: AppPalette.accentViolet, title: 'Profil rasmi', subtitle: 'Galereya yoki kamera', onTap: _changePhoto),
-                SettingTile(
-                  icon: LucideIcons.gift,
-                  accent: AppPalette.accentRose,
-                  title: "Do'stni taklif qilish",
-                  subtitle: p.referralCount > 0
-                      ? "${p.referralCount} ta do'st qo'shildi"
-                      : "Har 5 faol do'st uchun 7 kun Premium",
-                  onTap: _shareInvite,
-                ),
-              ],
-            ),
-
-            // ── Sozlamalar ─────────────────────────
-            const SectionBar(title: 'Sozlamalar'),
-            GroupCard(
-              children: [
-                SettingTile(
-                  icon: LucideIcons.moon,
-                  accent: AppPalette.accentIndigo,
-                  title: 'Tungi rejim',
-                  trailing: Switch(
-                    value: dark,
-                    onChanged: (v) => widget.onAppearanceChanged(v ? 'dark' : 'light'),
-                  ),
-                ),
-                SettingTile(
-                  icon: LucideIcons.bell,
-                  accent: AppPalette.accentAmber,
-                  title: 'Eslatmalar',
-                  subtitle: 'Reja va odat vaqtida Telegram xabari',
-                  trailing: Switch(value: p.notificationsEnabled, onChanged: _setNotifications),
-                ),
-              ],
-            ),
-
-            // ── Aloqa ──────────────────────────────
-            const SectionBar(title: 'Yordam'),
-            GroupCard(
-              children: [
-                SettingTile(
-                  icon: LucideIcons.megaphone,
-                  accent: AppPalette.accentBlue,
-                  title: 'Telegram kanal',
-                  subtitle: 'Yangiliklar va maslahatlar',
-                  onTap: () => _open('https://t.me/Intizom_AI'),
-                ),
-                SettingTile(
-                  icon: LucideIcons.messageCircle,
-                  accent: AppPalette.accentTeal,
-                  title: "Qo'llab-quvvatlash",
-                  subtitle: 'Savol va takliflar',
-                  onTap: () => _open('https://t.me/IntizomAI_Admin_bot'),
-                ),
-                SettingTile(
-                  icon: LucideIcons.atSign,
-                  accent: AppPalette.accentRose,
-                  title: 'Instagram',
-                  subtitle: '@intizomai.uz',
-                  onTap: () => _open('https://www.instagram.com/intizomai.uz'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            GroupCard(
-              children: [
-                SettingTile(icon: LucideIcons.logOut, title: 'Hisobdan chiqish', danger: true, onTap: _logout),
-              ],
-            ),
-            const SizedBox(height: 24),
-            const Center(child: BrandMark(size: 28)),
-            const SizedBox(height: 8),
-            Text(
-              'IntizomAI · ID ${p.telegramId}',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
-
-/// Kayfiyat: serverga emoji yuboriladi (AI konteksti uchun), ilovada ikonka.
-const _moods = [
-  ('🔥', LucideIcons.flame, "A'lo"),
-  ('💪', LucideIcons.zap, 'Kuchli'),
-  ('😐', LucideIcons.meh, 'Oddiy'),
-  ('😴', LucideIcons.moon, 'Charchoq'),
-  ('😞', LucideIcons.frown, 'Past'),
-];
 
 class _SubscriptionCard extends StatelessWidget {
   const _SubscriptionCard({required this.sub, required this.isPremium});
@@ -462,7 +367,7 @@ class _SubscriptionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              AppIconTile.tinted(icon: premium ? LucideIcons.crown : LucideIcons.sparkles, accent: AppPalette.gold, size: 38),
+              AppIconTile(icon: LucideIcons.crown, tone: AppPalette.gold, size: 40),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -470,7 +375,7 @@ class _SubscriptionCard extends StatelessWidget {
                   children: [
                     Text(
                       premium ? 'Premium faol' : 'Bepul tarif',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -.2),
+                      style: AppType.bodyStrong,
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -480,15 +385,16 @@ class _SubscriptionCard extends StatelessWidget {
                               '$days kun qoldi',
                               if (until != null) '${shortDate(until)} gacha',
                             ].join(' · ')
-                          : "Cheklovsiz reja, AI va Do'stlar",
-                      style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+                          : "Cheklovsiz reja, murabbiy va do'stlar",
+                      style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
                 premium ? 'Uzaytirish' : 'Ochish',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: scheme.tertiary),
+                style: AppType.label.copyWith(fontWeight: FontWeight.w600, color: scheme.tertiary),
               ),
             ],
           ),

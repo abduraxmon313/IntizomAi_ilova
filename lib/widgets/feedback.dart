@@ -5,7 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../config/app_config.dart';
 import '../services/api_client.dart';
 import '../theme/app_theme.dart';
-import 'app_ui.dart';
+import 'ui_kit.dart';
 
 /// Premium to'lovi faqat bot ichida — botning Premium oynasini ochadi.
 Future<void> openPremiumInBot() async {
@@ -32,6 +32,7 @@ Future<void> showPremiumDialog(BuildContext context, String message) {
   return showModalBottomSheet<void>(
     context: context,
     useSafeArea: true,
+    isScrollControlled: true,
     builder: (ctx) {
       final scheme = Theme.of(ctx).colorScheme;
       Widget row(IconData icon, String title, String text) => Padding(
@@ -39,65 +40,44 @@ Future<void> showPremiumDialog(BuildContext context, String message) {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 19, color: scheme.tertiary),
+            Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 19, color: scheme.tertiary)),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -.15)),
-                  Text(text, style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                  Text(title, style: AppType.bodyStrong),
+                  Text(text, style: AppType.label.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400)),
                 ],
               ),
             ),
           ],
         ),
       );
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(AppSpace.page, 12, AppSpace.page, 20),
+      return SheetScaffold(
+        title: 'IntizomAI Premium',
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(color: scheme.outline, borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            const SizedBox(height: 22),
-            const Row(children: [BrandMark(size: 44)]),
-            const SizedBox(height: 16),
-            const Text(
-              'IntizomAI Premium',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -.8),
-            ),
-            const SizedBox(height: 6),
-            Text(message, style: TextStyle(fontSize: 14.5, height: 1.45, color: scheme.onSurfaceVariant)),
-            const SizedBox(height: 14),
-            row(LucideIcons.infinity, 'Cheklovsiz', "Reja, odat, maqsad va AI Coach — chegarasiz"),
-            row(LucideIcons.chartColumn, 'Chuqur statistika', "Batafsil tahlil va reyting"),
-            row(LucideIcons.users, "Do'stlar va jamoa", "Guruhlar va Telegram hisobotlari"),
+            Text(message, style: AppType.body.copyWith(color: scheme.onSurfaceVariant)),
+            const SizedBox(height: 12),
+            row(LucideIcons.infinity, 'Cheklovsiz', "Reja, odat, maqsad va AI murabbiy — chegarasiz"),
+            row(LucideIcons.chartColumn, 'Chuqur tahlil', "Batafsil statistika va umumiy reyting"),
+            row(LucideIcons.users, "Do'stlar bilan", "Guruhlar va Telegram hisobotlari"),
             const SizedBox(height: 18),
             FilledButton(
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
               onPressed: () {
                 Navigator.pop(ctx);
                 openPremiumInBot();
               },
               child: const Text('Tarifni tanlash'),
             ),
-            const SizedBox(height: 4),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              style: TextButton.styleFrom(foregroundColor: scheme.onSurfaceVariant),
-              child: const Text('Keyinroq'),
-            ),
+            const SizedBox(height: 10),
             Text(
               "To'lov IntizomAI Telegram boti orqali amalga oshiriladi.",
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400),
             ),
           ],
         ),
@@ -122,21 +102,20 @@ class ErrorRetry extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(color: scheme.surfaceContainerLow, shape: BoxShape.circle),
-              child: Icon(LucideIcons.cloudOff, size: 22, color: scheme.onSurfaceVariant),
-            ),
+            Icon(LucideIcons.cloudOff, size: 30, color: scheme.outline),
             const SizedBox(height: 14),
-            const Text("Ma'lumot yuklanmadi", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const Text("Ma'lumot yuklanmadi", style: AppType.bodyStrong),
             const SizedBox(height: 4),
-            Text(message, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: scheme.onSurfaceVariant)),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppType.label.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400),
+            ),
             const SizedBox(height: 18),
-            OutlinedButton.icon(
+            OutlinedButton(
               onPressed: onRetry,
-              icon: const Icon(LucideIcons.rotateCcw, size: 16),
-              label: const Text('Qayta urinish'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+              child: const Text('Qayta urinish'),
             ),
           ],
         ),

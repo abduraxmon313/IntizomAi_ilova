@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../models/goal.dart';
 import '../../models/plan.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
@@ -10,27 +11,39 @@ import '../../widgets/feedback.dart';
 import '../../widgets/ui_kit.dart';
 import '../forms.dart';
 
-/// Rejalar: kun tasmasi va tanlangan kunning rejalari. (Odatlar — o'z bo'limida.)
+/// Rejalashtirish ufqi: kun rejalari, oy maqsadlari, yil maqsadlari.
+enum PlansView { day, month, year }
+
+/// Rejalar — rejalashtirishning yagona joyi, katta maqsaddan kunlik ishgacha:
+/// Kunlik (istalgan kunning rejalari) · Oylik · Yillik (maqsadlar).
 class PlansPage extends StatefulWidget {
   const PlansPage({super.key, required this.state});
 
   final AppState state;
 
   @override
-  State<PlansPage> createState() => _PlansPageState();
+  State<PlansPage> createState() => PlansPageState();
 }
 
-class _PlansPageState extends State<PlansPage> {
+class PlansPageState extends State<PlansPage> {
   AppState get s => widget.state;
 
+  PlansView _view = PlansView.day;
+
+  // Kunlik
   DateTime _day = tashkentToday();
   List<Plan> _plans = const [];
   bool _loadingPlans = true;
   int _seenVersion = -1;
 
+  // Maqsadlar
+  late int _year = tashkentToday().year;
+  late DateTime _month = DateTime(tashkentToday().year, tashkentToday().month);
+
   @override
   void initState() {
     super.initState();
+    _seenVersion = s.plansVersion;
     s.addListener(_onState);
     _loadPlans();
   }
@@ -49,6 +62,20 @@ class _PlansPageState extends State<PlansPage> {
     if (mounted) setState(() {});
   }
 
+  /// Boshqa bo'limdan kerakli ko'rinishni ochish (masalan, Bugun → oy maqsadlari).
+  void showView(PlansView v) {
+    final t = tashkentToday();
+    setState(() {
+      _view = v;
+      if (v == PlansView.month) _month = DateTime(t.year, t.month);
+      if (v == PlansView.year) _year = t.year;
+    });
+  }
+
+  /// Pastdagi "+" tugmasi: ko'rinishga qarab reja yoki maqsad.
+  Future<void> add() => _view == PlansView.day ? _addPlan() : _addGoal();
+
+  // ── Kunlik rejalar ─────────────────────────────────
   Future<void> _loadPlans() async {
     final day = _day;
     try {
@@ -65,11 +92,8 @@ class _PlansPageState extends State<PlansPage> {
     }
   }
 
-  Future<void> _refresh() async {
-    await Future.wait([s.refreshHabits(), s.refreshStats(), _loadPlans()]);
-  }
-
   void _selectDay(DateTime d) {
+    if (sameDay(d, _day)) return;
     setState(() {
       _day = d;
       _loadingPlans = true;
@@ -77,18 +101,19 @@ class _PlansPageState extends State<PlansPage> {
     _loadPlans();
   }
 
-  Future<void> _togglePlan(Plan p) async {
-    final today = tashkentToday();
-    final pd = parseYmd(p.planDate) ?? today;
-    if (pd.isBefore(today)) {
-      toast(context, "O'tib ketgan kun rejasini o'zgartirib bo'lmaydi");
-      return;
-    }
+  Future<void> _setPlanDone(Plan p, bool done) async {
     try {
-      final updated = await s.api.setPlanStatus(p.id, p.isDone ? 'pending' : 'done');
+      final updated = await s.api.setPlanStatus(p.id, done ? 'done' : 'pending');
       if (!mounted) return;
       setState(() => _plans = [for (final x in _plans) x.id == p.id ? updated : x]);
-      if (updated.isDone) toast(context, 'Bajarildi · +${updated.scoreValue} ball');
+      if (updated.isDone) {
+        toast(
+          context,
+          'Bajarildi · +${updated.scoreValue} ball',
+          actionLabel: 'Qaytarish',
+          onAction: () => _setPlanDone(updated, false),
+        );
+      }
       s.plansChanged();
     } catch (e) {
       if (mounted) showApiError(context, e);
@@ -99,86 +124,69 @@ class _PlansPageState extends State<PlansPage> {
     if (await showPlanForm(context, api: s.api, plan: p)) s.plansChanged();
   }
 
-  Future<void> _deletePlan(Plan p) async {
-    if (!await confirmAction(context, title: "Rejani o'chirish", message: p.title)) return;
-    try {
-      await s.api.deletePlan(p.id);
-      s.plansChanged();
-    } catch (e) {
-      if (mounted) showApiError(context, e);
-    }
-  }
-
   Future<void> _addPlan() async {
+    final today = tashkentToday();
     if (await showPlanForm(context, api: s.api, initialDate: _day)) {
-      final today = tashkentToday();
       if (_day.isBefore(today)) _selectDay(today);
       s.plansChanged();
     }
   }
 
+  // ── Maqsadlar ──────────────────────────────────────
+  String get _goalType => _view == PlansView.year ? 'yearly' : 'monthly';
+
+  String get _period =>
+      _view == PlansView.year ? '$_year' : '${_month.year}-${_month.month.toString().padLeft(2, '0')}';
+
+  String get _periodLabel =>
+      _view == PlansView.year ? '$_year-yil' : '${uzMonths[_month.month - 1]} ${_month.year}';
+
+  Future<void> _addGoal() async {
+    if (await showGoalForm(context, api: s.api, goalType: _goalType, period: _period, periodLabel: _periodLabel)) {
+      await s.refreshGoals();
+    }
+  }
+
+  Future<void> _setGoalDone(Goal g, bool done) async {
+    try {
+      await s.api.updateGoal(g.id, completed: done);
+      await s.refreshGoals();
+      if (done && mounted) {
+        toast(context, 'Maqsad bajarildi', actionLabel: 'Qaytarish', onAction: () => _setGoalDone(g, false));
+      }
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    }
+  }
+
+  Future<void> _editGoal(Goal g) async {
+    if (await showGoalForm(context, api: s.api, goal: g, periodLabel: _periodLabel)) await s.refreshGoals();
+  }
+
+  Future<void> _refresh() => _view == PlansView.day ? _loadPlans() : s.refreshGoals();
+
   @override
   Widget build(BuildContext context) {
-    final today = tashkentToday();
-    final isToday = sameDay(_day, today);
-    final plans = [..._plans]..sort((a, b) => (a.scheduledTime ?? '99:99').compareTo(b.scheduledTime ?? '99:99'));
-    final plansDone = plans.where((p) => p.isDone).length;
-
     return RefreshIndicator(
       onRefresh: _refresh,
       child: ListView(
-        padding: const EdgeInsets.only(bottom: 32),
+        padding: const EdgeInsets.only(bottom: AppSpace.bottomInset),
         children: [
-          PageHeader(
-            title: 'Rejalar',
-            subtitle: longDate(today),
-            actions: [HeaderIconButton(icon: LucideIcons.plus, tooltip: "Reja qo'shish", filled: true, onTap: _addPlan)],
-          ),
-          _WeekStrip(selected: _day, onSelect: _selectDay),
+          const PageHeader(title: 'Rejalar'),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SectionBar(
-                  title: _dayTitle(),
-                  count: plans.isEmpty ? null : '$plansDone/${plans.length}',
-                  actionLabel: 'Reja',
-                  onAction: _addPlan,
-                  top: 20,
-                ),
-                AnimatedSwitcher(
-                  duration: AppMotion.base,
-                  child: _loadingPlans
-                      ? const Padding(
-                          key: ValueKey('loading'),
-                          padding: EdgeInsets.all(28),
-                          child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
-                        )
-                      : plans.isEmpty
-                          ? EmptyView(
-                              key: ValueKey('empty${ymd(_day)}'),
-                              icon: LucideIcons.calendarPlus,
-                              title: isToday ? "Bugunga reja yo'q" : "Bu kunga reja yo'q",
-                              message: 'Vaqtini belgilang — bot o\'z vaqtida eslatadi.',
-                              actionLabel: "Reja qo'shish",
-                              onAction: _addPlan,
-                            )
-                          : GroupCard(
-                              key: ValueKey('plans${ymd(_day)}'),
-                              indent: 92,
-                              children: [
-                                for (final p in plans)
-                                  _PlanRow(
-                                    plan: p,
-                                    onToggle: () => _togglePlan(p),
-                                    onEdit: () => _editPlan(p),
-                                    onDelete: () => _deletePlan(p),
-                                  ),
-                              ],
-                            ),
-                ),
-              ],
+            child: SegmentTabs<PlansView>(
+              value: _view,
+              items: const [(PlansView.day, 'Kunlik'), (PlansView.month, 'Oylik'), (PlansView.year, 'Yillik')],
+              onChanged: (v) => setState(() => _view = v),
+            ),
+          ),
+          const SizedBox(height: 12),
+          AnimatedSwitcher(
+            duration: AppMotion.base,
+            child: KeyedSubtree(
+              key: ValueKey(_view),
+              child: _view == PlansView.day ? _dayView() : _goalsView(),
             ),
           ),
         ],
@@ -186,31 +194,158 @@ class _PlansPageState extends State<PlansPage> {
     );
   }
 
-  String _dayTitle() {
-    final r = relativeDay(_day);
-    if (r == 'Bugun') return 'Bugungi rejalar';
-    if (r == 'Ertaga') return 'Ertangi rejalar';
-    if (r == 'Kecha') return 'Kechagi rejalar';
-    return '${shortDate(_day)} rejalari';
+  Widget _dayView() {
+    final today = tashkentToday();
+    final past = _day.isBefore(today);
+    final plans = [..._plans]..sort((a, b) => (a.scheduledTime ?? '99:99').compareTo(b.scheduledTime ?? '99:99'));
+    final done = plans.where((p) => p.isDone).length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _DayStrip(selected: _day, onSelect: _selectDay),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SectionBar(title: _dayTitle(), count: plans.isEmpty ? null : '$done/${plans.length}', top: 16),
+              AnimatedSwitcher(
+                duration: AppMotion.base,
+                child: _loadingPlans
+                    ? const LoadingView(key: ValueKey('loading'))
+                    : plans.isEmpty
+                    ? EmptyView(
+                        key: ValueKey('empty${ymd(_day)}'),
+                        icon: LucideIcons.calendarPlus,
+                        title: past ? "Bu kunda reja bo'lmagan" : "Bu kunga hali reja yo'q",
+                        message: past ? null : "Vaqtini belgilasangiz, bot o'z vaqtida eslatadi.",
+                        actionLabel: "Reja qo'shish",
+                        onAction: past ? null : _addPlan,
+                      )
+                    : GroupCard(
+                        key: ValueKey('plans${ymd(_day)}'),
+                        indent: 52,
+                        children: [
+                          for (final p in plans)
+                            TaskRow(
+                              key: ValueKey(p.id),
+                              title: p.title,
+                              subtitle: p.description,
+                              done: p.isDone,
+                              locked: past,
+                              trailing: p.scheduledTime?.isNotEmpty == true ? p.scheduledTime : null,
+                              onToggle: () => _setPlanDone(p, !p.isDone),
+                              onTap: () => _editPlan(p),
+                            ),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
+  String _dayTitle() {
+    final r = relativeDay(_day);
+    return switch (r) {
+      'Bugun' => 'Bugun',
+      'Ertaga' => 'Ertaga',
+      'Kecha' => 'Kecha',
+      _ => r[0].toUpperCase() + r.substring(1),
+    };
+  }
+
+  Widget _goalsView() {
+    final scheme = Theme.of(context).colorScheme;
+    final today = tashkentToday();
+    final yearly = _view == PlansView.year;
+    final goals = s.goals.where((g) => g.goalType == _goalType && g.period == _period).toList()
+      ..sort((a, b) => a.completed == b.completed ? 0 : (a.completed ? 1 : -1));
+    final done = goals.where((g) => g.completed).length;
+    final isCurrent = yearly ? _year == today.year : (_month.year == today.year && _month.month == today.month);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PeriodStepper(
+            label: _periodLabel,
+            isCurrent: isCurrent,
+            resetLabel: yearly ? 'Joriy yilga qaytish' : 'Joriy oyga qaytish',
+            onReset: () => setState(() {
+              _year = today.year;
+              _month = DateTime(today.year, today.month);
+            }),
+            onPrev: () => setState(() => yearly ? _year-- : _month = DateTime(_month.year, _month.month - 1)),
+            onNext: () => setState(() => yearly ? _year++ : _month = DateTime(_month.year, _month.month + 1)),
+          ),
+          if (goals.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: AppProgressBar(value: done / goals.length)),
+                const SizedBox(width: 12),
+                Text(
+                  '$done/${goals.length}',
+                  style: AppType.label.copyWith(color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 14),
+          AnimatedSwitcher(
+            duration: AppMotion.base,
+            child: goals.isEmpty
+                ? EmptyView(
+                    key: ValueKey('e$_period'),
+                    icon: LucideIcons.target,
+                    title: "$_periodLabel uchun maqsad yo'q",
+                    message: yearly
+                        ? "Yil oxirida nimaga erishgan bo'lishni xohlaysiz? Bir-ikkita katta natijani yozing."
+                        : "Shu oyda erishmoqchi bo'lgan eng muhim natijani yozing.",
+                    actionLabel: "Maqsad qo'shish",
+                    onAction: _addGoal,
+                  )
+                : GroupCard(
+                    key: ValueKey('l$_period'),
+                    indent: 52,
+                    children: [
+                      for (final g in goals)
+                        TaskRow(
+                          key: ValueKey(g.id),
+                          title: g.title,
+                          subtitle: g.description,
+                          done: g.completed,
+                          onToggle: () => _setGoalDone(g, !g.completed),
+                          onTap: () => _editGoal(g),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-/// Kun tanlagich: 14 kun oldin … bugun … 30 kun keyin. Kalendar uslubida.
-class _WeekStrip extends StatefulWidget {
-  const _WeekStrip({required this.selected, required this.onSelect});
+/// Kun tanlagich: 14 kun oldin … bugun … 30 kun keyin.
+class _DayStrip extends StatefulWidget {
+  const _DayStrip({required this.selected, required this.onSelect});
 
   final DateTime selected;
   final ValueChanged<DateTime> onSelect;
 
   @override
-  State<_WeekStrip> createState() => _WeekStripState();
+  State<_DayStrip> createState() => _DayStripState();
 }
 
-class _WeekStripState extends State<_WeekStrip> {
+class _DayStripState extends State<_DayStrip> {
   static const _before = 14;
   static const _after = 30;
-  static const _itemW = 46.0;
+  static const _itemW = 48.0;
+  static const _pad = AppSpace.page - 6;
   final _ctrl = ScrollController();
 
   @override
@@ -229,14 +364,12 @@ class _WeekStripState extends State<_WeekStrip> {
     if (!_ctrl.hasClients) return;
     final idx = widget.selected.difference(tashkentToday()).inDays + _before;
     final w = _ctrl.position.viewportDimension;
-    final target = (12 + idx * _itemW - w / 2 + _itemW / 2).clamp(0.0, _ctrl.position.maxScrollExtent);
-    animate
-        ? _ctrl.animateTo(target, duration: AppMotion.base, curve: AppMotion.curve)
-        : _ctrl.jumpTo(target);
+    final target = (_pad + idx * _itemW - w / 2 + _itemW / 2).clamp(0.0, _ctrl.position.maxScrollExtent);
+    animate ? _ctrl.animateTo(target, duration: AppMotion.base, curve: AppMotion.curve) : _ctrl.jumpTo(target);
   }
 
   @override
-  void didUpdateWidget(covariant _WeekStrip oldWidget) {
+  void didUpdateWidget(covariant _DayStrip oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!sameDay(oldWidget.selected, widget.selected)) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _center());
@@ -248,36 +381,34 @@ class _WeekStripState extends State<_WeekStrip> {
     final scheme = Theme.of(context).colorScheme;
     final today = tashkentToday();
     final sel = widget.selected;
+    final onToday = sameDay(sel, today);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpace.page, 0, 12, 4),
-          child: Row(
-            children: [
-              Text(
-                '${uzMonths[sel.month - 1]} ${sel.year}',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -.2),
-              ),
-              const Spacer(),
-              AnimatedOpacity(
-                opacity: sameDay(sel, today) ? 0 : 1,
-                duration: AppMotion.fast,
-                child: TextButton(
-                  onPressed: sameDay(sel, today) ? null : () => widget.onSelect(today),
-                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
-                  child: const Text('Bugun'),
-                ),
-              ),
-            ],
+          padding: const EdgeInsets.fromLTRB(AppSpace.page + 4, 0, AppSpace.page - 8, 0),
+          child: SizedBox(
+            height: 40,
+            child: Row(
+              children: [
+                Text('${uzMonths[sel.month - 1]} ${sel.year}', style: AppType.bodyStrong),
+                const Spacer(),
+                if (!onToday)
+                  TextButton(
+                    onPressed: () => widget.onSelect(today),
+                    style: TextButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 10)),
+                    child: const Text('Bugun'),
+                  ),
+              ],
+            ),
           ),
         ),
         SizedBox(
-          height: 66,
+          height: 68,
           child: ListView.builder(
             controller: _ctrl,
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: _pad),
             itemExtent: _itemW,
             itemCount: _before + _after + 1,
             itemBuilder: (context, i) {
@@ -285,136 +416,57 @@ class _WeekStripState extends State<_WeekStrip> {
               final isSel = sameDay(d, sel);
               final isToday = sameDay(d, today);
               final past = d.isBefore(today);
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  tapFeedback();
-                  widget.onSelect(d);
-                },
-                child: Column(
-                  children: [
-                    Text(
-                      uzWeekdaysShort[d.weekday - 1],
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
-                        color: isToday ? scheme.tertiary : scheme.onSurfaceVariant,
+              return Semantics(
+                button: true,
+                selected: isSel,
+                label: longDate(d),
+                excludeSemantics: true,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    tapFeedback();
+                    widget.onSelect(d);
+                  },
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        uzWeekdaysShort[d.weekday - 1],
+                        style: AppType.caption.copyWith(color: isToday ? scheme.tertiary : scheme.onSurfaceVariant),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    AnimatedContainer(
-                      duration: AppMotion.fast,
-                      width: 36,
-                      height: 36,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isSel ? (isToday ? scheme.primary : scheme.onSurface) : Colors.transparent,
-                      ),
-                      child: Text(
-                        '${d.day}',
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: isSel || isToday ? FontWeight.w700 : FontWeight.w500,
-                          fontFeatures: tabularFigures,
-                          color: isSel
-                              ? (isToday ? scheme.onPrimary : scheme.surface)
-                              : isToday
-                                  ? scheme.tertiary
-                                  : past
-                                      ? scheme.onSurfaceVariant
-                                      : scheme.onSurface,
+                      const SizedBox(height: 6),
+                      AnimatedContainer(
+                        duration: AppMotion.fast,
+                        width: 38,
+                        height: 38,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSel ? scheme.primary : Colors.transparent,
+                        ),
+                        child: Text(
+                          '${d.day}',
+                          style: AppType.body.copyWith(
+                            fontWeight: isSel || isToday ? FontWeight.w700 : FontWeight.w500,
+                            fontFeatures: tabularFigures,
+                            color: isSel
+                                ? scheme.onPrimary
+                                : isToday
+                                ? scheme.tertiary
+                                : past
+                                ? scheme.outline
+                                : scheme.onSurface,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Reja qatori: chapda vaqt ustuni, keyin belgilash va matn.
-class _PlanRow extends StatelessWidget {
-  const _PlanRow({required this.plan, required this.onToggle, required this.onEdit, required this.onDelete});
-
-  final Plan plan;
-  final VoidCallback onToggle;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final time = plan.scheduledTime?.isNotEmpty == true ? plan.scheduledTime! : '—';
-    return InkWell(
-      onTap: onEdit,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 4, 6),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 42,
-              child: Text(
-                time,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  fontFeatures: tabularFigures,
-                  color: plan.isDone ? scheme.outline : scheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            CheckCircle(checked: plan.isDone, color: scheme.primary, onTap: onToggle),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AnimatedDefaultTextStyle(
-                      duration: AppMotion.fast,
-                      style: TextStyle(
-                        fontFamily: AppTheme.fontFamily,
-                        fontSize: 15,
-                        letterSpacing: -.15,
-                        fontWeight: FontWeight.w500,
-                        color: plan.isDone ? scheme.onSurfaceVariant : scheme.onSurface,
-                        decoration: plan.isDone ? TextDecoration.lineThrough : null,
-                        decorationColor: scheme.onSurfaceVariant,
-                      ),
-                      child: Text(plan.title),
-                    ),
-                    if (plan.description?.isNotEmpty == true) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        plan.description!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            PopupMenuButton<String>(
-              tooltip: 'Amallar',
-              icon: Icon(LucideIcons.ellipsis, size: 18, color: scheme.outline),
-              onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'edit', child: Text('Tahrirlash')),
-                PopupMenuItem(value: 'delete', child: Text("O'chirish", style: TextStyle(color: AppPalette.danger))),
-              ],
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
