@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../l10n/app_localizations.dart';
+import 'language_page.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
@@ -66,7 +68,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     if (!opened) {
       setState(() {
         _nonce = null;
-        _error = 'Telegram ochilmadi. Telegram ilovasi o\'rnatilganini tekshiring.';
+        _error = context.tr("Telegram ochilmadi. Telegram ilovasi o'rnatilganini tekshiring.");
       });
       return;
     }
@@ -79,7 +81,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     if (nonce == null || _polling) return;
     if (_startedAt != null &&
         DateTime.now().difference(_startedAt!) > _giveUpAfter) {
-      _stop('Vaqt tugadi. Qaytadan urinib ko\'ring.');
+      _stop(context.tr("Vaqt tugadi. Qaytadan urinib ko'ring."));
       return;
     }
     _polling = true;
@@ -117,6 +119,15 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
             constraints: const BoxConstraints(maxWidth: 440),
             child: Column(
               children: [
+                if (widget.onLanguageChanged != null)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      icon: const Icon(LucideIcons.languages, size: 18),
+                      label: Text(languageNames[Localizations.localeOf(context).languageCode] ?? context.tr("Til")),
+                      onPressed: () => showLanguagePicker(context, widget.onLanguageChanged!),
+                    ),
+                  ),
                 // ── Tanishtiruv (kichik ekranda aylantiriladi) ──
                 Expanded(
                   child: LayoutBuilder(
@@ -131,19 +142,19 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                             const SizedBox(height: AppSpace.xl),
                             const Align(alignment: Alignment.centerLeft, child: BrandMark(size: 56)),
                             const SizedBox(height: AppSpace.xl),
-                            const Text('Intizom — natijaning boshlanishi.', style: AppType.display),
+                             Text(context.tr("Intizom — natijaning boshlanishi."), style: AppType.display),
                             const SizedBox(height: AppSpace.md),
                             Text(
-                              "Rejalar, odatlar va maqsadlar bitta joyda. AI murabbiy esa har kuni to'g'ri yo'nalish beradi.",
+                              context.tr("Rejalar, odatlar va maqsadlar bitta joyda. AI murabbiy esa har kuni to'g'ri yo'nalish beradi."),
                               style: AppType.body.copyWith(color: scheme.onSurfaceVariant, height: 1.5),
                             ),
                             const SizedBox(height: AppSpace.xl),
-                            const GroupCard(
+                             GroupCard(
                               indent: 50,
                               children: [
-                                SettingTile(icon: LucideIcons.calendarCheck, title: 'Kunlik reja va vaqtida eslatma'),
-                                SettingTile(icon: LucideIcons.repeat, title: 'Odatlar va uzluksiz seriya'),
-                                SettingTile(icon: LucideIcons.sparkles, title: 'Shaxsiy AI murabbiy'),
+                                SettingTile(icon: LucideIcons.calendarCheck, title: context.tr("Kunlik reja va vaqtida eslatma")),
+                                SettingTile(icon: LucideIcons.repeat, title: context.tr("Odatlar va uzluksiz seriya")),
+                                SettingTile(icon: LucideIcons.sparkles, title: context.tr("Shaxsiy AI murabbiy")),
                               ],
                             ),
                             const SizedBox(height: AppSpace.xl),
@@ -184,11 +195,11 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                         onPressed: _start,
                         style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                         icon: const Icon(LucideIcons.send, size: 18),
-                        label: Text(waiting ? "Telegram'ni qayta ochish" : 'Telegram orqali kirish'),
+                        label: Text(waiting ? context.tr("Telegram'ni qayta ochish") : context.tr("Telegram orqali kirish")),
                       ),
                       const SizedBox(height: AppSpace.md),
                       Text(
-                        "Hisobingiz IntizomAI botidagi bilan bir xil — rejalar va Premium saqlanadi.",
+                        context.tr("Hisobingiz IntizomAI botidagi bilan bir xil — rejalar va Premium saqlanadi."),
                         textAlign: TextAlign.center,
                         style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
                       ),
@@ -237,13 +248,13 @@ class _WaitingCard extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
         child: Column(
           children: [
-            step(Icon(LucideIcons.circleCheck, size: 18, color: scheme.tertiary), 'Telegram ochildi'),
+            step(Icon(LucideIcons.circleCheck, size: 18, color: scheme.tertiary), context.tr("Telegram ochildi")),
             step(
               const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-              "Botda «Ilovaga kirishni tasdiqlash» tugmasini bosing va shu yerga qayting.",
+              context.tr("Botda «Ilovaga kirishni tasdiqlash» tugmasini bosing va shu yerga qayting."),
               active: true,
             ),
-            step(Icon(LucideIcons.logIn, size: 17, color: scheme.outline), "Tasdiqlangach ilova o'zi kiradi."),
+            step(Icon(LucideIcons.logIn, size: 17, color: scheme.outline), context.tr("Tasdiqlangach ilova o'zi kiradi.")),
           ],
         ),
       ),

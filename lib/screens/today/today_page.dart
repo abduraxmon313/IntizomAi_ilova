@@ -1,3 +1,4 @@
+import '../../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -26,12 +27,14 @@ class TodayPage extends StatefulWidget {
     required this.state,
     required this.onLogout,
     required this.onAppearanceChanged,
+    required this.onLanguageChanged,
     required this.onOpenGoals,
   });
 
   final AppState state;
   final VoidCallback onLogout;
   final ValueChanged<String> onAppearanceChanged;
+  final ValueChanged<String> onLanguageChanged;
   final VoidCallback onOpenGoals;
 
   @override
@@ -117,8 +120,8 @@ class TodayPageState extends State<TodayPage> {
       if (updated.isDone && undoable) {
         toast(
           context,
-          'Bajarildi · +${updated.scoreValue} ball',
-          actionLabel: 'Qaytarish',
+          context.tr("Bajarildi · +{v0} ball", {'v0': updated.scoreValue}),
+          actionLabel: context.tr("Qaytarish"),
           onAction: () => _setPlanDone(updated, false),
         );
       }
@@ -152,8 +155,8 @@ class TodayPageState extends State<TodayPage> {
       if (updated.doneToday && undoable) {
         toast(
           context,
-          updated.streak > 1 ? '${updated.title} · ${updated.streak} kun ketma-ket' : '${updated.title} · bajarildi',
-          actionLabel: 'Qaytarish',
+          updated.streak > 1 ? context.tr("{v0} · {v1} kun ketma-ket", {'v0': updated.title, 'v1': updated.streak}) : context.tr("{v0} · bajarildi", {'v0': updated.title}),
+          actionLabel: context.tr("Qaytarish"),
           onAction: () => _setHabitDone(updated, false),
         );
       }
@@ -165,7 +168,7 @@ class TodayPageState extends State<TodayPage> {
 
   void _openProfile() => Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) => ProfilePage(state: s, onLogout: widget.onLogout, onAppearanceChanged: widget.onAppearanceChanged),
+      builder: (_) => ProfilePage(state: s, onLogout: widget.onLogout, onAppearanceChanged: widget.onAppearanceChanged, onLanguageChanged: widget.onLanguageChanged),
     ),
   );
 
@@ -212,7 +215,7 @@ class TodayPageState extends State<TodayPage> {
           ?_insight(),
 
           // ── Rejalar ──────────────────────────────────
-          SectionBar(title: 'Rejalar', count: plans.isEmpty ? null : '$plansDone/${plans.length}'),
+          SectionBar(title: context.tr("Rejalar"), count: plans.isEmpty ? null : '$plansDone/${plans.length}'),
           if (!_loaded)
             const _Skeleton()
           else if (plans.isEmpty)
@@ -221,8 +224,8 @@ class TodayPageState extends State<TodayPage> {
               padding: const EdgeInsets.fromLTRB(16, 16, 14, 16),
               child: _HintRow(
                 icon: LucideIcons.calendarPlus,
-                title: "Bugunga reja yo'q",
-                text: "Eng muhim bitta ishni yozing — bot vaqtida eslatadi.",
+                title: context.tr("Bugunga reja yo'q"),
+                text: context.tr("Eng muhim bitta ishni yozing — bot vaqtida eslatadi."),
               ),
             )
           else
@@ -245,7 +248,7 @@ class TodayPageState extends State<TodayPage> {
 
           // ── Odatlar ──────────────────────────────────
           if (habits.isNotEmpty) ...[
-            SectionBar(title: 'Odatlar', count: '$habitsDone/${habits.length}'),
+            SectionBar(title: context.tr("Odatlar"), count: '$habitsDone/${habits.length}'),
             GroupCard(
               indent: 52,
               children: [
@@ -265,13 +268,13 @@ class TodayPageState extends State<TodayPage> {
 
           // ── Oy maqsadi ───────────────────────────────
           if (monthGoals.isNotEmpty) ...[
-            SectionBar(title: '${uzMonths[today.month - 1]} maqsadlari'),
+            SectionBar(title: context.tr("{v0} maqsadlari", {'v0': context.tr(uzMonths[today.month - 1])})),
             _GoalsCard(goals: monthGoals, onTap: widget.onOpenGoals),
           ],
 
           // ── Kunlik holat ─────────────────────────────
           if (_checkinLoaded) ...[
-            const SectionBar(title: 'Bugungi holat'),
+             SectionBar(title: context.tr("Bugungi holat")),
             _CheckinCard(checkin: _checkin, onSave: _saveCheckin),
           ],
         ],
@@ -288,15 +291,15 @@ class TodayPageState extends State<TodayPage> {
     const milestones = {7, 14, 21, 30, 50, 75, 100, 150, 200, 365};
     final (IconData, Color, String, String)? item;
     if (st.streakAtRisk && st.streak >= 2) {
-      item = (LucideIcons.flame, AppPalette.ember, '${st.streak} kunlik seriya davom etsin', "Bugun bitta reja yoki odat bajarilsa, seriya saqlanadi.");
+      item = (LucideIcons.flame, AppPalette.ember, context.tr("{v0} kunlik seriya davom etsin", {'v0': st.streak}), context.tr("Bugun bitta reja yoki odat bajarilsa, seriya saqlanadi."));
     } else if (milestones.contains(st.streak)) {
-      item = (LucideIcons.flame, AppPalette.ember, '${st.streak} kun ketma-ket', "Bu endi odat. Bugun ham xuddi shunday davom eting.");
+      item = (LucideIcons.flame, AppPalette.ember, context.tr("{v0} kun ketma-ket", {'v0': st.streak}), context.tr("Bu endi odat. Bugun ham xuddi shunday davom eting."));
     } else if (rate < 40 && total7 >= 5) {
-      item = (LucideIcons.sprout, AppPalette.success, 'Kichik qadamdan boshlang', "Bugun bitta yengil ishni bajaring — ritm shundan tiklanadi.");
+      item = (LucideIcons.sprout, AppPalette.success, context.tr("Kichik qadamdan boshlang"), context.tr("Bugun bitta yengil ishni bajaring — ritm shundan tiklanadi."));
     } else if (rate >= 80 && total7 >= 5) {
-      item = (LucideIcons.trendingUp, AppPalette.success, 'Kuchli hafta', "Oxirgi 7 kunda $total7 ta rejadan $done7 tasi bajarildi.");
+      item = (LucideIcons.trendingUp, AppPalette.success, context.tr("Kuchli hafta"), context.tr("Oxirgi 7 kunda {v0} ta rejadan {v1} tasi bajarildi.", {'v0': total7, 'v1': done7}));
     } else if (st.streak == 0 && total7 > 0) {
-      item = (LucideIcons.sprout, AppPalette.success, 'Bugun — yangi boshlanish', "Bitta ishni bajaring, seriya qaytadan boshlanadi.");
+      item = (LucideIcons.sprout, AppPalette.success, context.tr("Bugun — yangi boshlanish"), context.tr("Bitta ishni bajaring, seriya qaytadan boshlanadi."));
     } else {
       item = null;
     }
@@ -337,12 +340,12 @@ class TodayPageState extends State<TodayPage> {
   }
 }
 
-String _greeting() {
+String _greeting(BuildContext context) {
   final h = DateTime.now().toUtc().add(const Duration(hours: 5)).hour;
-  if (h >= 5 && h < 11) return 'Xayrli tong';
-  if (h >= 11 && h < 17) return 'Xayrli kun';
-  if (h >= 17 && h < 23) return 'Xayrli kech';
-  return 'Xayrli tun';
+  if (h >= 5 && h < 11) return context.tr("Xayrli tong");
+  if (h >= 11 && h < 17) return context.tr("Xayrli kun");
+  if (h >= 17 && h < 23) return context.tr("Xayrli kech");
+  return context.tr("Xayrli tun");
 }
 
 class _Header extends StatelessWidget {
@@ -366,14 +369,14 @@ class _Header extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                longDate(tashkentToday()),
+                longDate(context, tashkentToday()),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: AppType.label.copyWith(color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 2),
               Text(
-                first.isEmpty ? _greeting() : '${_greeting()}, $first',
+                first.isEmpty ? _greeting(context) : '${_greeting(context)}, $first',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: AppType.title,
@@ -384,7 +387,7 @@ class _Header extends StatelessWidget {
         const SizedBox(width: 12),
         Semantics(
           button: true,
-          label: 'Profil va sozlamalar',
+          label: context.tr("Profil va sozlamalar"),
           child: InkResponse(
             radius: 28,
             onTap: () {
@@ -425,14 +428,14 @@ class _DayCard extends StatelessWidget {
     final ring = dark ? AppPalette.brandOnDark : AppPalette.brandBright;
 
     final (String title, String text) = !loaded
-        ? ('Bugun', 'Yuklanmoqda…')
+        ? (context.tr("Bugun"), context.tr("Yuklanmoqda…"))
         : total == 0
-        ? ("Bugun bo'sh kun", "Bitta reja qo'shing — kun shundan boshlanadi.")
+        ? (context.tr("Bugun bo'sh kun"), context.tr("Bitta reja qo'shing — kun shundan boshlanadi."))
         : allDone
-        ? ('Bugun hammasi bajarildi', "Ajoyib. Ertangi kunni rejalab qo'ysangiz bo'ladi.")
+        ? (context.tr("Bugun hammasi bajarildi"), context.tr("Ajoyib. Ertangi kunni rejalab qo'ysangiz bo'ladi."))
         : done == 0
-        ? ('Bugun $total ta ish bor', 'Birinchisidan boshlang — qolgani osonlashadi.')
-        : ('$total tadan $done tasi bajarildi', left == 1 ? 'Yana bitta ish qoldi.' : 'Yana $left ta ish qoldi.');
+        ? (context.tr("Bugun {v0} ta ish bor", {'v0': total}), context.tr("Birinchisidan boshlang — qolgani osonlashadi."))
+        : (context.tr("{v0} tadan {v1} tasi bajarildi", {'v0': total, 'v1': done}), left == 1 ? context.tr("Yana bitta ish qoldi.") : context.tr("Yana {v0} ta ish qoldi.", {'v0': left}));
 
     Widget stat(IconData icon, Color color, String value, String label) => Expanded(
       child: Row(
@@ -494,9 +497,9 @@ class _DayCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              stat(LucideIcons.flame, streak > 0 ? AppPalette.ember : scheme.outline, '$streak kun', 'seriya'),
+              stat(LucideIcons.flame, streak > 0 ? AppPalette.ember : scheme.outline, context.tr("{v0} kun", {'v0': streak}), context.tr("seriya")),
               const SizedBox(width: 12),
-              stat(LucideIcons.gauge, scheme.tertiary, '$discipline', 'intizom balli'),
+              stat(LucideIcons.gauge, scheme.tertiary, '$discipline', context.tr("intizom balli")),
             ],
           ),
         ],
@@ -571,14 +574,14 @@ class _GoalsCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  focus?.title ?? 'Barcha maqsadlar bajarildi',
+                  focus?.title ?? context.tr("Barcha maqsadlar bajarildi"),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: AppType.body.copyWith(fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${goals.length} tadan $done tasi bajarildi',
+                  context.tr("{v0} tadan {v1} tasi bajarildi", {'v0': goals.length, 'v1': done}),
                   style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
                 ),
               ],
@@ -594,11 +597,11 @@ class _GoalsCard extends StatelessWidget {
 
 /// Kayfiyat: serverga emoji yuboriladi (AI konteksti uchun), ilovada ikonka.
 const _moods = [
-  ('🔥', LucideIcons.flame, "A'lo"),
-  ('💪', LucideIcons.zap, 'Kuchli'),
-  ('😐', LucideIcons.meh, 'Oddiy'),
-  ('😴', LucideIcons.moon, 'Charchoq'),
-  ('😞', LucideIcons.frown, 'Past'),
+  ('\u{1F61E}', LucideIcons.frown, 'Past'),
+  ('\u{1F634}', LucideIcons.moon, 'Charchoq'),
+  ('\u{1F610}', LucideIcons.meh, 'Oddiy'),
+  ('\u{1F4AA}', LucideIcons.zap, 'Kuchli'),
+  ('\u{1F525}', LucideIcons.flame, "A'lo"),
 ];
 
 /// Kunlik holat. Belgilangach bir qatorga yig'iladi — sahifani band qilmaydi.
@@ -632,11 +635,11 @@ class _CheckinCardState extends State<_CheckinCard> {
             const SizedBox(width: 14),
             Expanded(
               child: Text(
-                '${mood?.$3 ?? 'Belgilangan'} · energiya ${c.energy}/5',
+                context.tr("{v0} · energiya {v1}/5", {'v0': context.tr(mood?.$3 ?? 'Belgilangan'), 'v1': c.energy}),
                 style: AppType.body.copyWith(fontWeight: FontWeight.w500, fontFeatures: tabularFigures),
               ),
             ),
-            Text("O'zgartirish", style: AppType.label.copyWith(fontWeight: FontWeight.w600, color: scheme.tertiary)),
+            Text(context.tr("O'zgartirish"), style: AppType.label.copyWith(fontWeight: FontWeight.w600, color: scheme.tertiary)),
           ],
         ),
       );
@@ -648,10 +651,10 @@ class _CheckinCardState extends State<_CheckinCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Kayfiyatingiz qanday?', style: AppType.bodyStrong),
+          Text(context.tr("Kayfiyatingiz qanday?"), style: AppType.bodyStrong),
           const SizedBox(height: 2),
           Text(
-            'Murabbiy maslahat berishda shuni hisobga oladi.',
+            context.tr("Murabbiy maslahat berishda shuni hisobga oladi."),
             style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 12),
@@ -671,7 +674,7 @@ class _CheckinCardState extends State<_CheckinCard> {
                         children: [
                           Icon(icon, size: 20),
                           const SizedBox(height: 5),
-                          FittedBox(fit: BoxFit.scaleDown, child: Text(label, style: AppType.micro)),
+                          FittedBox(fit: BoxFit.scaleDown, child: Text(context.tr(label), style: AppType.micro)),
                         ],
                       ),
                     ),
@@ -682,10 +685,10 @@ class _CheckinCardState extends State<_CheckinCard> {
           const SizedBox(height: 16),
           Row(
             children: [
-              Text('Energiya', style: AppType.label.copyWith(fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant)),
+              Text(context.tr("Energiya"), style: AppType.label.copyWith(fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant)),
               const Spacer(),
               Text(
-                c.energy == null ? 'Tanlanmagan' : '${c.energy} / 5',
+                c.energy == null ? context.tr("Tanlanmagan") : '${c.energy} / 5',
                 style: AppType.label.copyWith(color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
               ),
             ],
@@ -697,7 +700,7 @@ class _CheckinCardState extends State<_CheckinCard> {
                 Expanded(
                   child: Semantics(
                     button: true,
-                    label: 'Energiya $e',
+                    label: context.tr("Energiya {v0}", {'v0': e}),
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () async {

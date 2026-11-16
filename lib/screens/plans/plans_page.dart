@@ -1,3 +1,4 @@
+import '../../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -109,8 +110,8 @@ class PlansPageState extends State<PlansPage> {
       if (updated.isDone) {
         toast(
           context,
-          'Bajarildi · +${updated.scoreValue} ball',
-          actionLabel: 'Qaytarish',
+          context.tr("Bajarildi · +{v0} ball", {'v0': updated.scoreValue}),
+          actionLabel: context.tr("Qaytarish"),
           onAction: () => _setPlanDone(updated, false),
         );
       }
@@ -139,7 +140,7 @@ class PlansPageState extends State<PlansPage> {
       _view == PlansView.year ? '$_year' : '${_month.year}-${_month.month.toString().padLeft(2, '0')}';
 
   String get _periodLabel =>
-      _view == PlansView.year ? '$_year-yil' : '${uzMonths[_month.month - 1]} ${_month.year}';
+      _view == PlansView.year ? context.tr("{v0}-yil", {'v0': _year}) : '${uzMonths[_month.month - 1]} ${_month.year}';
 
   Future<void> _addGoal() async {
     if (await showGoalForm(context, api: s.api, goalType: _goalType, period: _period, periodLabel: _periodLabel)) {
@@ -152,7 +153,7 @@ class PlansPageState extends State<PlansPage> {
       await s.api.updateGoal(g.id, completed: done);
       await s.refreshGoals();
       if (done && mounted) {
-        toast(context, 'Maqsad bajarildi', actionLabel: 'Qaytarish', onAction: () => _setGoalDone(g, false));
+        toast(context, context.tr("Maqsad bajarildi"), actionLabel: context.tr("Qaytarish"), onAction: () => _setGoalDone(g, false));
       }
     } catch (e) {
       if (mounted) showApiError(context, e);
@@ -172,12 +173,12 @@ class PlansPageState extends State<PlansPage> {
       child: ListView(
         padding: const EdgeInsets.only(bottom: AppSpace.bottomInset),
         children: [
-          const PageHeader(title: 'Rejalar'),
+           PageHeader(title: context.tr("Rejalar")),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
             child: SegmentTabs<PlansView>(
               value: _view,
-              items: const [(PlansView.day, 'Kunlik'), (PlansView.month, 'Oylik'), (PlansView.year, 'Yillik')],
+              items:  [(PlansView.day, context.tr("Kunlik")), (PlansView.month, context.tr("Oylik")), (PlansView.year, context.tr("Yillik"))],
               onChanged: (v) => setState(() => _view = v),
             ),
           ),
@@ -217,9 +218,9 @@ class PlansPageState extends State<PlansPage> {
                     ? EmptyView(
                         key: ValueKey('empty${ymd(_day)}'),
                         icon: LucideIcons.calendarPlus,
-                        title: past ? "Bu kunda reja bo'lmagan" : "Bu kunga hali reja yo'q",
-                        message: past ? null : "Vaqtini belgilasangiz, bot o'z vaqtida eslatadi.",
-                        actionLabel: "Reja qo'shish",
+                        title: past ? context.tr("Bu kunda reja bo'lmagan") : context.tr("Bu kunga hali reja yo'q"),
+                        message: past ? null : context.tr("Vaqtini belgilasangiz, bot o'z vaqtida eslatadi."),
+                        actionLabel: context.tr("Reja qo'shish"),
                         onAction: past ? null : _addPlan,
                       )
                     : GroupCard(
@@ -248,13 +249,8 @@ class PlansPageState extends State<PlansPage> {
   }
 
   String _dayTitle() {
-    final r = relativeDay(_day);
-    return switch (r) {
-      'Bugun' => 'Bugun',
-      'Ertaga' => 'Ertaga',
-      'Kecha' => 'Kecha',
-      _ => r[0].toUpperCase() + r.substring(1),
-    };
+    final r = relativeDay(context, _day);
+    return r.isEmpty ? r : r[0].toUpperCase() + r.substring(1);
   }
 
   Widget _goalsView() {
@@ -273,7 +269,7 @@ class PlansPageState extends State<PlansPage> {
           PeriodStepper(
             label: _periodLabel,
             isCurrent: isCurrent,
-            resetLabel: yearly ? 'Joriy yilga qaytish' : 'Joriy oyga qaytish',
+            resetLabel: yearly ? context.tr("Joriy yilga qaytish") : context.tr("Joriy oyga qaytish"),
             onReset: () => setState(() {
               _year = today.year;
               _month = DateTime(today.year, today.month);
@@ -301,11 +297,11 @@ class PlansPageState extends State<PlansPage> {
                 ? EmptyView(
                     key: ValueKey('e$_period'),
                     icon: LucideIcons.target,
-                    title: "$_periodLabel uchun maqsad yo'q",
+                    title: context.tr("{v0} uchun maqsad yo'q", {'v0': _periodLabel}),
                     message: yearly
-                        ? "Yil oxirida nimaga erishgan bo'lishni xohlaysiz? Bir-ikkita katta natijani yozing."
-                        : "Shu oyda erishmoqchi bo'lgan eng muhim natijani yozing.",
-                    actionLabel: "Maqsad qo'shish",
+                        ? context.tr("Yil oxirida nimaga erishgan bo'lishni xohlaysiz? Bir-ikkita katta natijani yozing.")
+                        : context.tr("Shu oyda erishmoqchi bo'lgan eng muhim natijani yozing."),
+                    actionLabel: context.tr("Maqsad qo'shish"),
                     onAction: _addGoal,
                   )
                 : GroupCard(
@@ -397,7 +393,7 @@ class _DayStripState extends State<_DayStrip> {
                   TextButton(
                     onPressed: () => widget.onSelect(today),
                     style: TextButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 10)),
-                    child: const Text('Bugun'),
+                    child:  Text(context.tr("Bugun")),
                   ),
               ],
             ),
@@ -419,7 +415,7 @@ class _DayStripState extends State<_DayStrip> {
               return Semantics(
                 button: true,
                 selected: isSel,
-                label: longDate(d),
+                label: longDate(context, d),
                 excludeSemantics: true,
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
@@ -431,7 +427,7 @@ class _DayStripState extends State<_DayStrip> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        uzWeekdaysShort[d.weekday - 1],
+                        context.tr(uzWeekdaysShort[d.weekday - 1]),
                         style: AppType.caption.copyWith(color: isToday ? scheme.tertiary : scheme.onSurfaceVariant),
                       ),
                       const SizedBox(height: 6),

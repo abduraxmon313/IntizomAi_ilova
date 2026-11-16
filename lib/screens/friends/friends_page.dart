@@ -1,3 +1,4 @@
+import '../../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -40,7 +41,28 @@ class FriendsPageState extends State<FriendsPage> {
   DateTime _memberDay = tashkentToday();
 
   bool _loading = false;
+  String _memberQuery = '';
   String? _premiumMessage;
+
+  static int _memberTotal(GroupMember m) => m.plansTotal + m.habitsTotal;
+
+  static double _memberRatio(GroupMember m) {
+    final total = _memberTotal(m);
+    return total == 0 ? 0 : (m.plansDone + m.habitsDone) / total;
+  }
+
+  /// Avval o'zingiz, keyin bugungi natijasi yuqori bo'lganlar.
+  List<GroupMember> _sortedMembers(GroupDetail g) {
+    final list = g.members.where((m) => _memberQuery.isEmpty || m.name.toLowerCase().contains(_memberQuery)).toList();
+    list.sort((a, b) {
+      if (a.isMe != b.isMe) return a.isMe ? -1 : 1;
+      final av = a.isMe || a.visible ? _memberRatio(a) : -1.0;
+      final bv = b.isMe || b.visible ? _memberRatio(b) : -1.0;
+      final byRatio = bv.compareTo(av);
+      return byRatio != 0 ? byRatio : b.streak.compareTo(a.streak);
+    });
+    return list;
+  }
   String? _error;
 
   /// Orqaga: a'zo → guruh. Ishlatilsa true (aks holda sahifa yopiladi).
@@ -135,8 +157,8 @@ class FriendsPageState extends State<FriendsPage> {
     final desc = TextEditingController();
     await showFormSheet<void>(
       context,
-      title: 'Yangi guruh',
-      saveLabel: 'Yaratish',
+      title: context.tr("Yangi guruh"),
+      saveLabel: context.tr("Yaratish"),
       builder: (ctx, _) => Column(
         children: [
           TextField(
@@ -144,7 +166,7 @@ class FriendsPageState extends State<FriendsPage> {
             autofocus: true,
             maxLength: 80,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(hintText: 'Guruh nomi (masalan: Oila, Ish jamoasi)', counterText: ''),
+            decoration:  InputDecoration(hintText: context.tr("Guruh nomi (masalan: Oila, Ish jamoasi)"), counterText: ''),
           ),
           const SizedBox(height: 10),
           TextField(
@@ -152,13 +174,13 @@ class FriendsPageState extends State<FriendsPage> {
             maxLength: 300,
             minLines: 2,
             maxLines: 4,
-            decoration: const InputDecoration(hintText: 'Tavsif (ixtiyoriy)', counterText: ''),
+            decoration:  InputDecoration(hintText: context.tr("Tavsif (ixtiyoriy)"), counterText: ''),
           ),
         ],
       ),
       onSave: () async {
         if (name.text.trim().isEmpty) {
-          toast(context, 'Guruh nomini yozing');
+          toast(context, context.tr("Guruh nomini yozing"));
           return false;
         }
         try {
@@ -177,13 +199,13 @@ class FriendsPageState extends State<FriendsPage> {
 
   Future<void> _invite(GroupDetail g) async {
     final link = _inviteLink(g);
-    final text = "«${g.name}» guruhiga taklif qilinyapsiz! IntizomAI botiga qo'shiling va birga intizomli bo'laylik.";
+    final text = context.tr("«{v0}» guruhiga taklif qilinyapsiz! IntizomAI botiga qo'shiling va birga intizomli bo'laylik.", {'v0': g.name});
     final share = Uri.https('t.me', '/share/url', {'url': link, 'text': text});
     try {
       if (await launchUrl(share, mode: LaunchMode.externalApplication)) return;
     } catch (_) {}
     await Clipboard.setData(ClipboardData(text: link));
-    if (mounted) toast(context, 'Taklif havolasi nusxalandi');
+    if (mounted) toast(context, context.tr("Taklif havolasi nusxalandi"));
   }
 
   Future<void> _permissions(GroupDetail g) async {
@@ -207,14 +229,14 @@ class FriendsPageState extends State<FriendsPage> {
           final others = perms.grantsOut.where((p) => p.userId != myId).toList();
           final incoming = perms.grantsIn.where((p) => p.userId != myId && p.canManage).toList();
           return SheetScaffold(
-            title: 'Ruxsatlar',
+            title: context.tr("Ruxsatlar"),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const SectionBar(title: 'Kim men uchun reja va odat yarata oladi', top: 4),
+                 SectionBar(title: context.tr("Kim men uchun reja va odat yarata oladi"), top: 4),
                 if (others.isEmpty)
-                  const _SheetNote("Guruhda boshqa a'zo yo'q")
+                   _SheetNote(context.tr("Guruhda boshqa a'zo yo'q"))
                 else
                   GroupCard(
                     indent: 64,
@@ -239,13 +261,13 @@ class FriendsPageState extends State<FriendsPage> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
                   child: Text(
-                    "Yoqilgan a'zo sizning hisobingizga reja va odat qo'sha oladi.",
+                    context.tr("Yoqilgan a'zo sizning hisobingizga reja va odat qo'sha oladi."),
                     style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
                   ),
                 ),
-                const SectionBar(title: 'Menga ruxsat berganlar', top: 22),
+                 SectionBar(title: context.tr("Menga ruxsat berganlar"), top: 22),
                 if (incoming.isEmpty)
-                  const _SheetNote('Hozircha hech kim')
+                   _SheetNote(context.tr("Hozircha hech kim"))
                 else
                   GroupCard(
                     indent: 50,
@@ -254,7 +276,7 @@ class FriendsPageState extends State<FriendsPage> {
                         SettingTile(
                           icon: LucideIcons.userCheck,
                           title: p.name,
-                          subtitle: 'Uning uchun reja va odat yarata olasiz',
+                          subtitle: context.tr("Uning uchun reja va odat yarata olasiz"),
                         ),
                     ],
                   ),
@@ -290,7 +312,7 @@ class FriendsPageState extends State<FriendsPage> {
     if (_group != null) return _groupView(_group!);
     return Column(
       children: [
-        const PageHeader(title: 'Guruh'),
+         PageHeader(title: context.tr("Guruh")),
         Expanded(
           child: _error != null
               ? ErrorRetry(message: _error!, onRetry: () => _openGroup(widget.groupId!))
@@ -319,8 +341,8 @@ class FriendsPageState extends State<FriendsPage> {
                     padding: const EdgeInsets.only(top: 8),
                     child: PremiumGate(
                       icon: LucideIcons.users,
-                      title: "Do'stlar Premium bilan ochiladi",
-                      message: "Oila, do'stlar yoki jamoa bilan guruh tuzing, bir-biringizning kunini kuzating va Telegram guruhga kunlik hisobot yuboring.",
+                      title: context.tr("Do'stlar Premium bilan ochiladi"),
+                      message: context.tr("Oila, do'stlar yoki jamoa bilan guruh tuzing, bir-biringizning kunini kuzating va Telegram guruhga kunlik hisobot yuboring."),
                       onOpen: () => showPremiumDialog(context, _premiumMessage!),
                     ),
                   );
@@ -329,16 +351,16 @@ class FriendsPageState extends State<FriendsPage> {
                 if (groups.isEmpty) {
                   return EmptyView(
                     icon: LucideIcons.users,
-                    title: "Hozircha guruh yo'q",
-                    message: "Guruh yarating va do'stlaringizni taklif qiling — birga intizom oson.",
-                    actionLabel: 'Yangi guruh',
+                    title: context.tr("Hozircha guruh yo'q"),
+                    message: context.tr("Guruh yarating va do'stlaringizni taklif qiling — birga intizom oson."),
+                    actionLabel: context.tr("Yangi guruh"),
                     onAction: _createGroup,
                   );
                 }
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SectionBar(title: 'Guruhlar', count: '${groups.length}', actionLabel: 'Yangi guruh', onAction: _createGroup, top: 8),
+                    SectionBar(title: context.tr("Guruhlar"), count: '${groups.length}', actionLabel: context.tr("Yangi guruh"), onAction: _createGroup, top: 8),
                     GroupCard(
                       indent: 68,
                       children: [
@@ -365,12 +387,12 @@ class FriendsPageState extends State<FriendsPage> {
                                                 style: AppType.bodyStrong,
                                               ),
                                             ),
-                                            if (g.isOwner) ...[const SizedBox(width: 6), const Pill('Ega')],
+                                            if (g.isOwner) ...[const SizedBox(width: 6),  Pill(context.tr("Ega"))],
                                           ],
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          "${g.memberCount} a'zo${g.description?.isNotEmpty == true ? ' · ${g.description}' : ''}",
+                                          context.tr("{v0} a'zo{v1}", {'v0': g.memberCount, 'v1': g.description?.isNotEmpty == true ? ' · ${g.description}' : ''}),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
@@ -407,9 +429,9 @@ class FriendsPageState extends State<FriendsPage> {
         children: [
           PageHeader(
             title: g.name,
-            subtitle: "${g.members.length} a'zo",
+            subtitle: context.tr("{v0} a'zo", {'v0': g.members.length}),
             actions: [
-              HeaderIconButton(icon: LucideIcons.settings, tooltip: 'Guruh sozlamalari', onTap: () => _groupSettings(g)),
+              HeaderIconButton(icon: LucideIcons.settings, tooltip: context.tr("Guruh sozlamalari"), onTap: () => _groupSettings(g)),
             ],
           ),
           Padding(
@@ -424,13 +446,13 @@ class FriendsPageState extends State<FriendsPage> {
                       onPressed: () => _invite(g),
                       style: FilledButton.styleFrom(padding: pad, minimumSize: const Size(0, 48)),
                       icon: const Icon(LucideIcons.userPlus, size: 18),
-                      label: const Text('Taklif qilish', maxLines: 1),
+                      label:  Text(context.tr("Taklif qilish"), maxLines: 1),
                     );
                     final perms = OutlinedButton.icon(
                       onPressed: () => _permissions(g),
                       style: OutlinedButton.styleFrom(padding: pad, minimumSize: const Size(0, 48)),
                       icon: const Icon(LucideIcons.shield, size: 18),
-                      label: const Text('Ruxsatlar', maxLines: 1),
+                      label:  Text(context.tr("Ruxsatlar"), maxLines: 1),
                     );
                     // Ikki tugma yonma-yon sig'masa — ustma-ust.
                     if (box.maxWidth < 300) {
@@ -448,11 +470,24 @@ class FriendsPageState extends State<FriendsPage> {
                     );
                   },
                 ),
-                SectionBar(title: "A'zolar", count: '${g.members.length}'),
+                _GroupTodaySummary(members: g.members),
+                SectionBar(title: context.tr("A'zolar"), count: '${g.members.length}'),
+                if (g.members.length > 5)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: TextField(
+                      onChanged: (v) => setState(() => _memberQuery = v.trim().toLowerCase()),
+                      decoration: InputDecoration(
+                        hintText: context.tr("A'zoni qidirish"),
+                        prefixIcon: const Icon(LucideIcons.search, size: 18),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
                 GroupCard(
                   indent: 66,
                   children: [
-                    for (final m in g.members)
+                    for (final m in _sortedMembers(g))
                       InkWell(
                         onTap: () => _openMember(m.userId),
                         child: Padding(
@@ -475,9 +510,9 @@ class FriendsPageState extends State<FriendsPage> {
                                             style: AppType.bodyStrong,
                                           ),
                                         ),
-                                        if (m.isMe) ...[const SizedBox(width: 6), const Pill('Siz')],
-                                        if (m.isOwner) ...[const SizedBox(width: 6), const Pill('Ega')],
-                                        if (!m.isActive) ...[const SizedBox(width: 6), const Pill('Pauza', muted: true)],
+                                        if (m.isMe) ...[const SizedBox(width: 6),  Pill(context.tr("Siz"))],
+                                        if (m.isOwner) ...[const SizedBox(width: 6),  Pill(context.tr("Ega"))],
+                                        if (!m.isActive) ...[const SizedBox(width: 6),  Pill(context.tr("Pauza"), muted: true)],
                                       ],
                                     ),
                                     const SizedBox(height: 4),
@@ -485,15 +520,37 @@ class FriendsPageState extends State<FriendsPage> {
                                       spacing: 12,
                                       children: m.isMe || m.visible
                                           ? [
-                                              MetaTag(icon: LucideIcons.calendarCheck, text: '${m.plansDone}/${m.plansTotal}'),
-                                              MetaTag(icon: LucideIcons.repeat, text: '${m.habitsDone}/${m.habitsTotal}'),
-                                              MetaTag(icon: LucideIcons.flame, text: '${m.streak}', color: AppPalette.ember),
+                                              MetaTag(icon: LucideIcons.calendarCheck, text: context.tr("Reja {v0}/{v1}", {'v0': m.plansDone, 'v1': m.plansTotal})),
+                                              MetaTag(icon: LucideIcons.repeat, text: context.tr("Odat {v0}/{v1}", {'v0': m.habitsDone, 'v1': m.habitsTotal})),
+                                              MetaTag(icon: LucideIcons.flame, text: context.tr("{v0} kun", {'v0': m.streak}), color: AppPalette.ember),
                                             ]
                                           : [
-                                              const MetaTag(icon: LucideIcons.lock, text: 'Yashirin'),
-                                              MetaTag(icon: LucideIcons.flame, text: '${m.streak}', color: AppPalette.ember),
+                                               MetaTag(icon: LucideIcons.lock, text: context.tr("Yashirin")),
+                                              MetaTag(icon: LucideIcons.flame, text: context.tr("{v0} kun", {'v0': m.streak}), color: AppPalette.ember),
                                             ],
                                     ),
+                                    if ((m.isMe || m.visible) && _memberTotal(m) > 0) ...[
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: ClipRRect(
+                                              borderRadius: BorderRadius.circular(4),
+                                              child: LinearProgressIndicator(
+                                                value: _memberRatio(m),
+                                                minHeight: 5,
+                                                backgroundColor: scheme.surfaceContainerHighest,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '${(_memberRatio(m) * 100).round()}%',
+                                            style: AppType.caption.copyWith(fontFeatures: tabularFigures, color: scheme.onSurfaceVariant),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -510,7 +567,7 @@ class FriendsPageState extends State<FriendsPage> {
                   child: TextButton.icon(
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: _inviteLink(g)));
-                      toast(context, 'Taklif havolasi nusxalandi');
+                      toast(context, context.tr("Taklif havolasi nusxalandi"));
                     },
                     style: TextButton.styleFrom(
                       foregroundColor: scheme.onSurfaceVariant,
@@ -521,7 +578,7 @@ class FriendsPageState extends State<FriendsPage> {
                       ),
                     ),
                     icon: const Icon(LucideIcons.copy, size: 15),
-                    label: Text('Taklif kodi: ${g.inviteCode}'),
+                    label: Text(context.tr("Taklif kodi: {v0}", {'v0': g.inviteCode})),
                   ),
                 ),
               ],
@@ -549,7 +606,7 @@ class FriendsPageState extends State<FriendsPage> {
         children: [
           PageHeader(
             title: m.name,
-            subtitle: '${m.streak} kunlik seriya · ${m.totalScore} ball',
+            subtitle: context.tr("{v0} kunlik seriya · {v1} ball", {'v0': m.streak, 'v1': m.totalScore}),
             onBack: handleBack,
           ),
           Padding(
@@ -558,34 +615,34 @@ class FriendsPageState extends State<FriendsPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 PeriodStepper(
-                  label: relativeDay(_memberDay),
+                  label: relativeDay(context, _memberDay),
                   isCurrent: m.isToday,
                   onReset: () => _openMember(_memberUid!, tashkentToday()),
                   onPrev: () => shift(-1),
                   onNext: () => shift(1),
                 ),
                 if (!m.visible)
-                  const Padding(
+                   Padding(
                     padding: EdgeInsets.only(top: 12),
                     child: EmptyView(
                       icon: LucideIcons.lock,
-                      title: "Ma'lumotlari yashirin",
-                      message: "Bu a'zoning reja va odatlari sizga ko'rinmaydi.",
+                      title: context.tr("Ma'lumotlari yashirin"),
+                      message: context.tr("Bu a'zoning reja va odatlari sizga ko'rinmaydi."),
                     ),
                   )
                 else ...[
                   SectionBar(
                     top: 12,
-                    title: 'Rejalar',
+                    title: context.tr("Rejalar"),
                     count: '${plans.where((p) => p.done).length}/${plans.length}',
-                    actionLabel: canManage ? "Reja qo'shish" : null,
+                    actionLabel: canManage ? context.tr("Reja qo'shish") : null,
                     onAction: canManage
                         ? () async {
                             final ok = await showPlanForm(
                               context,
                               api: s.api,
                               initialDate: _memberDay,
-                              titleOverride: '${m.name} uchun reja',
+                              titleOverride: context.tr("{v0} uchun reja", {'v0': m.name}),
                               onSubmit: (t, d, time, date) => s.api.createPlanForMember(
                                 g.id,
                                 m.userId,
@@ -599,29 +656,29 @@ class FriendsPageState extends State<FriendsPage> {
                           }
                         : null,
                   ),
-                  _memberItems(plans, "Reja yo'q"),
+                  _memberItems(plans, context.tr("Reja yo'q")),
                   SectionBar(
-                    title: 'Odatlar',
+                    title: context.tr("Odatlar"),
                     count: '${habits.where((h) => h.done).length}/${habits.length}',
-                    actionLabel: canManage ? "Odat qo'shish" : null,
+                    actionLabel: canManage ? context.tr("Odat qo'shish") : null,
                     onAction: canManage
                         ? () async {
                             final ok = await showHabitForm(
                               context,
                               api: s.api,
-                              titleOverride: '${m.name} uchun odat',
+                              titleOverride: context.tr("{v0} uchun odat", {'v0': m.name}),
                               onSubmit: (input) => s.api.createHabitForMember(g.id, m.userId, input),
                             );
                             if (ok) _openMember(_memberUid!, _memberDay);
                           }
                         : null,
                   ),
-                  _memberItems(habits, "Odat yo'q"),
+                  _memberItems(habits, context.tr("Odat yo'q")),
                   if (!canManage && !m.isMe)
                     Padding(
                       padding: const EdgeInsets.only(top: 14),
                       child: Text(
-                        "Bu a'zo sizga u uchun reja yaratishga ruxsat bermagan.",
+                        context.tr("Bu a'zo sizga u uchun reja yaratishga ruxsat bermagan."),
                         textAlign: TextAlign.center,
                         style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
                       ),
@@ -759,18 +816,18 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
       isScrollControlled: true,
       useSafeArea: true,
       builder: (ctx) => SheetScaffold(
-        title: 'Telegram guruhni tanlang',
+        title: context.tr("Telegram guruhni tanlang"),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
             _SheetNote(
-              "Bot va siz a'zo bo'lgan guruhlar. Ro'yxatda bo'lmasa — botni guruhga qo'shing va u yerda bir marta xabar yozing.",
+              context.tr("Bot va siz a'zo bo'lgan guruhlar. Ro'yxatda bo'lmasa — botni guruhga qo'shing va u yerda bir marta xabar yozing."),
               boxed: false,
             ),
             const SizedBox(height: 14),
             if (chats.isEmpty)
-              const _SheetNote('Mos guruh topilmadi')
+               _SheetNote(context.tr("Mos guruh topilmadi"))
             else
               GroupCard(
                 indent: 50,
@@ -779,7 +836,7 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
                     SettingTile(
                       icon: LucideIcons.send,
                       title: c.title,
-                      subtitle: c.canSend ? null : "Bot xabar yubora olmaydi — botni admin qiling",
+                      subtitle: c.canSend ? null : context.tr("Bot xabar yubora olmaydi — botni admin qiling"),
                       onTap: () => Navigator.pop(ctx, c),
                     ),
                 ],
@@ -801,7 +858,7 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
     final scheme = Theme.of(context).colorScheme;
     final owner = _g.isOwner;
     return SheetScaffold(
-      title: 'Guruh sozlamalari',
+      title: context.tr("Guruh sozlamalari"),
       subtitle: owner ? null : _g.name,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -817,12 +874,12 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
               children: [
                 SettingTile(
                   icon: LucideIcons.logOut,
-                  title: 'Guruhdan chiqish',
+                  title: context.tr("Guruhdan chiqish"),
                   danger: true,
                   onTap: _busy
                       ? null
                       : () async {
-                          if (!await confirmAction(context, title: 'Guruhdan chiqish', message: _g.name, confirmLabel: 'Chiqish')) return;
+                          if (!await confirmAction(context, title: context.tr("Guruhdan chiqish"), message: _g.name, confirmLabel: context.tr("Chiqish"))) return;
                           await _run(() => _api.leaveGroup(_g.id));
                           if (!context.mounted) return;
                           Navigator.pop(context);
@@ -834,7 +891,7 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
           ] else ...[
             SegmentTabs<String>(
               value: _tab,
-              items: const [('general', 'Umumiy'), ('digest', 'Hisobot'), ('members', "A'zolar")],
+              items:  [('general', context.tr("Umumiy")), ('digest', context.tr("Hisobot")), ('members', context.tr("A'zolar"))],
               onChanged: (v) {
                 setState(() => _tab = v);
                 if (v == 'digest' && _digest == null) _loadDigest();
@@ -863,21 +920,21 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
   }
 
   List<Widget> _general() => [
-    const FieldLabel('Guruh nomi'),
+     FieldLabel(context.tr("Guruh nomi")),
     TextField(
       controller: _name,
       maxLength: 80,
       textCapitalization: TextCapitalization.sentences,
       decoration: const InputDecoration(counterText: ''),
     ),
-    const FieldLabel('Tavsif'),
+     FieldLabel(context.tr("Tavsif")),
     TextField(
       controller: _desc,
       maxLength: 300,
       minLines: 2,
       maxLines: 4,
       textCapitalization: TextCapitalization.sentences,
-      decoration: const InputDecoration(hintText: 'Ixtiyoriy', counterText: ''),
+      decoration:  InputDecoration(hintText: context.tr("Ixtiyoriy"), counterText: ''),
     ),
     const SizedBox(height: 22),
     FilledButton(
@@ -889,7 +946,7 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
               widget.onChanged();
               if (mounted) Navigator.pop(context);
             }),
-      child: const Text('Saqlash'),
+      child:  Text(context.tr("Saqlash")),
     ),
     const SizedBox(height: 4),
     TextButton(
@@ -898,8 +955,8 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
           : () async {
               if (!await confirmAction(
                 context,
-                title: "Guruhni o'chirish",
-                message: "«${_g.name}» va undagi ruxsatlar o'chiriladi.",
+                title: context.tr("Guruhni o'chirish"),
+                message: context.tr("«{v0}» va undagi ruxsatlar o'chiriladi.", {'v0': _g.name}),
               )) {
                 return;
               }
@@ -909,7 +966,7 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
               widget.onGone();
             },
       style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
-      child: const Text("Guruhni o'chirish"),
+      child:  Text(context.tr("Guruhni o'chirish")),
     ),
   ];
 
@@ -922,7 +979,7 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
     return [
       const SizedBox(height: 12),
       _SheetNote(
-        "Belgilangan vaqtda har bir a'zoning rejasi (ertalab) va natijasi (kechqurun) Telegram guruhga yuboriladi.",
+        context.tr("Belgilangan vaqtda har bir a'zoning rejasi (ertalab) va natijasi (kechqurun) Telegram guruhga yuboriladi."),
         boxed: false,
       ),
       const SizedBox(height: 12),
@@ -930,8 +987,8 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
         children: [
           SettingTile(
             icon: LucideIcons.send,
-            title: 'Telegram guruh',
-            subtitle: d.chatTitle ?? 'Tanlanmagan',
+            title: context.tr("Telegram guruh"),
+            subtitle: d.chatTitle ?? context.tr("Tanlanmagan"),
             onTap: _busy ? null : _pickChat,
             trailing: d.chatId == null
                 ? null
@@ -942,15 +999,15 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
                             await _run(() => _api.unlinkTelegram(_g.id));
                             _loadDigest();
                           },
-                    child: const Text('Uzish'),
+                    child:  Text(context.tr("Uzish")),
                   ),
           ),
         ],
       ),
-      const FieldLabel('Nima yuborilsin'),
+       FieldLabel(context.tr("Nima yuborilsin")),
       SegmentTabs<String>(
         value: d.reportSource,
-        items: const [('plans', 'Rejalar'), ('both', 'Ikkisi'), ('habits', 'Odatlar')],
+        items:  [('plans', context.tr("Rejalar")), ('both', context.tr("Ikkisi")), ('habits', context.tr("Odatlar"))],
         onChanged: (v) => _updateDigest({'report_source': v}),
       ),
       const SizedBox(height: 12),
@@ -959,8 +1016,8 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
         children: [
           _DigestRow(
             icon: LucideIcons.sunrise,
-            title: 'Kunlik reja',
-            subtitle: 'Ertalab — bugun nima qilinadi',
+            title: context.tr("Kunlik reja"),
+            subtitle: context.tr("Ertalab — bugun nima qilinadi"),
             enabled: d.plansEnabled,
             time: d.plansTime,
             times: times,
@@ -970,8 +1027,8 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
           ),
           _DigestRow(
             icon: LucideIcons.moon,
-            title: 'Kunlik hisobot',
-            subtitle: 'Kechqurun — nima bajarildi',
+            title: context.tr("Kunlik hisobot"),
+            subtitle: context.tr("Kechqurun — nima bajarildi"),
             enabled: d.digestEnabled,
             time: d.digestTime,
             times: times,
@@ -988,7 +1045,7 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
             child: OutlinedButton(
               onPressed: _busy || d.chatId == null ? null : () => _test('plans'),
               style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10), minimumSize: const Size(0, 46)),
-              child: const Text('Rejani sinash', maxLines: 1, overflow: TextOverflow.ellipsis),
+              child:  Text(context.tr("Rejani sinash"), maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
           ),
           const SizedBox(width: 10),
@@ -996,7 +1053,7 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
             child: OutlinedButton(
               onPressed: _busy || d.chatId == null ? null : () => _test('report'),
               style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10), minimumSize: const Size(0, 46)),
-              child: const Text('Hisobotni sinash', maxLines: 1, overflow: TextOverflow.ellipsis),
+              child:  Text(context.tr("Hisobotni sinash"), maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
           ),
         ],
@@ -1004,7 +1061,7 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
       if (d.lastError?.isNotEmpty == true) ...[
         const SizedBox(height: 10),
         Text(
-          'Oxirgi xato: ${d.lastError}',
+          context.tr("Oxirgi xato: {v0}", {'v0': d.lastError}),
           style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.error),
         ),
       ],
@@ -1013,16 +1070,16 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
 
   Future<void> _test(String kind) => _run(() async {
     final (ok, reason) = await _api.testDigest(_g.id, kind);
-    if (mounted) toast(context, ok ? 'Telegram guruhga yuborildi' : 'Yuborilmadi: ${reason ?? 'noma\'lum sabab'}');
+    if (mounted) toast(context, ok ? context.tr("Telegram guruhga yuborildi") : context.tr("Yuborilmadi: {v0}", {'v0': reason ?? 'noma\'lum sabab'}));
   });
 
   List<Widget> _members(ColorScheme scheme) {
     final others = _g.members.where((m) => !m.isMe).toList();
-    if (others.isEmpty) return const [SizedBox(height: 12), _SheetNote("Boshqa a'zo yo'q")];
+    if (others.isEmpty) return  [SizedBox(height: 12), _SheetNote(context.tr("Boshqa a'zo yo'q"))];
     return [
       const SizedBox(height: 12),
       _SheetNote(
-        "O'chirilgan (pauza) a'zoning ma'lumotlari boshqalarga va Telegram hisobotiga ko'rinmaydi.",
+        context.tr("O'chirilgan (pauza) a'zoning ma'lumotlari boshqalarga va Telegram hisobotiga ko'rinmaydi."),
         boxed: false,
       ),
       const SizedBox(height: 12),
@@ -1034,7 +1091,7 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
               member: m,
               name: m.name,
               value: m.isActive,
-              subtitle: m.isActive ? 'Faol' : 'Pauza',
+              subtitle: m.isActive ? context.tr("Faol") : context.tr("Pauza"),
               onChanged: _busy
                   ? null
                   : (v) => _run(() async {
@@ -1044,11 +1101,11 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
                       widget.onChanged();
                     }),
               trailing: IconButton(
-                tooltip: 'Chiqarib yuborish',
+                tooltip: context.tr("Chiqarib yuborish"),
                 onPressed: _busy
                     ? null
                     : () async {
-                        if (!await confirmAction(context, title: 'Guruhdan chiqarish', message: m.name, confirmLabel: 'Chiqarish')) return;
+                        if (!await confirmAction(context, title: context.tr("Guruhdan chiqarish"), message: m.name, confirmLabel: context.tr("Chiqarish"))) return;
                         await _run(() async {
                           await _api.removeMember(_g.id, m.userId);
                           final g = await _api.group(_g.id);
@@ -1066,6 +1123,76 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
 }
 
 /// Varaq ichidagi izoh yoki bo'sh holat matni.
+class _GroupTodaySummary extends StatelessWidget {
+  const _GroupTodaySummary({required this.members});
+
+  final List<GroupMember> members;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final visible = members.where((m) => m.isMe || m.visible).toList();
+    var done = 0, total = 0, finished = 0;
+    for (final m in visible) {
+      final t = m.plansTotal + m.habitsTotal;
+      final d = m.plansDone + m.habitsDone;
+      done += d;
+      total += t;
+      if (t > 0 && d >= t) finished++;
+    }
+    final ratio = total == 0 ? 0.0 : done / total;
+    final bestStreak = members.fold<int>(0, (a, m) => m.streak > a ? m.streak : a);
+    Widget stat(String value, String label) => Expanded(
+          child: Column(
+            children: [
+              Text(value, style: AppType.bodyStrong.copyWith(fontFeatures: tabularFigures)),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        );
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(context.tr("Bugun guruhda"), style: AppType.bodyStrong),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: ratio,
+                minHeight: 8,
+                backgroundColor: scheme.surfaceContainerHighest,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                stat('${(ratio * 100).round()}%', context.tr("Umumiy bajarilish")),
+                stat('$finished/${visible.length}', context.tr("Kunni yakunlagan")),
+                stat('$bestStreak', context.tr("Eng uzun seriya")),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SheetNote extends StatelessWidget {
   const _SheetNote(this.text, {this.boxed = true});
   final String text;
@@ -1191,7 +1318,7 @@ class _DigestRow extends StatelessWidget {
             padding: const EdgeInsets.only(left: 34, top: 2),
             child: Row(
               children: [
-                Text('Vaqt', style: AppType.label.copyWith(color: scheme.onSurfaceVariant)),
+                Text(context.tr("Vaqt"), style: AppType.label.copyWith(color: scheme.onSurfaceVariant)),
                 const SizedBox(width: 12),
                 DropdownButton<String>(
                   value: times.contains(time) ? time : null,

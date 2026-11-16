@@ -1,3 +1,4 @@
+import '../../l10n/app_localizations.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -105,12 +106,12 @@ class _StatsPageState extends State<StatsPage> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const PageHeader(title: 'Natijalar'),
+         PageHeader(title: context.tr("Natijalar")),
         Padding(
           padding: const EdgeInsets.fromLTRB(AppSpace.page, 0, AppSpace.page, 8),
           child: SegmentTabs<String>(
             value: _view,
-            items: const [('mine', 'Shaxsiy'), ('friends', "Do'stlar"), ('rating', 'Reyting')],
+            items:  [('mine', context.tr("Shaxsiy")), ('friends', context.tr("Do'stlar")), ('rating', context.tr("Reyting"))],
             onChanged: (v) {
               setState(() => _view = v);
               if (v == 'rating' && _lb == null && _lbPremium == null) _loadLb();
@@ -154,12 +155,12 @@ class _StatsPageState extends State<StatsPage> {
     final prevTotal = [for (var i = 1; i <= 7; i++) dayCount(d7.subtract(Duration(days: i)))].fold<int>(0, (a, b) => a + b);
     final diff = weekTotal - prevTotal;
     final weekLine = weekTotal == 0
-        ? "Oxirgi 7 kunda bajarilgan ish yo'q. Bugun bittasidan boshlang."
+        ? context.tr("Oxirgi 7 kunda bajarilgan ish yo'q. Bugun bittasidan boshlang.")
         : diff > 0
-        ? "Oxirgi 7 kunda $weekTotal ta ish — oldingi haftadan $diff ta ko'p."
+        ? context.tr("Oxirgi 7 kunda {v0} ta ish — oldingi haftadan {v1} ta ko'p.", {'v0': weekTotal, 'v1': diff})
         : diff < 0
-        ? "Oxirgi 7 kunda $weekTotal ta ish — oldingi haftadan ${-diff} ta kam."
-        : "Oxirgi 7 kunda $weekTotal ta ish — oldingi hafta bilan bir xil.";
+        ? context.tr("Oxirgi 7 kunda {v0} ta ish — oldingi haftadan {v1} ta kam.", {'v0': weekTotal, 'v1': -diff})
+        : context.tr("Oxirgi 7 kunda {v0} ta ish — oldingi hafta bilan bir xil.", {'v0': weekTotal});
 
     // 30 kun: rejalar bajarilishi va faol kunlar.
     final p30 = plans.where((p) => !pd(p).isBefore(d30)).toList();
@@ -208,7 +209,7 @@ class _StatsPageState extends State<StatsPage> {
                         '${st.disciplineScore.clamp(0, 100)}',
                         style: AppType.title.copyWith(fontSize: 24, height: 1.05, fontFeatures: tabularFigures),
                       ),
-                      Text('intizom', style: AppType.micro.copyWith(color: scheme.onSurfaceVariant)),
+                      Text(context.tr("intizom"), style: AppType.micro.copyWith(color: scheme.onSurfaceVariant)),
                     ],
                   ),
                 ),
@@ -220,14 +221,14 @@ class _StatsPageState extends State<StatsPage> {
                       Text(st.rankTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.heading),
                       const SizedBox(height: 2),
                       Text(
-                        '${st.level}-daraja · ${st.xpInLevel}/${st.xpNeeded}\u00a0XP',
+                        context.tr("{v0}-daraja · {v1}/{v2} XP", {'v0': st.level, 'v1': st.xpInLevel, 'v2': st.xpNeeded}),
                         style: AppType.label.copyWith(color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
                       ),
                       const SizedBox(height: 10),
                       AppProgressBar(value: st.xpPercent / 100),
                       const SizedBox(height: 6),
                       Text(
-                        'Keyingi darajagacha ${(st.xpNeeded - st.xpInLevel).clamp(0, 1 << 30)}\u00a0XP',
+                        context.tr("Keyingi darajagacha {v0} XP", {'v0': (st.xpNeeded - st.xpInLevel).clamp(0, 1 << 30)}),
                         style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400, fontFeatures: tabularFigures),
                       ),
                     ],
@@ -239,15 +240,15 @@ class _StatsPageState extends State<StatsPage> {
           const SizedBox(height: 10),
           _FactGrid(
             items: [
-              ('${st.streak} kun', 'Joriy seriya', 'Rekord: ${st.longestStreak} kun'),
-              (rate == null ? '—' : '$rate%', 'Rejalar bajarilishi', rate == null ? "30 kunda reja yo'q" : '30 kunda $done30/${p30.length}'),
-              ('$activeDays/30', 'Faol kunlar', 'Oxirgi 30 kun'),
-              ('${st.perfectDays}', 'Mukammal kunlar', 'Hammasi bajarilgan'),
+              (context.tr("{v0} kun", {'v0': st.streak}), context.tr("Joriy seriya"), context.tr("Rekord: {v0} kun", {'v0': st.longestStreak})),
+              (rate == null ? '—' : '$rate%', context.tr("Rejalar bajarilishi"), rate == null ? context.tr("30 kunda reja yo'q") : context.tr("30 kunda {v0}/{v1}", {'v0': done30, 'v1': p30.length})),
+              ('$activeDays/30', context.tr("Faol kunlar"), context.tr("Oxirgi 30 kun")),
+              ('${st.perfectDays}', context.tr("Mukammal kunlar"), context.tr("Hammasi bajarilgan")),
             ],
           ),
 
           // ── Hafta ──────────────────────────────────
-          const SectionBar(title: 'Shu hafta'),
+           SectionBar(title: context.tr("Shu hafta")),
           Container(
             decoration: surfaceDecoration(context),
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -263,7 +264,7 @@ class _StatsPageState extends State<StatsPage> {
 
           // ── Odatlar ────────────────────────────────
           if (habitRates.isNotEmpty) ...[
-            const SectionBar(title: 'Odatlar', count: '30 kun'),
+             SectionBar(title: context.tr("Odatlar"), count: context.tr("30 kun")),
             Container(
               decoration: surfaceDecoration(context),
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
@@ -302,7 +303,7 @@ class _StatsPageState extends State<StatsPage> {
           ],
 
           // ── Barqarorlik ────────────────────────────
-          const SectionBar(title: 'Barqarorlik', count: '14 hafta'),
+           SectionBar(title: context.tr("Barqarorlik"), count: context.tr("14 hafta")),
           Container(
             decoration: surfaceDecoration(context),
             padding: const EdgeInsets.all(16),
@@ -310,10 +311,10 @@ class _StatsPageState extends State<StatsPage> {
           ),
 
           // ── Maqsad va yutuqlar ─────────────────────
-          const SectionBar(title: 'Maqsad va yutuqlar'),
+           SectionBar(title: context.tr("Maqsad va yutuqlar")),
           GroupCard(
             children: [
-              for (final (type, label) in const [('yearly', 'Yillik maqsadlar'), ('monthly', 'Oylik maqsadlar')])
+              for (final (type, label) in  [('yearly', context.tr("Yillik maqsadlar")), ('monthly', context.tr("Oylik maqsadlar"))])
                 Builder(
                   builder: (_) {
                     final all = goals.where((g) => g.goalType == type).length;
@@ -342,8 +343,8 @@ class _StatsPageState extends State<StatsPage> {
                 ),
               SettingTile(
                 icon: LucideIcons.trophy,
-                title: 'Yutuqlar',
-                subtitle: '${milestones.length} bosqichdan $unlocked tasi ochilgan',
+                title: context.tr("Yutuqlar"),
+                subtitle: context.tr("{v0} bosqichdan {v1} tasi ochilgan", {'v0': milestones.length, 'v1': unlocked}),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => Scaffold(body: SafeArea(child: AchievementsPage(state: s))),
@@ -359,7 +360,7 @@ class _StatsPageState extends State<StatsPage> {
 
   // ── Reyting ────────────────────────────────────────
   Widget _rating() {
-    final unit = _lbPeriod == 'streak' ? 'kun' : 'ball';
+    final unit = _lbPeriod == 'streak' ? context.tr("kun") : context.tr("ball");
     return ListView(
       padding: const EdgeInsets.fromLTRB(AppSpace.page, 4, AppSpace.page, 40),
       children: [
@@ -368,15 +369,15 @@ class _StatsPageState extends State<StatsPage> {
             padding: const EdgeInsets.only(top: 8),
             child: PremiumGate(
               icon: LucideIcons.trophy,
-              title: 'Reyting Premium bilan ochiladi',
-              message: "Natijalaringizni boshqa foydalanuvchilar bilan solishtiring.",
+              title: context.tr("Reyting Premium bilan ochiladi"),
+              message: context.tr("Natijalaringizni boshqa foydalanuvchilar bilan solishtiring."),
               onOpen: () => showPremiumDialog(context, _lbPremium!),
             ),
           )
         else ...[
           Row(
             children: [
-              for (final (v, label) in const [('all', 'Umumiy'), ('week', 'Haftalik'), ('streak', 'Seriya')])
+              for (final (v, label) in  [('all', context.tr("Umumiy")), ('week', context.tr("Haftalik")), ('streak', context.tr("Seriya"))])
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: _FilterChip(
@@ -398,11 +399,11 @@ class _StatsPageState extends State<StatsPage> {
               opacity: _lbLoading ? .5 : 1,
               duration: AppMotion.fast,
               child: _lb!.top.isEmpty
-                  ? const EmptyView(icon: LucideIcons.trophy, title: "Hali reyting yo'q")
+                  ?  EmptyView(icon: LucideIcons.trophy, title: context.tr("Hali reyting yo'q"))
                   : GroupCard(indent: 94, children: [for (final r in _lb!.top) _LeaderTile(row: r, unit: unit)]),
             ),
             if (_lb!.me != null && !_lb!.meInTop) ...[
-              const SectionBar(title: "Sizning o'rningiz", top: 20),
+               SectionBar(title: context.tr("Sizning o'rningiz"), top: 20),
               GroupCard(children: [_LeaderTile(row: _lb!.me!, unit: unit)]),
             ],
           ],
@@ -522,7 +523,7 @@ class _WeekBars extends StatelessWidget {
     final mx = math.max(1, values.fold<int>(0, math.max));
     return Semantics(
       label: [
-        for (var i = 0; i < days.length; i++) '${uzWeekdays[days[i].weekday - 1]}: ${values[i]} ta',
+        for (var i = 0; i < days.length; i++) context.tr("{v0}: {v1} ta", {'v0': context.tr(uzWeekdays[days[i].weekday - 1]), 'v1': values[i]}),
       ].join(', '),
       excludeSemantics: true,
       child: SizedBox(
@@ -567,7 +568,7 @@ class _WeekBars extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          uzWeekdaysShort[days[i].weekday - 1],
+                          context.tr(uzWeekdaysShort[days[i].weekday - 1]),
                           style: AppType.micro.copyWith(
                             fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
                             color: isToday ? scheme.tertiary : scheme.onSurfaceVariant,
@@ -632,7 +633,7 @@ class _Heatmap extends StatelessWidget {
                         SizedBox(
                           height: cell + (r < 6 ? _gap : 0),
                           child: r.isEven
-                              ? Align(alignment: Alignment.topLeft, child: Text(uzWeekdaysShort[r], style: labelStyle))
+                              ? Align(alignment: Alignment.topLeft, child: Text(context.tr(uzWeekdaysShort[r]), style: labelStyle))
                               : null,
                         ),
                     ],
@@ -670,13 +671,13 @@ class _Heatmap extends StatelessWidget {
         const SizedBox(height: 12),
         Row(
           children: [
-            Text(shortDate(start), style: labelStyle.copyWith(fontFeatures: tabularFigures)),
+            Text(shortDate(context, start), style: labelStyle.copyWith(fontFeatures: tabularFigures)),
             const Spacer(),
-            Text('Kam', style: labelStyle),
+            Text(context.tr("Kam"), style: labelStyle),
             const SizedBox(width: 6),
             for (final c in [0, 1, 3, 5, 6]) swatch(c),
             const SizedBox(width: 6),
-            Text("Ko'p", style: labelStyle),
+            Text(context.tr("Ko'p"), style: labelStyle),
           ],
         ),
       ],
@@ -752,7 +753,7 @@ class _LeaderTile extends StatelessWidget {
                     style: AppType.body.copyWith(fontWeight: row.isMe ? FontWeight.w600 : FontWeight.w500),
                   ),
                 ),
-                if (row.isMe) ...[const SizedBox(width: 6), const Pill('Siz')],
+                if (row.isMe) ...[const SizedBox(width: 6),  Pill(context.tr("Siz"))],
               ],
             ),
           ),

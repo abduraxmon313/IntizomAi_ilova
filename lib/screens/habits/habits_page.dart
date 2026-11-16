@@ -1,3 +1,4 @@
+import '../../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -44,7 +45,7 @@ class HabitsPageState extends State<HabitsPage> {
     try {
       final u = await s.api.toggleHabit(h.id, done: !h.doneOn(day), day: day);
       s.replaceHabit(u);
-      if (today && u.doneToday && u.streak > 1 && mounted) toast(context, '${u.title} · ${u.streak} kun ketma-ket');
+      if (today && u.doneToday && u.streak > 1 && mounted) toast(context, context.tr("{v0} · {v1} kun ketma-ket", {'v0': u.title, 'v1': u.streak}));
       s.refreshStats();
     } catch (e) {
       if (mounted) showApiError(context, e);
@@ -62,8 +63,8 @@ class HabitsPageState extends State<HabitsPage> {
     final days = [for (var i = 0; i < 7; i++) _week.add(Duration(days: i))];
     final end = days.last;
     final range = _week.month == end.month
-        ? '${_week.day}–${end.day} ${uzMonths[end.month - 1].toLowerCase()}'
-        : '${shortDate(_week)} – ${shortDate(end)}';
+        ? '${_week.day}–${end.day} ${context.tr(uzMonths[end.month - 1]).toLowerCase()}'
+        : '${shortDate(context, _week)} – ${shortDate(context, end)}';
     final thisWeek = sameDay(_week, weekStart(today));
 
     return RefreshIndicator(
@@ -71,15 +72,15 @@ class HabitsPageState extends State<HabitsPage> {
       child: ListView(
         padding: const EdgeInsets.only(bottom: AppSpace.bottomInset),
         children: [
-          const PageHeader(title: 'Odatlar'),
+           PageHeader(title: context.tr("Odatlar")),
           if (habits.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 40),
               child: EmptyView(
                 icon: LucideIcons.repeat,
-                title: "Hali odat yo'q",
-                message: "Kichik, har kuni takrorlanadigan bitta odatdan boshlang. Seriya shu yerda yig'iladi.",
-                actionLabel: "Odat qo'shish",
+                title: context.tr("Hali odat yo'q"),
+                message: context.tr("Kichik, har kuni takrorlanadigan bitta odatdan boshlang. Seriya shu yerda yig'iladi."),
+                actionLabel: context.tr("Odat qo'shish"),
                 onAction: add,
               ),
             )
@@ -90,9 +91,9 @@ class HabitsPageState extends State<HabitsPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   PeriodStepper(
-                    label: thisWeek ? 'Shu hafta · $range' : range,
+                    label: thisWeek ? context.tr("Shu hafta · {v0}", {'v0': range}) : range,
                     isCurrent: thisWeek,
-                    resetLabel: 'Joriy haftaga qaytish',
+                    resetLabel: context.tr("Joriy haftaga qaytish"),
                     onReset: () => setState(() => _week = weekStart(today)),
                     onPrev: () => setState(() => _week = _week.subtract(const Duration(days: 7))),
                     onNext: () => setState(() => _week = _week.add(const Duration(days: 7))),
@@ -106,7 +107,7 @@ class HabitsPageState extends State<HabitsPage> {
                         for (final d in days)
                           Expanded(
                             child: Text(
-                              uzWeekdaysShort[d.weekday - 1],
+                              context.tr(uzWeekdaysShort[d.weekday - 1]),
                               textAlign: TextAlign.center,
                               style: AppType.caption.copyWith(
                                 fontWeight: sameDay(d, today) ? FontWeight.w700 : FontWeight.w500,
@@ -132,7 +133,7 @@ class HabitsPageState extends State<HabitsPage> {
                     ),
                   const SizedBox(height: 4),
                   Text(
-                    "Katakni bosib o'tgan kunlarni ham belgilash mumkin.",
+                    context.tr("Katakni bosib o'tgan kunlarni ham belgilash mumkin."),
                     textAlign: TextAlign.center,
                     style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400),
                   ),
@@ -165,10 +166,10 @@ class _HabitCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final h = habit;
-    final rep = h.isWeekly ? h.weekdays.map((i) => uzWeekdaysShort[i]).join(', ') : 'Har kuni';
+    final rep = h.isWeekly ? h.weekdays.map((i) => context.tr(uzWeekdaysShort[i])).join(', ') : context.tr("Har kuni");
     String? dur;
     if (h.durationType == 'days' && h.targetDays != null && !h.finished) {
-      dur = h.daysLeft != null ? '${h.daysLeft} kun qoldi' : '${h.targetDays} kun';
+      dur = h.daysLeft != null ? context.tr("{v0} kun qoldi", {'v0': h.daysLeft}) : context.tr("{v0} kun", {'v0': h.targetDays});
     }
     final meta = [rep, ?h.reminderTime, ?dur].join(' · ');
     return Container(
@@ -205,11 +206,11 @@ class _HabitCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 10),
                       if (h.finished)
-                        const Pill('Yakunlandi', muted: true)
+                         Pill(context.tr("Yakunlandi"), muted: true)
                       else
                         MetaTag(
                           icon: LucideIcons.flame,
-                          text: '${h.streak} kun',
+                          text: context.tr("{v0} kun", {'v0': h.streak}),
                           color: h.streak > 0 ? AppPalette.ember : scheme.onSurfaceVariant,
                         ),
                     ],
@@ -270,7 +271,7 @@ class _DayCell extends StatelessWidget {
     return Semantics(
       button: tappable,
       checked: done,
-      label: longDate(day),
+      label: longDate(context, day),
       excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,

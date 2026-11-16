@@ -1,3 +1,4 @@
+import '../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -57,7 +58,7 @@ Future<bool> showPlanForm(
 
   await showFormSheet<void>(
     context,
-    title: titleOverride ?? (plan == null ? 'Yangi reja' : 'Rejani tahrirlash'),
+    title: titleOverride ?? (plan == null ? context.tr("Yangi reja") : context.tr("Rejani tahrirlash")),
     builder: (ctx, setSheet) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -66,7 +67,7 @@ Future<bool> showPlanForm(
           autofocus: plan == null,
           textCapitalization: TextCapitalization.sentences,
           style: AppType.heading.copyWith(fontWeight: FontWeight.w500),
-          decoration: const InputDecoration(hintText: 'Nima qilasiz?'),
+          decoration:  InputDecoration(hintText: context.tr("Nima qilasiz?")),
         ),
         const SizedBox(height: 10),
         TextField(
@@ -74,15 +75,15 @@ Future<bool> showPlanForm(
           minLines: 1,
           maxLines: 3,
           textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(hintText: 'Izoh (ixtiyoriy)'),
+          decoration:  InputDecoration(hintText: context.tr("Izoh (ixtiyoriy)")),
         ),
-        const FieldLabel('Qachon'),
+         FieldLabel(context.tr("Qachon")),
         Row(
           children: [
             Expanded(
               child: PickerField(
                 icon: LucideIcons.clock,
-                text: time == null ? 'Vaqt' : _hm(time!),
+                text: time == null ? context.tr("Vaqt") : _hm(time!),
                 placeholder: time == null,
                 onTap: () async {
                   final t = await pickTime(ctx, time ?? TimeOfDay.now());
@@ -94,7 +95,7 @@ Future<bool> showPlanForm(
             Expanded(
               child: PickerField(
                 icon: LucideIcons.calendar,
-                text: relativeDay(date),
+                text: relativeDay(context, date),
                 onTap: plan != null
                     ? null
                     : () async {
@@ -127,7 +128,7 @@ Future<bool> showPlanForm(
     onSave: () async {
       final t = title.text.trim();
       if (t.isEmpty) {
-        toast(context, 'Reja nomini yozing');
+        toast(context, context.tr("Reja nomini yozing"));
         return false;
       }
       final d = desc.text.trim().isEmpty ? null : desc.text.trim();
@@ -171,7 +172,7 @@ Future<bool> showHabitForm(
 
   await showFormSheet<void>(
     context,
-    title: titleOverride ?? (habit == null ? 'Yangi odat' : 'Odatni tahrirlash'),
+    title: titleOverride ?? (habit == null ? context.tr("Yangi odat") : context.tr("Odatni tahrirlash")),
     builder: (ctx, setSheet) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -180,7 +181,7 @@ Future<bool> showHabitForm(
           autofocus: habit == null,
           textCapitalization: TextCapitalization.sentences,
           style: AppType.heading.copyWith(fontWeight: FontWeight.w500),
-          decoration: const InputDecoration(hintText: 'Odat nomi (masalan: Kitob o\'qish)'),
+          decoration:  InputDecoration(hintText: context.tr("Odat nomi (masalan: Kitob o'qish)")),
         ),
         const SizedBox(height: 10),
         TextField(
@@ -188,9 +189,9 @@ Future<bool> showHabitForm(
           minLines: 1,
           maxLines: 3,
           textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(hintText: 'Izoh (ixtiyoriy)'),
+          decoration:  InputDecoration(hintText: context.tr("Izoh (ixtiyoriy)")),
         ),
-        const FieldLabel('Belgi'),
+         FieldLabel(context.tr("Belgi")),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -206,10 +207,10 @@ Future<bool> showHabitForm(
               ),
           ],
         ),
-        const FieldLabel('Takrorlanish'),
+         FieldLabel(context.tr("Takrorlanish")),
         SegmentTabs<String>(
           value: freq,
-          items: const [('daily', 'Har kuni'), ('weekly', 'Tanlangan kunlar')],
+          items:  [('daily', context.tr("Har kuni")), ('weekly', context.tr("Tanlangan kunlar"))],
           onChanged: (v) => setSheet(() => freq = v),
         ),
         if (freq == 'weekly') ...[
@@ -223,17 +224,17 @@ Future<bool> showHabitForm(
                     child: ChoiceChipBox(
                       selected: weekdays.contains(i),
                       onTap: () => setSheet(() => weekdays.contains(i) ? weekdays.remove(i) : weekdays.add(i)),
-                      child: Text(uzWeekdaysShort[i]),
+                      child: Text(context.tr(uzWeekdaysShort[i])),
                     ),
                   ),
                 ),
             ],
           ),
         ],
-        const FieldLabel('Davomiylik'),
+         FieldLabel(context.tr("Davomiylik")),
         SegmentTabs<String>(
           value: duration,
-          items: const [('permanent', 'Doimiy'), ('days', 'Muddatli')],
+          items:  [('permanent', context.tr("Doimiy")), ('days', context.tr("Muddatli"))],
           onChanged: (v) => setSheet(() => duration = v),
         ),
         if (duration == 'days') ...[
@@ -241,16 +242,16 @@ Future<bool> showHabitForm(
           TextField(
             controller: days,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(hintText: 'Necha kun? (masalan: 30)', suffixText: 'kun'),
+            decoration:  InputDecoration(hintText: context.tr("Necha kun? (masalan: 30)"), suffixText: context.tr("kun")),
           ),
         ],
-        const FieldLabel('Eslatma'),
+         FieldLabel(context.tr("Eslatma")),
         Row(
           children: [
             Expanded(
               child: PickerField(
                 icon: LucideIcons.bell,
-                text: reminder == null ? 'Eslatmasiz' : 'Har kuni ${_hm(reminder!)} da',
+                text: reminder == null ? context.tr("Eslatmasiz") : context.tr("Har kuni {v0} da", {'v0': _hm(reminder!)}),
                 placeholder: reminder == null,
                 onTap: () async {
                   final t = await pickTime(ctx, reminder ?? const TimeOfDay(hour: 20, minute: 0));
@@ -260,7 +261,7 @@ Future<bool> showHabitForm(
             ),
             if (reminder != null)
               IconButton(
-                tooltip: "Eslatmani o'chirish",
+                tooltip: context.tr("Eslatmani o'chirish"),
                 onPressed: () => setSheet(() => reminder = null),
                 icon: const Icon(LucideIcons.x, size: 18),
               ),
@@ -273,8 +274,8 @@ Future<bool> showHabitForm(
         : () async {
             final ok = await confirmAction(
               context,
-              title: "Odatni o'chirish",
-              message: "«${habit.title}» va uning butun tarixi o'chiriladi.",
+              title: context.tr("Odatni o'chirish"),
+              message: context.tr("«{v0}» va uning butun tarixi o'chiriladi.", {'v0': habit.title}),
             );
             if (!ok) return false;
             try {
@@ -289,16 +290,16 @@ Future<bool> showHabitForm(
     onSave: () async {
       final t = title.text.trim();
       if (t.isEmpty) {
-        toast(context, 'Odat nomini yozing');
+        toast(context, context.tr("Odat nomini yozing"));
         return false;
       }
       if (freq == 'weekly' && weekdays.isEmpty) {
-        toast(context, 'Kamida bitta kunni tanlang');
+        toast(context, context.tr("Kamida bitta kunni tanlang"));
         return false;
       }
       final target = int.tryParse(days.text.trim());
       if (duration == 'days' && (target == null || target < 1)) {
-        toast(context, 'Necha kun davom etishini yozing');
+        toast(context, context.tr("Necha kun davom etishini yozing"));
         return false;
       }
       final input = HabitInput(
@@ -345,7 +346,7 @@ Future<bool> showGoalForm(
 
   await showFormSheet<void>(
     context,
-    title: goal == null ? 'Yangi maqsad' : 'Maqsadni tahrirlash',
+    title: goal == null ? context.tr("Yangi maqsad") : context.tr("Maqsadni tahrirlash"),
     subtitle: periodLabel,
     builder: (ctx, setSheet) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -355,7 +356,7 @@ Future<bool> showGoalForm(
           autofocus: goal == null,
           textCapitalization: TextCapitalization.sentences,
           style: AppType.heading.copyWith(fontWeight: FontWeight.w500),
-          decoration: const InputDecoration(hintText: 'Qanday natijaga erishmoqchisiz?'),
+          decoration:  InputDecoration(hintText: context.tr("Qanday natijaga erishmoqchisiz?")),
         ),
         const SizedBox(height: 10),
         TextField(
@@ -363,7 +364,7 @@ Future<bool> showGoalForm(
           minLines: 2,
           maxLines: 4,
           textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(hintText: 'Tavsif (ixtiyoriy)'),
+          decoration:  InputDecoration(hintText: context.tr("Tavsif (ixtiyoriy)")),
         ),
       ],
     ),
@@ -382,7 +383,7 @@ Future<bool> showGoalForm(
     onSave: () async {
       final t = title.text.trim();
       if (t.isEmpty) {
-        toast(context, 'Maqsadni yozing');
+        toast(context, context.tr("Maqsadni yozing"));
         return false;
       }
       final d = desc.text.trim().isEmpty ? null : desc.text.trim();
