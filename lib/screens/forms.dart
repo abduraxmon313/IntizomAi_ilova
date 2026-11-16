@@ -202,7 +202,7 @@ Future<bool> showHabitForm(
                 onTap: () => setSheet(() => icon = e),
                 child: habitGlyphs[e] != null
                     ? Icon(habitGlyphs[e], size: 19)
-                    : Text(e, style: const TextStyle(fontSize: 18)),
+                    : Text(e, style: AppType.heading.copyWith(height: 1)),
               ),
           ],
         ),

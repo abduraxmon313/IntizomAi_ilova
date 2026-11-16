@@ -278,7 +278,7 @@ class HabitGlyph extends StatelessWidget {
       ),
       child: glyph != null
           ? Icon(glyph, size: size * .48, color: done ? scheme.tertiary : scheme.onSurfaceVariant)
-          : Text(icon, style: TextStyle(fontSize: size * .46)),
+          : Text(icon, style: AppType.body.copyWith(fontSize: size * .46, height: 1)),
     );
   }
 }

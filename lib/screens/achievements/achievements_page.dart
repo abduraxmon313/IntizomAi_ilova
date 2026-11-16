@@ -129,7 +129,7 @@ class AchievementsPage extends StatelessWidget {
                               padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
                               child: Row(
                                 children: [
-                                  Text(a.icon, style: const TextStyle(fontSize: 20)),
+                                  Text(a.icon, style: AppType.title.copyWith(fontSize: 20, height: 1)),
                                   const SizedBox(width: 14),
                                   Expanded(child: Text(a.title, style: AppType.body.copyWith(fontWeight: FontWeight.w500))),
                                   Pill(_rarityLabel(a.rarity), muted: a.rarity == 'common', color: a.rarity == 'legendary' ? AppPalette.gold : null),

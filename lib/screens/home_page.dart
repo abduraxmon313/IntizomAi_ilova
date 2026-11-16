@@ -211,10 +211,7 @@ class _NavBar extends StatelessWidget {
                             items[i].$2,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11,
-                              height: 1.2,
-                              letterSpacing: 0,
+                            style: AppType.micro.copyWith(
                               fontWeight: i == index ? FontWeight.w600 : FontWeight.w500,
                               color: i == index ? scheme.tertiary : scheme.onSurfaceVariant,
                             ),

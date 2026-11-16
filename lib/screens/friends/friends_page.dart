@@ -200,64 +200,66 @@ class FriendsPageState extends State<FriendsPage> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
       useSafeArea: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) {
           final scheme = Theme.of(ctx).colorScheme;
           final others = perms.grantsOut.where((p) => p.userId != myId).toList();
           final incoming = perms.grantsIn.where((p) => p.userId != myId && p.canManage).toList();
-          return ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-            children: [
-              const Text('Ruxsatlar', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -.5)),
-              const SizedBox(height: 16),
-              const Text('Kim men uchun reja va odat yarata oladi', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 4),
-              Text(
-                "Yoqilgan a'zo sizning hisobingizga reja va odat qo'sha oladi.",
-                style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 10),
-              if (others.isEmpty)
-                Text("Guruhda boshqa a'zo yo'q", style: TextStyle(color: scheme.onSurfaceVariant))
-              else
-                GroupCard(
-                  children: [
-                    for (final p in others)
-                      SwitchListTile.adaptive(
-                        title: Text(p.name, style: const TextStyle(fontSize: 14.5)),
-                        value: out[p.userId] ?? false,
-                        onChanged: (v) async {
-                          setSheet(() => out[p.userId] = v);
-                          try {
-                            await s.api.setPermission(g.id, p.userId, canManage: v);
-                          } catch (e) {
-                            setSheet(() => out[p.userId] = !v);
-                            if (ctx.mounted) showApiError(ctx, e);
-                          }
-                        },
-                      ),
-                  ],
+          return SheetScaffold(
+            title: 'Ruxsatlar',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SectionBar(title: 'Kim men uchun reja va odat yarata oladi', top: 4),
+                if (others.isEmpty)
+                  const _SheetNote("Guruhda boshqa a'zo yo'q")
+                else
+                  GroupCard(
+                    indent: 64,
+                    children: [
+                      for (final p in others)
+                        _MemberSwitchRow(
+                          member: g.members.where((m) => m.userId == p.userId).firstOrNull,
+                          name: p.name,
+                          value: out[p.userId] ?? false,
+                          onChanged: (v) async {
+                            setSheet(() => out[p.userId] = v);
+                            try {
+                              await s.api.setPermission(g.id, p.userId, canManage: v);
+                            } catch (e) {
+                              setSheet(() => out[p.userId] = !v);
+                              if (ctx.mounted) showApiError(ctx, e);
+                            }
+                          },
+                        ),
+                    ],
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                  child: Text(
+                    "Yoqilgan a'zo sizning hisobingizga reja va odat qo'sha oladi.",
+                    style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
+                  ),
                 ),
-              const SizedBox(height: 20),
-              const Text('Menga ruxsat berganlar', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 10),
-              if (incoming.isEmpty)
-                Text("Hozircha hech kim", style: TextStyle(color: scheme.onSurfaceVariant))
-              else
-                GroupCard(
-                  children: [
-                    for (final p in incoming)
-                      ListTile(
-                        leading: Icon(LucideIcons.userCheck, size: 20, color: scheme.onSurfaceVariant),
-                        title: Text(p.name),
-                        subtitle: const Text('Uning uchun reja va odat yarata olasiz'),
-                      ),
-                  ],
-                ),
-            ],
+                const SectionBar(title: 'Menga ruxsat berganlar', top: 22),
+                if (incoming.isEmpty)
+                  const _SheetNote('Hozircha hech kim')
+                else
+                  GroupCard(
+                    indent: 50,
+                    children: [
+                      for (final p in incoming)
+                        SettingTile(
+                          icon: LucideIcons.userCheck,
+                          title: p.name,
+                          subtitle: 'Uning uchun reja va odat yarata olasiz',
+                        ),
+                    ],
+                  ),
+              ],
+            ),
           );
         },
       ),
@@ -269,7 +271,6 @@ class FriendsPageState extends State<FriendsPage> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
       useSafeArea: true,
       builder: (ctx) => _GroupSettingsSheet(
         api: s,
@@ -361,7 +362,7 @@ class FriendsPageState extends State<FriendsPage> {
                                                 g.name,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, letterSpacing: -.2),
+                                                style: AppType.bodyStrong,
                                               ),
                                             ),
                                             if (g.isOwner) ...[const SizedBox(width: 6), const Pill('Ega')],
@@ -372,11 +373,12 @@ class FriendsPageState extends State<FriendsPage> {
                                           "${g.memberCount} a'zo${g.description?.isNotEmpty == true ? ' · ${g.description}' : ''}",
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
+                                          style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
                                         ),
                                       ],
                                     ),
                                   ),
+                                  const SizedBox(width: 8),
                                   Icon(LucideIcons.chevronRight, size: 18, color: scheme.outline),
                                 ],
                               ),
@@ -400,6 +402,7 @@ class FriendsPageState extends State<FriendsPage> {
     return RefreshIndicator(
       onRefresh: _reloadGroup,
       child: ListView(
+        key: ValueKey('group-${g.id}'),
         padding: const EdgeInsets.only(bottom: 28),
         children: [
           PageHeader(
@@ -414,25 +417,36 @@ class FriendsPageState extends State<FriendsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: () => _invite(g),
-                        icon: const Icon(LucideIcons.userPlus, size: 17),
-                        label: const Text('Taklif qilish'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _permissions(g),
-                        icon: const Icon(LucideIcons.shield, size: 17),
-                        label: const Text('Ruxsatlar'),
-                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
-                      ),
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (_, box) {
+                    const pad = EdgeInsets.symmetric(horizontal: 12);
+                    final invite = FilledButton.icon(
+                      onPressed: () => _invite(g),
+                      style: FilledButton.styleFrom(padding: pad, minimumSize: const Size(0, 48)),
+                      icon: const Icon(LucideIcons.userPlus, size: 18),
+                      label: const Text('Taklif qilish', maxLines: 1),
+                    );
+                    final perms = OutlinedButton.icon(
+                      onPressed: () => _permissions(g),
+                      style: OutlinedButton.styleFrom(padding: pad, minimumSize: const Size(0, 48)),
+                      icon: const Icon(LucideIcons.shield, size: 18),
+                      label: const Text('Ruxsatlar', maxLines: 1),
+                    );
+                    // Ikki tugma yonma-yon sig'masa — ustma-ust.
+                    if (box.maxWidth < 300) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [invite, const SizedBox(height: 8), perms],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: invite),
+                        const SizedBox(width: 10),
+                        Expanded(child: perms),
+                      ],
+                    );
+                  },
                 ),
                 SectionBar(title: "A'zolar", count: '${g.members.length}'),
                 GroupCard(
@@ -458,7 +472,7 @@ class FriendsPageState extends State<FriendsPage> {
                                             m.name,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -.15),
+                                            style: AppType.bodyStrong,
                                           ),
                                         ),
                                         if (m.isMe) ...[const SizedBox(width: 6), const Pill('Siz')],
@@ -483,6 +497,7 @@ class FriendsPageState extends State<FriendsPage> {
                                   ],
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               Icon(LucideIcons.chevronRight, size: 18, color: scheme.outline),
                             ],
                           ),
@@ -490,16 +505,23 @@ class FriendsPageState extends State<FriendsPage> {
                       ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                GestureDetector(
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: _inviteLink(g)));
-                    toast(context, 'Taklif havolasi nusxalandi');
-                  },
-                  child: Text(
-                    'Taklif kodi: ${g.inviteCode} · nusxalash',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                const SizedBox(height: 6),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: _inviteLink(g)));
+                      toast(context, 'Taklif havolasi nusxalandi');
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: scheme.onSurfaceVariant,
+                      textStyle: AppType.label.copyWith(
+                        fontFamily: AppTheme.fontFamily,
+                        fontWeight: FontWeight.w500,
+                        fontFeatures: tabularFigures,
+                      ),
+                    ),
+                    icon: const Icon(LucideIcons.copy, size: 15),
+                    label: Text('Taklif kodi: ${g.inviteCode}'),
                   ),
                 ),
               ],
@@ -522,6 +544,7 @@ class FriendsPageState extends State<FriendsPage> {
     return RefreshIndicator(
       onRefresh: () => _openMember(_memberUid!, _memberDay),
       child: ListView(
+        key: ValueKey('member-$_memberUid'),
         padding: const EdgeInsets.only(bottom: 28),
         children: [
           PageHeader(
@@ -600,7 +623,7 @@ class FriendsPageState extends State<FriendsPage> {
                       child: Text(
                         "Bu a'zo sizga u uchun reja yaratishga ruxsat bermagan.",
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                        style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
                       ),
                     ),
                 ],
@@ -615,38 +638,53 @@ class FriendsPageState extends State<FriendsPage> {
   Widget _memberItems(List<MemberItem> items, String empty) {
     final scheme = Theme.of(context).colorScheme;
     if (items.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        child: Text(empty, style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+      return Container(
+        decoration: surfaceDecoration(context),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        child: Text(empty, style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant)),
       );
     }
     return GroupCard(
-      indent: 50,
+      indent: 52,
       children: [
         for (final it in items)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 6, 14, 6),
-            child: Row(
-              children: [
-                CheckCircle(checked: it.done, disabled: true),
-                const SizedBox(width: 6),
-                if (it.icon != null) ...[
-                  _ItemGlyph(icon: it.icon!),
-                  const SizedBox(width: 10),
-                ],
-                Expanded(
-                  child: Text(
-                    it.title,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      letterSpacing: -.1,
-                      decoration: it.done ? TextDecoration.lineThrough : null,
-                      color: it.done ? scheme.onSurfaceVariant : scheme.onSurface,
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(4, 4, 16, 4),
+              child: Row(
+                children: [
+                  CheckCircle(checked: it.done, disabled: true, semanticLabel: it.title),
+                  const SizedBox(width: 4),
+                  if (it.icon != null) ...[
+                    _ItemGlyph(icon: it.icon!),
+                    const SizedBox(width: 10),
+                  ],
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        it.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppType.body.copyWith(
+                          fontWeight: FontWeight.w500,
+                          decoration: it.done ? TextDecoration.lineThrough : null,
+                          decorationColor: scheme.outline,
+                          color: it.done ? scheme.onSurfaceVariant : scheme.onSurface,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                if (it.time != null) MetaTag(icon: LucideIcons.clock, text: it.time!),
-              ],
+                  if (it.time != null) ...[
+                    const SizedBox(width: 10),
+                    Text(
+                      it.time!,
+                      style: AppType.label.copyWith(fontFeatures: tabularFigures, color: scheme.onSurfaceVariant),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
       ],
@@ -716,32 +754,38 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
       return;
     }
     if (!mounted) return;
-    final scheme = Theme.of(context).colorScheme;
     final picked = await showModalBottomSheet<TelegramChat>(
       context: context,
-      showDragHandle: true,
-      builder: (ctx) => ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-        children: [
-          const Text('Telegram guruhni tanlang', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -.5)),
-          const SizedBox(height: 6),
-          Text(
-            "Bot va siz a'zo bo'lgan guruhlar. Ro'yxatda bo'lmasa — botni guruhga qo'shing va u yerda bir marta xabar yozing.",
-            style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 12),
-          if (chats.isEmpty)
-            Text("Mos guruh topilmadi", style: TextStyle(color: scheme.onSurfaceVariant))
-          else
-            for (final c in chats)
-              ListTile(
-                leading: Icon(LucideIcons.send, size: 20, color: scheme.onSurfaceVariant),
-                title: Text(c.title),
-                subtitle: c.canSend ? null : const Text("Bot xabar yubora olmaydi — botni admin qiling"),
-                onTap: () => Navigator.pop(ctx, c),
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => SheetScaffold(
+        title: 'Telegram guruhni tanlang',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SheetNote(
+              "Bot va siz a'zo bo'lgan guruhlar. Ro'yxatda bo'lmasa — botni guruhga qo'shing va u yerda bir marta xabar yozing.",
+              boxed: false,
+            ),
+            const SizedBox(height: 14),
+            if (chats.isEmpty)
+              const _SheetNote('Mos guruh topilmadi')
+            else
+              GroupCard(
+                indent: 50,
+                children: [
+                  for (final c in chats)
+                    SettingTile(
+                      icon: LucideIcons.send,
+                      title: c.title,
+                      subtitle: c.canSend ? null : "Bot xabar yubora olmaydi — botni admin qiling",
+                      onTap: () => Navigator.pop(ctx, c),
+                    ),
+                ],
               ),
-        ],
+          ],
+        ),
       ),
     );
     if (picked != null) {
@@ -756,31 +800,36 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final owner = _g.isOwner;
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+    return SheetScaffold(
+      title: 'Guruh sozlamalari',
+      subtitle: owner ? null : _g.name,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('Guruh sozlamalari', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -.5)),
-          const SizedBox(height: 14),
           if (!owner) ...[
-            Text(_g.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-            if (_g.description?.isNotEmpty == true)
-              Text(_g.description!, style: TextStyle(color: scheme.onSurfaceVariant)),
-            const SizedBox(height: 20),
-            OutlinedButton.icon(
-              onPressed: _busy
-                  ? null
-                  : () async {
-                      if (!await confirmAction(context, title: 'Guruhdan chiqish', message: _g.name, confirmLabel: 'Chiqish')) return;
-                      await _run(() => _api.leaveGroup(_g.id));
-                      if (!context.mounted) return;
-                      Navigator.pop(context);
-                      widget.onGone();
-                    },
-              icon: const Icon(LucideIcons.logOut, size: 17, color: AppPalette.danger),
-              label: const Text('Guruhdan chiqish', style: TextStyle(color: AppPalette.danger)),
+            if (_g.description?.isNotEmpty == true) ...[
+              Text(_g.description!, style: AppType.body.copyWith(color: scheme.onSurfaceVariant)),
+              const SizedBox(height: 16),
+            ] else
+              const SizedBox(height: 4),
+            GroupCard(
+              children: [
+                SettingTile(
+                  icon: LucideIcons.logOut,
+                  title: 'Guruhdan chiqish',
+                  danger: true,
+                  onTap: _busy
+                      ? null
+                      : () async {
+                          if (!await confirmAction(context, title: 'Guruhdan chiqish', message: _g.name, confirmLabel: 'Chiqish')) return;
+                          await _run(() => _api.leaveGroup(_g.id));
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+                          widget.onGone();
+                        },
+                ),
+              ],
             ),
           ] else ...[
             SegmentTabs<String>(
@@ -791,10 +840,22 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
                 if (v == 'digest' && _digest == null) _loadDigest();
               },
             ),
-            const SizedBox(height: 16),
-            if (_tab == 'general') ..._general(),
-            if (_tab == 'digest') ..._digestPane(scheme),
-            if (_tab == 'members') ..._members(scheme),
+            const SizedBox(height: 4),
+            AnimatedSize(
+              duration: AppMotion.base,
+              curve: AppMotion.curve,
+              alignment: Alignment.topCenter,
+              child: Column(
+                key: ValueKey(_tab),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: switch (_tab) {
+                  'digest' => _digestPane(scheme),
+                  'members' => _members(scheme),
+                  _ => _general(),
+                },
+              ),
+            ),
           ],
         ],
       ),
@@ -803,10 +864,22 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
 
   List<Widget> _general() => [
     const FieldLabel('Guruh nomi'),
-    TextField(controller: _name, maxLength: 80, decoration: const InputDecoration(counterText: '')),
+    TextField(
+      controller: _name,
+      maxLength: 80,
+      textCapitalization: TextCapitalization.sentences,
+      decoration: const InputDecoration(counterText: ''),
+    ),
     const FieldLabel('Tavsif'),
-    TextField(controller: _desc, maxLength: 300, minLines: 2, maxLines: 4, decoration: const InputDecoration(counterText: '')),
-    const SizedBox(height: 14),
+    TextField(
+      controller: _desc,
+      maxLength: 300,
+      minLines: 2,
+      maxLines: 4,
+      textCapitalization: TextCapitalization.sentences,
+      decoration: const InputDecoration(hintText: 'Ixtiyoriy', counterText: ''),
+    ),
+    const SizedBox(height: 22),
     FilledButton(
       onPressed: _busy
           ? null
@@ -818,8 +891,8 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
             }),
       child: const Text('Saqlash'),
     ),
-    const SizedBox(height: 10),
-    TextButton.icon(
+    const SizedBox(height: 4),
+    TextButton(
       onPressed: _busy
           ? null
           : () async {
@@ -835,28 +908,22 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
               Navigator.pop(context);
               widget.onGone();
             },
-      icon: const Icon(LucideIcons.trash2, size: 17, color: AppPalette.danger),
-      label: const Text("Guruhni o'chirish", style: TextStyle(color: AppPalette.danger)),
+      style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+      child: const Text("Guruhni o'chirish"),
     ),
   ];
 
   List<Widget> _digestPane(ColorScheme scheme) {
     final d = _digest;
-    if (d == null) return const [Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))];
+    if (d == null) return const [LoadingView()];
     final times = d.allowedTimes.isEmpty
         ? [for (var h = 0; h < 24; h++) '${h.toString().padLeft(2, '0')}:00']
         : d.allowedTimes;
-    Widget timeDrop(String value, ValueChanged<String> onChanged) => DropdownButton<String>(
-      value: times.contains(value) ? value : null,
-      hint: Text(value),
-      underline: const SizedBox(),
-      items: [for (final t in times) DropdownMenuItem(value: t, child: Text(t))],
-      onChanged: _busy ? null : (v) => v == null ? null : onChanged(v),
-    );
     return [
-      Text(
+      const SizedBox(height: 12),
+      _SheetNote(
         "Belgilangan vaqtda har bir a'zoning rejasi (ertalab) va natijasi (kechqurun) Telegram guruhga yuboriladi.",
-        style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant, height: 1.4),
+        boxed: false,
       ),
       const SizedBox(height: 12),
       GroupCard(
@@ -888,54 +955,58 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
       ),
       const SizedBox(height: 12),
       GroupCard(
+        indent: 50,
         children: [
-          SettingTile(
+          _DigestRow(
             icon: LucideIcons.sunrise,
             title: 'Kunlik reja',
             subtitle: 'Ertalab — bugun nima qilinadi',
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                timeDrop(d.plansTime, (v) => _updateDigest({'plans_time': v})),
-                Switch.adaptive(value: d.plansEnabled, onChanged: _busy ? null : (v) => _updateDigest({'plans_enabled': v})),
-              ],
-            ),
+            enabled: d.plansEnabled,
+            time: d.plansTime,
+            times: times,
+            busy: _busy,
+            onEnabled: (v) => _updateDigest({'plans_enabled': v}),
+            onTime: (v) => _updateDigest({'plans_time': v}),
           ),
-          SettingTile(
+          _DigestRow(
             icon: LucideIcons.moon,
             title: 'Kunlik hisobot',
             subtitle: 'Kechqurun — nima bajarildi',
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                timeDrop(d.digestTime, (v) => _updateDigest({'digest_time': v})),
-                Switch.adaptive(value: d.digestEnabled, onChanged: _busy ? null : (v) => _updateDigest({'digest_enabled': v})),
-              ],
-            ),
+            enabled: d.digestEnabled,
+            time: d.digestTime,
+            times: times,
+            busy: _busy,
+            onEnabled: (v) => _updateDigest({'digest_enabled': v}),
+            onTime: (v) => _updateDigest({'digest_time': v}),
           ),
         ],
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 14),
       Row(
         children: [
           Expanded(
             child: OutlinedButton(
               onPressed: _busy || d.chatId == null ? null : () => _test('plans'),
-              child: const Text('Rejani sinash'),
+              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10), minimumSize: const Size(0, 46)),
+              child: const Text('Rejani sinash', maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: OutlinedButton(
               onPressed: _busy || d.chatId == null ? null : () => _test('report'),
-              child: const Text('Hisobotni sinash'),
+              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10), minimumSize: const Size(0, 46)),
+              child: const Text('Hisobotni sinash', maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
           ),
         ],
       ),
       if (d.lastError?.isNotEmpty == true) ...[
-        const SizedBox(height: 8),
-        Text('Oxirgi xato: ${d.lastError}', style: const TextStyle(fontSize: 12, color: AppPalette.danger)),
+        const SizedBox(height: 10),
+        Text(
+          'Oxirgi xato: ${d.lastError}',
+          style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.error),
+        ),
       ],
     ];
   }
@@ -947,55 +1018,198 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
 
   List<Widget> _members(ColorScheme scheme) {
     final others = _g.members.where((m) => !m.isMe).toList();
-    if (others.isEmpty) return [Text("Boshqa a'zo yo'q", style: TextStyle(color: scheme.onSurfaceVariant))];
+    if (others.isEmpty) return const [SizedBox(height: 12), _SheetNote("Boshqa a'zo yo'q")];
     return [
-      Text(
+      const SizedBox(height: 12),
+      _SheetNote(
         "O'chirilgan (pauza) a'zoning ma'lumotlari boshqalarga va Telegram hisobotiga ko'rinmaydi.",
-        style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
+        boxed: false,
       ),
-      const SizedBox(height: 10),
+      const SizedBox(height: 12),
       GroupCard(
+        indent: 64,
         children: [
           for (final m in others)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              child: Row(
-                children: [
-                  ProfileAvatar(url: null, telegramId: m.telegramId, name: m.name, size: 32),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(m.name, style: const TextStyle(fontSize: 14))),
-                  Switch.adaptive(
-                    value: m.isActive,
-                    onChanged: _busy
-                        ? null
-                        : (v) => _run(() async {
-                            await _api.setMemberActive(_g.id, m.userId, v);
-                            final g = await _api.group(_g.id);
-                            if (mounted) setState(() => _g = g);
-                            widget.onChanged();
-                          }),
-                  ),
-                  IconButton(
-                    tooltip: 'Chiqarib yuborish',
-                    onPressed: _busy
-                        ? null
-                        : () async {
-                            if (!await confirmAction(context, title: 'Guruhdan chiqarish', message: m.name, confirmLabel: 'Chiqarish')) return;
-                            await _run(() async {
-                              await _api.removeMember(_g.id, m.userId);
-                              final g = await _api.group(_g.id);
-                              if (mounted) setState(() => _g = g);
-                              widget.onChanged();
-                            });
-                          },
-                    icon: const Icon(LucideIcons.userX, size: 18, color: AppPalette.danger),
-                  ),
-                ],
+            _MemberSwitchRow(
+              member: m,
+              name: m.name,
+              value: m.isActive,
+              subtitle: m.isActive ? 'Faol' : 'Pauza',
+              onChanged: _busy
+                  ? null
+                  : (v) => _run(() async {
+                      await _api.setMemberActive(_g.id, m.userId, v);
+                      final g = await _api.group(_g.id);
+                      if (mounted) setState(() => _g = g);
+                      widget.onChanged();
+                    }),
+              trailing: IconButton(
+                tooltip: 'Chiqarib yuborish',
+                onPressed: _busy
+                    ? null
+                    : () async {
+                        if (!await confirmAction(context, title: 'Guruhdan chiqarish', message: m.name, confirmLabel: 'Chiqarish')) return;
+                        await _run(() async {
+                          await _api.removeMember(_g.id, m.userId);
+                          final g = await _api.group(_g.id);
+                          if (mounted) setState(() => _g = g);
+                          widget.onChanged();
+                        });
+                      },
+                icon: Icon(LucideIcons.userX, size: 19, color: scheme.error),
               ),
             ),
         ],
       ),
     ];
+  }
+}
+
+/// Varaq ichidagi izoh yoki bo'sh holat matni.
+class _SheetNote extends StatelessWidget {
+  const _SheetNote(this.text, {this.boxed = true});
+  final String text;
+
+  /// true — bo'sh holat (yuza ichida), false — oddiy izoh.
+  final bool boxed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final t = Text(text, style: AppType.label.copyWith(fontWeight: FontWeight.w400, height: 1.45, color: scheme.onSurfaceVariant));
+    if (!boxed) return Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: t);
+    return Container(
+      decoration: BoxDecoration(color: scheme.surfaceContainerLow, borderRadius: BorderRadius.circular(AppRadius.lg)),
+      padding: const EdgeInsets.all(16),
+      child: t,
+    );
+  }
+}
+
+/// A'zo qatori: avatar, ism (2 qatorgacha), o'ngda kalit va ixtiyoriy amal.
+class _MemberSwitchRow extends StatelessWidget {
+  const _MemberSwitchRow({
+    required this.member,
+    required this.name,
+    required this.value,
+    required this.onChanged,
+    this.subtitle,
+    this.trailing,
+  });
+
+  final GroupMember? member;
+  final String name;
+  final String? subtitle;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return MergeSemantics(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 60),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16, 8, trailing == null ? 12 : 4, 8),
+          child: Row(
+            children: [
+              ProfileAvatar(url: null, telegramId: member?.telegramId ?? 0, name: name, size: 36),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppType.body.copyWith(fontWeight: FontWeight.w500)),
+                    if (subtitle != null)
+                      Text(subtitle!, style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Switch(value: value, onChanged: onChanged),
+              ?trailing,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Hisobot qatori: nom va izoh, o'ngda kalit; pastida yuborish vaqti.
+class _DigestRow extends StatelessWidget {
+  const _DigestRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.enabled,
+    required this.time,
+    required this.times,
+    required this.busy,
+    required this.onEnabled,
+    required this.onTime,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool enabled;
+  final String time;
+  final List<String> times;
+  final bool busy;
+  final ValueChanged<bool> onEnabled;
+  final ValueChanged<String> onTime;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20, color: scheme.onSurfaceVariant),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: AppType.body.copyWith(fontWeight: FontWeight.w500)),
+                    Text(subtitle, style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Switch(value: enabled, onChanged: busy ? null : onEnabled),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 34, top: 2),
+            child: Row(
+              children: [
+                Text('Vaqt', style: AppType.label.copyWith(color: scheme.onSurfaceVariant)),
+                const SizedBox(width: 12),
+                DropdownButton<String>(
+                  value: times.contains(time) ? time : null,
+                  hint: Text(time, style: AppType.bodyStrong.copyWith(fontFeatures: tabularFigures)),
+                  isDense: true,
+                  underline: const SizedBox(),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  icon: Icon(LucideIcons.chevronDown, size: 16, color: scheme.onSurfaceVariant),
+                  style: AppType.bodyStrong.copyWith(fontFamily: AppTheme.fontFamily, color: scheme.onSurface, fontFeatures: tabularFigures),
+                  items: [for (final t in times) DropdownMenuItem(value: t, child: Text(t))],
+                  onChanged: busy ? null : (v) => v == null ? null : onTime(v),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1030,8 +1244,8 @@ class _ItemGlyph extends StatelessWidget {
   Widget build(BuildContext context) {
     final g = habitGlyphs[icon.trim()];
     return g != null
-        ? Icon(g, size: 17, color: Theme.of(context).colorScheme.onSurfaceVariant)
-        : Text(icon, style: const TextStyle(fontSize: 15));
+        ? Icon(g, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant)
+        : Text(icon, style: AppType.body);
   }
 }
 

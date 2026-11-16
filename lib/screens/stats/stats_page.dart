@@ -208,7 +208,7 @@ class _StatsPageState extends State<StatsPage> {
                         '${st.disciplineScore.clamp(0, 100)}',
                         style: AppType.title.copyWith(fontSize: 24, height: 1.05, fontFeatures: tabularFigures),
                       ),
-                      Text('intizom', style: AppType.caption.copyWith(fontSize: 11, color: scheme.onSurfaceVariant)),
+                      Text('intizom', style: AppType.micro.copyWith(color: scheme.onSurfaceVariant)),
                     ],
                   ),
                 ),
@@ -220,14 +220,14 @@ class _StatsPageState extends State<StatsPage> {
                       Text(st.rankTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.heading),
                       const SizedBox(height: 2),
                       Text(
-                        '${st.level}-daraja · ${st.xpInLevel}/${st.xpNeeded} XP',
+                        '${st.level}-daraja · ${st.xpInLevel}/${st.xpNeeded}\u00a0XP',
                         style: AppType.label.copyWith(color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
                       ),
                       const SizedBox(height: 10),
                       AppProgressBar(value: st.xpPercent / 100),
                       const SizedBox(height: 6),
                       Text(
-                        'Keyingi darajagacha ${(st.xpNeeded - st.xpInLevel).clamp(0, 1 << 30)} XP',
+                        'Keyingi darajagacha ${(st.xpNeeded - st.xpInLevel).clamp(0, 1 << 30)}\u00a0XP',
                         style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400, fontFeatures: tabularFigures),
                       ),
                     ],
@@ -322,8 +322,11 @@ class _StatsPageState extends State<StatsPage> {
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                       child: Row(
                         children: [
-                          Expanded(flex: 5, child: Text(label, style: AppType.body.copyWith(fontWeight: FontWeight.w500))),
-                          Expanded(flex: 4, child: AppProgressBar(value: all == 0 ? 0 : dn / all, color: chart)),
+                          Expanded(
+                            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.body.copyWith(fontWeight: FontWeight.w500)),
+                          ),
+                          const SizedBox(width: 12),
+                          SizedBox(width: 72, child: AppProgressBar(value: all == 0 ? 0 : dn / all, color: chart)),
                           SizedBox(
                             width: 44,
                             child: Text(
@@ -396,7 +399,7 @@ class _StatsPageState extends State<StatsPage> {
               duration: AppMotion.fast,
               child: _lb!.top.isEmpty
                   ? const EmptyView(icon: LucideIcons.trophy, title: "Hali reyting yo'q")
-                  : GroupCard(indent: 96, children: [for (final r in _lb!.top) _LeaderTile(row: r, unit: unit)]),
+                  : GroupCard(indent: 94, children: [for (final r in _lb!.top) _LeaderTile(row: r, unit: unit)]),
             ),
             if (_lb!.me != null && !_lb!.meInTop) ...[
               const SectionBar(title: "Sizning o'rningiz", top: 20),
@@ -475,9 +478,9 @@ class _FactGrid extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             m.$3,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: AppType.caption.copyWith(color: scheme.outline, fontWeight: FontWeight.w400, fontFeatures: tabularFigures),
+            style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400, fontFeatures: tabularFigures),
           ),
         ],
       ),
@@ -503,90 +506,144 @@ class _FactGrid extends StatelessWidget {
   }
 }
 
+/// Haftalik ustunlar: bugungi kun — to'liq brend rangda, qolganlari och tonda.
 class _WeekBars extends StatelessWidget {
   const _WeekBars({required this.days, required this.values, required this.color});
   final List<DateTime> days;
   final List<int> values;
   final Color color;
 
+  static const _barMax = 88.0;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final today = tashkentToday();
     final mx = math.max(1, values.fold<int>(0, math.max));
-    return SizedBox(
-      height: 140,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          for (var i = 0; i < days.length; i++)
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text('${values[i]}', style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant, fontFeatures: tabularFigures)),
-                  const SizedBox(height: 4),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 500),
-                    curve: Curves.easeOut,
-                    width: 20,
-                    height: math.max(3, values[i] / mx * 90),
-                    decoration: BoxDecoration(
-                      color: values[i] == 0
-                          ? scheme.surfaceContainerHigh
-                          : sameDay(days[i], tashkentToday())
-                          ? color
-                          : color.withValues(alpha: .35),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    uzWeekdaysShort[days[i].weekday - 1],
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: sameDay(days[i], tashkentToday()) ? scheme.onSurface : scheme.onSurfaceVariant,
-                      fontWeight: sameDay(days[i], tashkentToday()) ? FontWeight.w600 : FontWeight.w400,
-                    ),
-                  ),
-                ],
+    return Semantics(
+      label: [
+        for (var i = 0; i < days.length; i++) '${uzWeekdays[days[i].weekday - 1]}: ${values[i]} ta',
+      ].join(', '),
+      excludeSemantics: true,
+      child: SizedBox(
+        height: _barMax + 48,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            for (var i = 0; i < days.length; i++)
+              Expanded(
+                child: Builder(
+                  builder: (_) {
+                    final isToday = sameDay(days[i], today);
+                    final v = values[i];
+                    return Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          '$v',
+                          style: AppType.micro.copyWith(
+                            fontFeatures: tabularFigures,
+                            fontWeight: isToday ? FontWeight.w600 : FontWeight.w500,
+                            color: v == 0 ? scheme.outline : scheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0, end: v / mx),
+                          duration: AppMotion.slow,
+                          curve: AppMotion.curve,
+                          builder: (_, f, _) => Container(
+                            width: 22,
+                            height: math.max(4, f * _barMax),
+                            decoration: BoxDecoration(
+                              color: v == 0
+                                  ? scheme.surfaceContainerHigh
+                                  : isToday
+                                  ? color
+                                  : color.withValues(alpha: .38),
+                              borderRadius: BorderRadius.circular(AppRadius.xs),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          uzWeekdaysShort[days[i].weekday - 1],
+                          style: AppType.micro.copyWith(
+                            fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                            color: isToday ? scheme.tertiary : scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
+/// 14 hafta × 7 kun. Katak o'lchami eniga moslashadi, chap ustunda — hafta kunlari.
 class _Heatmap extends StatelessWidget {
   const _Heatmap({required this.today, required this.count, required this.color});
   final DateTime today;
   final int Function(DateTime) count;
   final Color color;
 
+  static const _weeks = 14;
+  static const _gap = 4.0;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    // 14 ustun (hafta) × 7 qator (Du..Ya). Oxirgi ustun — joriy hafta.
-    final start = weekStart(today).subtract(const Duration(days: 7 * 13));
+    final start = weekStart(today).subtract(const Duration(days: 7 * (_weeks - 1)));
     Color shade(int c) {
       if (c == 0) return scheme.surfaceContainerHigh;
       final level = c < 2 ? .28 : c < 4 ? .5 : c < 6 ? .75 : 1.0;
       return color.withValues(alpha: level);
     }
 
+    final labelStyle = AppType.micro.copyWith(color: scheme.onSurfaceVariant);
+    Widget swatch(int c) => Container(
+      width: 10,
+      height: 10,
+      margin: const EdgeInsets.symmetric(horizontal: 1.5),
+      decoration: BoxDecoration(color: shade(c), borderRadius: BorderRadius.circular(2)),
+    );
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         LayoutBuilder(
           builder: (_, box) {
-            final cell = (box.maxWidth - 13 * 4) / 14;
-            return Column(
+            const labelW = 24.0;
+            final cell = ((box.maxWidth - labelW - (_weeks - 1) * _gap) / _weeks).clamp(8.0, 22.0);
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (var r = 0; r < 7; r++)
+                SizedBox(
+                  width: labelW,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var r = 0; r < 7; r++)
+                        SizedBox(
+                          height: cell + (r < 6 ? _gap : 0),
+                          child: r.isEven
+                              ? Align(alignment: Alignment.topLeft, child: Text(uzWeekdaysShort[r], style: labelStyle))
+                              : null,
+                        ),
+                    ],
+                  ),
+                ),
+                for (var c = 0; c < _weeks; c++)
                   Padding(
-                    padding: EdgeInsets.only(bottom: r < 6 ? 4 : 0),
-                    child: Row(
+                    padding: EdgeInsets.only(right: c < _weeks - 1 ? _gap : 0),
+                    child: Column(
                       children: [
-                        for (var c = 0; c < 14; c++)
+                        for (var r = 0; r < 7; r++)
                           Builder(
                             builder: (_) {
                               final d = start.add(Duration(days: c * 7 + r));
@@ -594,10 +651,11 @@ class _Heatmap extends StatelessWidget {
                               return Container(
                                 width: cell,
                                 height: cell,
-                                margin: EdgeInsets.only(right: c < 13 ? 4 : 0),
+                                margin: EdgeInsets.only(bottom: r < 6 ? _gap : 0),
                                 decoration: BoxDecoration(
                                   color: future ? Colors.transparent : shade(count(d)),
                                   borderRadius: BorderRadius.circular(3),
+                                  border: sameDay(d, today) ? Border.all(color: scheme.tertiary, width: 1.2) : null,
                                 ),
                               );
                             },
@@ -609,21 +667,16 @@ class _Heatmap extends StatelessWidget {
             );
           },
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Row(
-          mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Text('Kam', style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+            Text(shortDate(start), style: labelStyle.copyWith(fontFeatures: tabularFigures)),
+            const Spacer(),
+            Text('Kam', style: labelStyle),
             const SizedBox(width: 6),
-            for (final c in [0, 1, 3, 5, 6])
-              Container(
-                width: 11,
-                height: 11,
-                margin: const EdgeInsets.only(right: 3),
-                decoration: BoxDecoration(color: shade(c), borderRadius: BorderRadius.circular(2)),
-              ),
-            const SizedBox(width: 3),
-            Text("Ko'p", style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+            for (final c in [0, 1, 3, 5, 6]) swatch(c),
+            const SizedBox(width: 6),
+            Text("Ko'p", style: labelStyle),
           ],
         ),
       ],
@@ -631,6 +684,7 @@ class _Heatmap extends StatelessWidget {
   }
 }
 
+/// Reyting qatori: o'rin, avatar, ism, natija. Birinchi uchtalik — chegarali avatar.
 class _LeaderTile extends StatelessWidget {
   const _LeaderTile({required this.row, required this.unit});
   final LeaderRow row;
@@ -638,40 +692,43 @@ class _LeaderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
     final podium = switch (row.rank) {
       1 => AppPalette.gold,
-      2 => const Color(0xFF8C96A3),
-      3 => const Color(0xFFA9714B),
+      2 => dark ? scheme.onSurfaceVariant : AppPalette.ink2,
+      3 => AppPalette.bronze,
       _ => null,
     };
     final photo = IntizomApi.absoluteUrl(row.photoUrl);
     final initial = Text(
-      row.name.isEmpty ? '?' : row.name[0].toUpperCase(),
-      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant),
+      row.name.isEmpty ? '?' : row.name.characters.first.toUpperCase(),
+      style: AppType.label.copyWith(fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant),
     );
     return Container(
-      color: row.isMe ? scheme.primary.withValues(alpha: .06) : null,
-      padding: const EdgeInsets.fromLTRB(14, 11, 16, 11),
+      color: row.isMe ? scheme.primaryContainer.withValues(alpha: dark ? .45 : .6) : null,
+      constraints: const BoxConstraints(minHeight: 56),
+      padding: const EdgeInsets.fromLTRB(10, 10, 16, 10),
       child: Row(
         children: [
           SizedBox(
-            width: 28,
+            width: 30,
             child: Text(
               '${row.rank}',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
+              maxLines: 1,
+              style: AppType.label.copyWith(
                 fontWeight: FontWeight.w700,
                 fontFeatures: tabularFigures,
-                color: podium ?? scheme.onSurfaceVariant,
+                color: podium == null ? scheme.onSurfaceVariant : AppPalette.textTone(podium, theme.brightness),
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Container(
-            width: 36,
-            height: 36,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: scheme.surfaceContainerHigh,
@@ -681,7 +738,7 @@ class _LeaderTile extends StatelessWidget {
             alignment: Alignment.center,
             child: photo == null
                 ? initial
-                : Image.network(photo, width: 36, height: 36, fit: BoxFit.cover, errorBuilder: (_, _, _) => initial),
+                : Image.network(photo, width: 34, height: 34, fit: BoxFit.cover, errorBuilder: (_, _, _) => initial),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -692,26 +749,25 @@ class _LeaderTile extends StatelessWidget {
                     row.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 15, letterSpacing: -.15, fontWeight: row.isMe ? FontWeight.w600 : FontWeight.w500),
+                    style: AppType.body.copyWith(fontWeight: row.isMe ? FontWeight.w600 : FontWeight.w500),
                   ),
                 ),
                 if (row.isMe) ...[const SizedBox(width: 6), const Pill('Siz')],
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Text.rich(
             TextSpan(
               children: [
-                TextSpan(text: '${row.value}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                TextSpan(text: ' $unit', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5)),
+                TextSpan(text: '${row.value}', style: AppType.bodyStrong.copyWith(fontFeatures: tabularFigures)),
+                TextSpan(text: ' $unit', style: AppType.caption.copyWith(color: scheme.onSurfaceVariant)),
               ],
             ),
-            style: const TextStyle(fontSize: 14.5, fontFeatures: tabularFigures),
+            maxLines: 1,
           ),
         ],
       ),
     );
   }
 }
-

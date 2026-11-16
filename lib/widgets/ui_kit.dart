@@ -142,7 +142,7 @@ class SegmentTabs<T> extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: dark ? scheme.surfaceContainerHighest : scheme.surfaceContainerLowest,
                     borderRadius: BorderRadius.circular(AppRadius.md - 3),
-                    boxShadow: dark ? null : const [BoxShadow(color: Color(0x140B1720), blurRadius: 4, offset: Offset(0, 1))],
+                    boxShadow: dark ? null : AppShadows.thumb,
                   ),
                 ),
               ),
@@ -164,10 +164,8 @@ class SegmentTabs<T> extends StatelessWidget {
                             child: Center(
                               child: AnimatedDefaultTextStyle(
                                 duration: AppMotion.fast,
-                                style: TextStyle(
+                                style: AppType.label.copyWith(
                                   fontFamily: AppTheme.fontFamily,
-                                  fontSize: 13.5,
-                                  letterSpacing: -.1,
                                   fontWeight: v == value ? FontWeight.w600 : FontWeight.w500,
                                   color: v == value ? scheme.onSurface : scheme.onSurfaceVariant,
                                 ),
@@ -215,19 +213,24 @@ class SectionBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(4, top, 0, 10),
       child: Row(
         children: [
-          Flexible(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppType.label.copyWith(fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant),
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.label.copyWith(fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant),
+                  ),
+                ),
+                if (count != null) ...[
+                  const SizedBox(width: 8),
+                  Text(count!, style: AppType.label.copyWith(color: scheme.onSurfaceVariant, fontFeatures: tabularFigures)),
+                ],
+              ],
             ),
           ),
-          if (count != null) ...[
-            const SizedBox(width: 8),
-            Text(count!, style: AppType.label.copyWith(color: scheme.outline, fontFeatures: tabularFigures)),
-          ],
-          const Spacer(),
           if (onAction != null && actionLabel != null)
             GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -480,13 +483,14 @@ class MetaTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? Theme.of(context).colorScheme.onSurfaceVariant;
+    final theme = Theme.of(context);
+    final c = color ?? theme.colorScheme.onSurfaceVariant;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 13, color: c),
         const SizedBox(width: 4),
-        Text(text, style: AppType.caption.copyWith(color: c, fontFeatures: tabularFigures)),
+        Text(text, style: AppType.caption.copyWith(color: AppPalette.textTone(c, theme.brightness), fontFeatures: tabularFigures)),
       ],
     );
   }
@@ -501,7 +505,8 @@ class Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final c = color ?? scheme.tertiary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
@@ -511,12 +516,10 @@ class Pill extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(
-          fontSize: 11,
-          height: 1.2,
+        maxLines: 1,
+        style: AppType.micro.copyWith(
           fontWeight: FontWeight.w600,
-          letterSpacing: .1,
-          color: muted ? scheme.onSurfaceVariant : c,
+          color: muted ? scheme.onSurfaceVariant : AppPalette.textTone(c, theme.brightness),
         ),
       ),
     );
@@ -734,7 +737,7 @@ class SheetScaffold extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.title.copyWith(fontSize: 20)),
+                      Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppType.title.copyWith(fontSize: 20)),
                       if (subtitle != null)
                         Text(subtitle!, style: AppType.label.copyWith(color: scheme.onSurfaceVariant)),
                     ],
@@ -893,12 +896,16 @@ class ChoiceChipBox extends StatelessWidget {
     required this.onTap,
     required this.child,
     this.size,
+    this.scaleToFit = true,
   });
 
   final bool selected;
   final VoidCallback onTap;
   final Widget child;
   final double? size;
+
+  /// `false` bo'lsa, bola o'zi siqilishni boshqaradi (masalan, faqat matn kichrayadi).
+  final bool scaleToFit;
 
   @override
   Widget build(BuildContext context) {
@@ -915,7 +922,7 @@ class ChoiceChipBox extends StatelessWidget {
           duration: AppMotion.fast,
           width: size,
           height: size,
-          padding: size == null ? const EdgeInsets.symmetric(horizontal: 6, vertical: 11) : null,
+          padding: size == null ? const EdgeInsets.symmetric(horizontal: 2, vertical: 11) : null,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: selected ? scheme.primaryContainer : scheme.surfaceContainerLow,
@@ -923,14 +930,15 @@ class ChoiceChipBox extends StatelessWidget {
             border: Border.all(color: selected ? scheme.primary : Colors.transparent, width: 1.5),
           ),
           child: DefaultTextStyle.merge(
-            style: TextStyle(
-              fontSize: 13,
+            style: AppType.label.copyWith(
               fontWeight: FontWeight.w600,
               color: selected ? scheme.onPrimaryContainer : scheme.onSurface,
             ),
+            softWrap: false,
+            maxLines: 1,
             child: IconTheme.merge(
               data: IconThemeData(color: selected ? scheme.tertiary : scheme.onSurfaceVariant),
-              child: child,
+              child: scaleToFit ? FittedBox(fit: BoxFit.scaleDown, child: child) : child,
             ),
           ),
         ),
@@ -989,7 +997,7 @@ Future<bool> confirmAction(
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: danger ? Theme.of(ctx).colorScheme.error : null,
-            foregroundColor: danger ? Colors.white : null,
+            foregroundColor: danger ? Theme.of(ctx).colorScheme.onError : null,
             minimumSize: const Size(0, 44),
           ),
           onPressed: () => Navigator.pop(ctx, true),
@@ -1009,6 +1017,7 @@ void toast(BuildContext context, String message, {String? actionLabel, VoidCallb
     ..showSnackBar(
       SnackBar(
         content: Text(message),
+        actionOverflowThreshold: .4,
         duration: Duration(milliseconds: actionLabel == null ? 1800 : 4000),
         action: actionLabel == null ? null : SnackBarAction(label: actionLabel, onPressed: onAction ?? () {}),
       ),
