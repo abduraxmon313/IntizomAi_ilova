@@ -9,6 +9,7 @@ import '../../l10n/app_localizations.dart';
 import '../auth/language_page.dart';
 import '../../models/extras.dart';
 import '../../services/intizom_api.dart';
+import '../../services/reminder_service.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/dates.dart';
@@ -39,12 +40,20 @@ class _ProfilePageState extends State<ProfilePage> {
   AppState get s => widget.state;
 
   Subscription? _sub;
+  bool _phoneReminders = false;
 
   @override
   void initState() {
     super.initState();
     s.addListener(_onState);
     _load();
+    _loadReminders();
+  }
+
+  Future<void> _loadReminders() async {
+    final reminders = ReminderService.instance;
+    final on = await reminders.isEnabled() && await reminders.hasPermission();
+    if (mounted) setState(() => _phoneReminders = on);
   }
 
   @override
@@ -158,12 +167,16 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _setNotifications(bool v) async {
-    try {
-      s.setProfile(await s.api.updateProfile(notifications: v));
-    } catch (e) {
-      if (mounted) showApiError(context, e);
+  Future<void> _setPhoneReminders(bool v) async {
+    final reminders = ReminderService.instance;
+    if (v && !await reminders.requestPermission()) {
+      if (mounted) toast(context, context.tr("Telefon sozlamalarida IntizomAI uchun bildirishnomalarga ruxsat bering"));
+      return;
     }
+    await reminders.setEnabled(v);
+    if (!mounted) return;
+    setState(() => _phoneReminders = v);
+    if (v) await reminders.sync(api: s.api, habits: s.habits, locale: Localizations.localeOf(context));
   }
 
   Future<void> _logout() async {
@@ -297,8 +310,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         SettingTile(
                           icon: LucideIcons.bell,
                           title: context.tr("Eslatmalar"),
-                          subtitle: context.tr("Reja va odat vaqtida Telegram xabari"),
-                          trailing: Switch(value: p.notificationsEnabled, onChanged: _setNotifications),
+                          subtitle: context.tr("Reja va odat vaqtida telefonda bildirishnoma"),
+                          trailing: Switch(value: _phoneReminders, onChanged: _setPhoneReminders),
                         ),
                       ],
                     ),

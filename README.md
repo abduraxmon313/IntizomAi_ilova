@@ -89,6 +89,10 @@ lib/
 2. Botda **✅ Ilovaga kirishni tasdiqlash** bosiladi.
 3. Ilova `/api/webapp/app-auth/poll` orqali tasdiqni kutadi va tokenni o'zi oladi.
    Token qurilmaning xavfsiz xotirasida saqlanadi (180 kun).
+4. Bugun sahifasidan oldin telefon bildirishnomalariga ruxsat so'raladi
+   (Android'da aniq vaqtda eslatish ruxsati ham). Profil → **Eslatmalar** kaliti
+   faqat telefondagi bildirishnomalarni yoqadi/o'chiradi; Telegram xabarlari o'zgarmaydi.
+   Bildirishnomadagi **Bajarildi** tugmasi reja/odatni ilovani ochmasdan belgilaydi.
 
 ## APK yig'ish (Codemagic)
 

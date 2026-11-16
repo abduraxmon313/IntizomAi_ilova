@@ -43,7 +43,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   late final AppState _state = AppState(widget.api);
   final _todayKey = GlobalKey<TodayPageState>();
   final _plansKey = GlobalKey<PlansPageState>();
@@ -63,13 +63,28 @@ class _HomePageState extends State<HomePage> {
   ];
 
   Object? _reminderKey;
-  bool _askedNotificationPermission = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    ReminderService.instance.completions.addListener(_refreshAfterNotificationAction);
     _state.addListener(_syncReminders);
     _state.loadAll();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshAfterNotificationAction();
+  }
+
+  /// Bildirishnomadan "Bajarildi" bosilgan bo'lsa, ro'yxatlarni yangilaymiz.
+  Future<void> _refreshAfterNotificationAction() async {
+    if (!await ReminderService.instance.consumeCompletedFromNotification() || !mounted) return;
+    try {
+      await _state.refreshHabits();
+    } catch (_) {}
+    _state.plansChanged();
   }
 
   @override
@@ -84,17 +99,13 @@ class _HomePageState extends State<HomePage> {
     final key = (identityHashCode(_state.habits), _state.plansVersion, locale.languageCode);
     if (key == _reminderKey) return;
     _reminderKey = key;
-    () async {
-      if (!_askedNotificationPermission) {
-        _askedNotificationPermission = true;
-        await ReminderService.instance.requestPermission();
-      }
-      await ReminderService.instance.sync(api: _state.api, habits: _state.habits, locale: locale);
-    }();
+    ReminderService.instance.sync(api: _state.api, habits: _state.habits, locale: locale);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    ReminderService.instance.completions.removeListener(_refreshAfterNotificationAction);
     _state.removeListener(_syncReminders);
     _state.dispose();
     super.dispose();

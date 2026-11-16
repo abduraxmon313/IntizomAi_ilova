@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/auth/login_page.dart';
 import 'screens/auth/language_page.dart';
+import 'screens/auth/notification_permission_page.dart';
 import 'screens/home_page.dart';
 import 'services/api_client.dart';
 import 'services/appearance_store.dart';
@@ -13,6 +14,7 @@ import 'services/auth_service.dart';
 import 'services/auth_store.dart';
 import 'services/intizom_api.dart';
 import 'services/locale_store.dart';
+import 'services/reminder_service.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -24,6 +26,8 @@ Future<void> main() async {
   final initialAppearance = await appearanceStore.load();
   final initialLocale = await localeStore.load();
   final loggedIn = await authStore.isLoggedIn();
+  await ReminderService.instance.init();
+  final askReminders = loggedIn && await ReminderService.instance.needsPrompt(afterLogin: false);
 
   SystemChrome.setSystemUIOverlayStyle(
     AppTheme.systemOverlay(initialAppearance == 'dark' ? AppTheme.dark : AppTheme.light),
@@ -37,6 +41,7 @@ Future<void> main() async {
       initialAppearance: initialAppearance,
       initialLocale: initialLocale,
       loggedIn: loggedIn,
+      askReminders: askReminders,
     ),
   );
 }
@@ -50,6 +55,7 @@ class IntizomAiApp extends StatefulWidget {
     this.initialAppearance,
     this.initialLocale,
     this.loggedIn = false,
+    this.askReminders = false,
   });
 
   final AppearanceStore appearanceStore;
@@ -58,6 +64,7 @@ class IntizomAiApp extends StatefulWidget {
   final String? initialAppearance;
   final String? initialLocale;
   final bool loggedIn;
+  final bool askReminders;
 
   @override
   State<IntizomAiApp> createState() => _IntizomAiAppState();
@@ -67,6 +74,7 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
   late ThemeMode _themeMode;
   Locale? _locale;
   late bool _loggedIn;
+  late bool _askReminders;
 
   late final ApiClient _client;
   late final AuthService _auth;
@@ -78,6 +86,7 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
     _themeMode = widget.initialAppearance == 'dark' ? ThemeMode.dark : ThemeMode.light;
     _locale = widget.initialLocale == null ? null : Locale(widget.initialLocale!);
     _loggedIn = widget.loggedIn;
+    _askReminders = widget.askReminders;
 
     _client = ApiClient(authStore: widget.authStore);
     _auth = AuthService(api: _client, store: widget.authStore);
@@ -102,8 +111,19 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
     unawaited(widget.localeStore.save(code).catchError((Object _) {}));
   }
 
+  Future<void> _onLoginSuccess() async {
+    final ask = await ReminderService.instance.needsPrompt(afterLogin: true);
+    if (mounted) {
+      setState(() {
+        _loggedIn = true;
+        _askReminders = ask;
+      });
+    }
+  }
+
   Future<void> _logout() async {
     await _auth.signOut();
+    await ReminderService.instance.cancelAll();
     if (mounted) setState(() => _loggedIn = false);
   }
 
@@ -125,6 +145,11 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
       ),
       home: _locale == null
           ? LanguagePage(onSelected: _setLocale)
+          : _loggedIn && _askReminders
+          ? NotificationPermissionPage(
+              key: const ValueKey('reminders'),
+              onDone: () => setState(() => _askReminders = false),
+            )
           : _loggedIn
           ? HomePage(
               key: const ValueKey('home'),
@@ -136,7 +161,7 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
           : LoginPage(
               key: const ValueKey('login'),
               authService: _auth,
-              onLoginSuccess: () => setState(() => _loggedIn = true),
+              onLoginSuccess: _onLoginSuccess,
               onLanguageChanged: _setLocale,
             ),
     );
