@@ -2,6 +2,7 @@ import '../../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../config/store_policy.dart';
 import '../../services/intizom_api.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
@@ -125,11 +126,22 @@ class _CoachPageState extends State<CoachPage> {
         if (_remaining >= 0 && _remaining <= 1)
           Padding(
             padding: const EdgeInsets.fromLTRB(AppSpace.page, 0, AppSpace.page, 4),
-            child: TextButton(
-              onPressed: openPremiumInBot,
-              style: TextButton.styleFrom(minimumSize: const Size(0, 36)),
-              child: Text(_remaining == 0 ? context.tr("Bugungi bepul xabarlar tugadi · Premium") : context.tr("1 ta bepul xabar qoldi · Premium")),
-            ),
+            child: StorePolicy.purchasesVisible
+                ? TextButton(
+                    onPressed: openPremiumInBot,
+                    style: TextButton.styleFrom(minimumSize: const Size(0, 36)),
+                    child: Text(_remaining == 0 ? context.tr("Bugungi bepul xabarlar tugadi · Premium") : context.tr("1 ta bepul xabar qoldi · Premium")),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      _remaining == 0
+                          ? context.tr("Bugungi bepul xabarlar tugadi. Ertaga yangilanadi.")
+                          : context.tr("Bugun yana 1 ta bepul xabar qoldi."),
+                      textAlign: TextAlign.center,
+                      style: AppType.caption.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                  ),
           ),
         Padding(
           padding: const EdgeInsets.fromLTRB(AppSpace.lg, 4, AppSpace.lg, 12),

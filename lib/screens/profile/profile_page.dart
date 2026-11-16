@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../auth/language_page.dart';
+import '../../config/store_policy.dart';
 import '../../models/extras.dart';
 import '../../services/intizom_api.dart';
 import '../../services/reminder_service.dart';
@@ -282,7 +283,9 @@ class _ProfilePageState extends State<ProfilePage> {
                           title: context.tr("Do'stni taklif qilish"),
                           subtitle: p.referralCount > 0
                               ? context.tr("{v0} ta do'st qo'shildi", {'v0': p.referralCount})
-                              : context.tr("Har 5 faol do'st uchun 7 kun Premium"),
+                              : (StorePolicy.purchasesVisible
+                                    ? context.tr("Har 5 faol do'st uchun 7 kun Premium")
+                                    : context.tr("Do'stlaringizni ilovaga taklif qiling")),
                           onTap: _shareInvite,
                         ),
                       ],
@@ -376,8 +379,13 @@ class _SubscriptionCard extends StatelessWidget {
     final premium = sub?.isPremium ?? isPremium;
     final until = parseYmd(sub?.premiumUntil);
     final days = sub?.daysLeft ?? 0;
+    final canPurchase = StorePolicy.purchasesVisible;
     return AppCard(
-      onTap: premium ? openPremiumInBot : () => showPremiumDialog(context, context.tr("Barcha imkoniyatlarni oching.")),
+      // iOS'da (App Store 3.1.1) botga yo'naltiruvchi "uzaytirish" bo'lmaydi;
+      // bepul foydalanuvchi uchun neytral oyna chiqadi.
+      onTap: premium
+          ? (canPurchase ? openPremiumInBot : null)
+          : () => showPremiumDialog(context, context.tr("Barcha imkoniyatlarni oching.")),
       padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,11 +416,13 @@ class _SubscriptionCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                premium ? context.tr("Uzaytirish") : context.tr("Ochish"),
-                style: AppType.label.copyWith(fontWeight: FontWeight.w600, color: scheme.tertiary),
-              ),
+              if (canPurchase) ...[
+                const SizedBox(width: 8),
+                Text(
+                  premium ? context.tr("Uzaytirish") : context.tr("Ochish"),
+                  style: AppType.label.copyWith(fontWeight: FontWeight.w600, color: scheme.tertiary),
+                ),
+              ],
             ],
           ),
           if (premium && days > 0) ...[

@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/app_config.dart';
+import '../config/store_policy.dart';
 import '../services/api_client.dart';
 import '../theme/app_theme.dart';
 import 'ui_kit.dart';
@@ -13,6 +14,37 @@ Future<void> openPremiumInBot() async {
   try {
     await launchUrl(botUri('premium'), mode: LaunchMode.externalApplication);
   } catch (_) {}
+}
+
+/// iOS uchun neytral oyna: qulflangan imkoniyat haqida, hech qanday
+/// to'lov havolasi/narxsiz (App Store 3.1.1).
+Future<void> _showFeatureUnavailable(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    builder: (ctx) {
+      final scheme = Theme.of(ctx).colorScheme;
+      return SheetScaffold(
+        title: context.tr("Imkoniyat mavjud emas"),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              context.tr("Bu imkoniyat hozircha hisobingizda faol emas."),
+              style: AppType.body.copyWith(color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 18),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(context.tr("Tushunarli")),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 /// Xatoni foydalanuvchiga ko'rsatadi. 402 bo'lsa Premium oynasi chiqadi.
@@ -29,7 +61,11 @@ void showApiError(BuildContext context, Object error) {
 }
 
 /// Premium taklifi (Mini App'dagi paywall'ning ilova varianti).
+///
+/// iOS'da (App Store 3.1.1) tashqi to'lovga yo'naltiradigan tugma/narx
+/// ko'rsatilmaydi — faqat neytral tushuntirish beriladi.
 Future<void> showPremiumDialog(BuildContext context, String message) {
+  if (!StorePolicy.purchasesVisible) return _showFeatureUnavailable(context);
   return showModalBottomSheet<void>(
     context: context,
     useSafeArea: true,

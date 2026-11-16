@@ -2,6 +2,7 @@ import '../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../config/store_policy.dart';
 import '../theme/app_theme.dart';
 import 'app_ui.dart';
 
@@ -605,12 +606,16 @@ class PremiumGate extends StatelessWidget {
             textAlign: TextAlign.center,
             style: AppType.label.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400, height: 1.45),
           ),
-          const SizedBox(height: 18),
-          FilledButton(
-            onPressed: onOpen,
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            child:  Text(context.tr("Premium haqida")),
-          ),
+          // iOS'da (App Store 3.1.1) tashqi to'lovga yo'naltiruvchi tugma
+          // ko'rsatilmaydi — qulflangan imkoniyat faqat tushuntiriladi.
+          if (StorePolicy.purchasesVisible) ...[
+            const SizedBox(height: 18),
+            FilledButton(
+              onPressed: onOpen,
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              child: Text(context.tr("Premium haqida")),
+            ),
+          ],
         ],
       ),
     );

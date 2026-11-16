@@ -1,5 +1,11 @@
 const interfaceTranslations = <String, (String, String)>{
   "Oflayn — saqlangan ma'lumot ko'rsatilmoqda": ('Офлайн — показаны сохранённые данные', 'Offline — showing saved data'),
+  "Imkoniyat mavjud emas": ('Функция недоступна', 'Feature unavailable'),
+  "Bu imkoniyat hozircha hisobingizda faol emas.": ('Эта функция пока не активна для вашего аккаунта.', "This feature isn't active on your account yet."),
+  "Tushunarli": ('Понятно', 'Got it'),
+  "Bugungi bepul xabarlar tugadi. Ertaga yangilanadi.": ('Бесплатные сообщения на сегодня закончились. Обновятся завтра.', "Today's free messages are used up. They reset tomorrow."),
+  "Bugun yana 1 ta bepul xabar qoldi.": ('Осталось ещё 1 бесплатное сообщение на сегодня.', '1 free message left for today.'),
+  "Do'stlaringizni ilovaga taklif qiling": ('Пригласите друзей в приложение', 'Invite your friends to the app'),
   "1 ta bepul xabar qoldi · Premium": ('Осталось 1 бесплатное сообщение · Премиум', '1 free message left · Premium'),
   '10 ta maqsad': ('10 целей', '10 goals'),
   '100 ball': ('100 баллов', '100 points'),
