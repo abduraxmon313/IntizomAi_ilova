@@ -2,6 +2,10 @@
 
 Bu branch faqat video fayllari uchun, ilova kodi emas. `main`ga merge qilinmaydi.
 
+## Muqova rasmlari
+- `IntizomAI_cover_reels.jpg` — Reels muqovasi, 1080x1920
+- `IntizomAI_cover_post.jpg` — feed post, 1080x1350 (4:5)
+
 ## v6 — har gap alohida ekranda, har bo'limda bosishlar (tavsiya)
 - `IntizomAI_promo_v6.mp4` — 1080x1920, 52 s
 - `IntizomAI_promo_v6_cover.jpg` — muqova
