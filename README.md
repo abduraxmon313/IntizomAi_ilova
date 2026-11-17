@@ -2,7 +2,11 @@
 
 Bu branch faqat video fayllari uchun, ilova kodi emas. `main`ga merge qilinmaydi.
 
-## v3 — kelishilgan ssenariy, ovozsiz (tavsiya)
+## v4 — erkak ovozi, imkoniyatlar batafsil (tavsiya)
+- `IntizomAI_promo_v4_ovozli.mp4` — 1080x1920, ~1:41
+- `IntizomAI_promo_v4_cover.jpg` — muqova
+
+## v3 — kelishilgan ssenariy, ovozsiz
 - `IntizomAI_promo_v3.mp4` — 1080x1920, 32 s
 - `IntizomAI_promo_v3_cover.jpg` — muqova
 
