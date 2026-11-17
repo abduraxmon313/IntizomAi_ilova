@@ -2,7 +2,11 @@
 
 Bu branch faqat video fayllari uchun, ilova kodi emas. `main`ga merge qilinmaydi.
 
-## v5 — sizning matningiz, gapsiz, orqa fon tovushlari (tavsiya)
+## v6 — har gap alohida ekranda, har bo'limda bosishlar (tavsiya)
+- `IntizomAI_promo_v6.mp4` — 1080x1920, 52 s
+- `IntizomAI_promo_v6_cover.jpg` — muqova
+
+## v5 — sizning matningiz, gapsiz, orqa fon tovushlari
 - `IntizomAI_promo_v5.mp4` — 1080x1920, 48.5 s
 - `IntizomAI_promo_v5_cover.jpg` — muqova
 
