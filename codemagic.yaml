@@ -67,3 +67,105 @@ workflows:
         notify:
           success: true
           failure: true
+
+  # iPhone'ga Sideloadly orqali o'rnatish uchun IMZOSIZ IPA (faqat qo'lda ishga tushiriladi).
+  # Apple Developer obunasi, sertifikat, provisioning profile, App Store Connect yoki
+  # TestFlight kerak emas: IPA'ni Sideloadly sizning bepul Apple ID'ingiz bilan imzolaydi.
+  #
+  # `triggering` bo'limi ataylab yo'q — main'ga push bo'lganda bu workflow ishlamaydi
+  # (Android APK workflow'i avvalgidek alohida ishlayveradi).
+  # Ishga tushirish: Codemagic → IntizomAi_ilova → Start new build → "iOS Sideload (unsigned IPA)".
+  ios-sideload:
+    name: iOS Sideload (unsigned IPA)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      vars:
+        # Railway server (bot + Mini App). Maxfiy emas — Android workflow bilan bir xil.
+        API_BASE_URL: https://intizom-aibot-production.up.railway.app
+        IPA_NAME: IntizomAI-unsigned.ipa
+    scripts:
+      - name: Sozlamalarni tekshirish
+        script: |
+          if [ -z "$API_BASE_URL" ]; then
+            echo "XATO: API_BASE_URL bo'sh (codemagic.yaml → vars)."
+            exit 1
+          fi
+          flutter --version
+          xcodebuild -version
+          pod --version
+      - name: Paketlarni yuklash
+        script: flutter pub get
+      - name: iOS loyihasini tayyorlash (Podfile, Swift Package'lar)
+        script: |
+          # Flutter iOS plaginlarini Swift Package Manager orqali ulaydi. SPM'ni
+          # qo'llamaydigan plaginlar uchun (masalan flutter_secure_storage) Podfile
+          # shu yerda avtomatik yaratiladi.
+          flutter build ios --config-only --release --no-codesign \
+            --build-number=$BUILD_NUMBER \
+            --dart-define=API_BASE_URL=$API_BASE_URL
+      - name: CocoaPods bog'liqliklarini tekshirish
+        script: |
+          # Oldingi qadam (`--config-only`) `pod install`ni allaqachon bajargan;
+          # bu yerda natija tekshiriladi va o'rnatilgan pod'lar ro'yxati chiqariladi.
+          if [ -f ios/Podfile ]; then
+            cd ios
+            pod install
+            test -d Pods || { echo "XATO: ios/Pods yaratilmadi"; exit 1; }
+            echo "--- Podfile.lock (plaginlar) ---"
+            sed -n '/^PODS:/,/^DEPENDENCIES:/p' Podfile.lock
+          else
+            echo "ios/Podfile yo'q — barcha plaginlar Swift Package Manager orqali ulangan."
+          fi
+      - name: IPA uchun ilovani yig'ish (imzosiz, Release)
+        script: |
+          flutter build ios --release --no-codesign \
+            --build-number=$BUILD_NUMBER \
+            --dart-define=API_BASE_URL=$API_BASE_URL
+      - name: Imzosiz IPA'ni qadoqlash (Payload/Runner.app)
+        script: |
+          set -euo pipefail
+          APP="build/ios/iphoneos/Runner.app"
+          if [ ! -d "$APP" ]; then
+            echo "XATO: $APP topilmadi. Mavjud build/ios tarkibi:"
+            find build/ios -maxdepth 3 -type d || true
+            exit 1
+          fi
+          OUT="build/ios/ipa-unsigned"
+          rm -rf "$OUT"
+          mkdir -p "$OUT/Payload"
+          # ditto — symlink va ruxsatlarni (Frameworks ichida) buzmasdan nusxa oladi.
+          ditto "$APP" "$OUT/Payload/Runner.app"
+          (cd "$OUT" && zip -qry "$IPA_NAME" Payload)
+          rm -rf "$OUT/Payload"
+          ls -lh "$OUT/$IPA_NAME"
+      - name: IPA'ni tekshirish
+        script: |
+          set -euo pipefail
+          IPA="build/ios/ipa-unsigned/$IPA_NAME"
+          CHECK="$(mktemp -d)"
+          unzip -q "$IPA" -d "$CHECK"
+          RUNNER="$CHECK/Payload/Runner.app"
+          test -f "$RUNNER/Runner" || { echo "XATO: Payload/Runner.app/Runner yo'q"; exit 1; }
+          test -f "$RUNNER/Info.plist" || { echo "XATO: Info.plist yo'q"; exit 1; }
+          test -d "$RUNNER/Frameworks/Flutter.framework" || { echo "XATO: Flutter.framework yo'q"; exit 1; }
+          test -d "$RUNNER/Frameworks/App.framework" || { echo "XATO: App.framework yo'q"; exit 1; }
+          echo "Bundle ID: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$RUNNER/Info.plist")"
+          echo "Versiya:   $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$RUNNER/Info.plist") ($(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$RUNNER/Info.plist"))"
+          echo "Min iOS:   $(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$RUNNER/Info.plist")"
+          echo "Arxitektura: $(lipo -archs "$RUNNER/Runner")"
+          echo "Frameworks:"
+          ls "$RUNNER/Frameworks"
+          rm -rf "$CHECK"
+    artifacts:
+      - build/ios/ipa-unsigned/*.ipa
+    publishing:
+      email:
+        recipients:
+          - a.xakimjonov@student.pdp.university
+        notify:
+          success: true
+          failure: true
