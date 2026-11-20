@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../config/store_policy.dart';
+import '../../services/ai_consent_store.dart';
 import '../../services/intizom_api.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
@@ -43,9 +44,26 @@ class _CoachPageState extends State<CoachPage> {
     super.dispose();
   }
 
+  /// Birinchi xabardan oldin uchinchi tomon AI'ga ma'lumot yuborishga rozilik.
+  Future<bool> _ensureConsent() async {
+    final store = AiConsentStore();
+    if (await store.load()) return true;
+    if (!mounted) return false;
+    final ok = await confirmAction(
+      context,
+      title: context.tr("AI murabbiy haqida"),
+      message: context.tr("Murabbiy javoblarini OpenAI sun'iy intellekti tayyorlaydi. Buning uchun xabarlaringiz hamda maqsad, reja, odat va natijalaringiz OpenAI'ga yuboriladi. Javoblar xato bo'lishi mumkin — ular maslahat xolos. Rozilikni Profil sahifasida istalgan vaqtda bekor qilasiz."),
+      confirmLabel: "Roziman",
+      danger: false,
+    );
+    if (ok) await store.save(true);
+    return ok;
+  }
+
   Future<void> _send([String? preset]) async {
     final text = (preset ?? _input.text).trim();
     if (text.isEmpty || _sending) return;
+    if (!await _ensureConsent() || !mounted) return;
     _input.clear();
     setState(() {
       _messages.add(ChatMessage('user', text));
@@ -115,6 +133,7 @@ class _CoachPageState extends State<CoachPage> {
                 : ListView.builder(
                     key: const ValueKey('c'),
                     controller: _scroll,
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.fromLTRB(AppSpace.page, 8, AppSpace.page, 12),
                     itemCount: _messages.length + (_sending ? 1 : 0),
                     itemBuilder: (_, i) => i == _messages.length

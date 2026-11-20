@@ -10,6 +10,7 @@ import '../auth/language_page.dart';
 import '../../config/app_config.dart';
 import '../../config/store_policy.dart';
 import '../../models/extras.dart';
+import '../../services/ai_consent_store.dart';
 import '../../services/intizom_api.dart';
 import '../../services/reminder_service.dart';
 import '../../state/app_state.dart';
@@ -44,6 +45,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Subscription? _sub;
   bool _phoneReminders = false;
+  bool _aiConsent = false;
+  final _aiConsentStore = AiConsentStore();
 
   @override
   void initState() {
@@ -51,6 +54,14 @@ class _ProfilePageState extends State<ProfilePage> {
     s.addListener(_onState);
     _load();
     _loadReminders();
+    _aiConsentStore.load().then((v) {
+      if (mounted) setState(() => _aiConsent = v);
+    });
+  }
+
+  Future<void> _setAiConsent(bool v) async {
+    await _aiConsentStore.save(v);
+    if (mounted) setState(() => _aiConsent = v);
   }
 
   Future<void> _loadReminders() async {
@@ -317,6 +328,12 @@ class _ProfilePageState extends State<ProfilePage> {
                           title: context.tr("Eslatmalar"),
                           subtitle: context.tr("Reja va odat vaqtida telefonda bildirishnoma"),
                           trailing: Switch(value: _phoneReminders, onChanged: _setPhoneReminders),
+                        ),
+                        SettingTile(
+                          icon: LucideIcons.sparkles,
+                          title: context.tr("AI murabbiyga ruxsat"),
+                          subtitle: context.tr("Xabarlar va rejalar javob uchun OpenAI'ga yuboriladi"),
+                          trailing: Switch(value: _aiConsent, onChanged: _setAiConsent),
                         ),
                       ],
                     ),

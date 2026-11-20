@@ -141,9 +141,16 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
       darkTheme: AppTheme.dark,
       themeMode: _themeMode,
       themeAnimationDuration: const Duration(milliseconds: 220),
-      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-        value: AppTheme.systemOverlay(Theme.of(context)),
-        child: child!,
+      // Matn maydonidan tashqariga bosilganda klaviatura yopiladi (iOS'da
+      // Flutter buni o'zi qilmaydi). Navigator'dan yuqorida — bottom sheet va
+      // dialoglarni ham qamraydi; tugma va maydonlar o'z bosilishini yutadi.
+      builder: (context, child) => GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: AppTheme.systemOverlay(Theme.of(context)),
+          child: child!,
+        ),
       ),
       home: _locale == null
           ? LanguagePage(onSelected: _setLocale)
