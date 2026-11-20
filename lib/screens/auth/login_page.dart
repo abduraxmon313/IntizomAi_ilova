@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -37,7 +36,6 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   Timer? _timer;
   DateTime? _startedAt;
   bool _polling = false;
-  bool _hasTelegramApp = false;
   String? _error;
 
   @override
@@ -58,88 +56,25 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed && _nonce != null) _pollOnce();
   }
 
-  /// Qayerda ochishni tanlaydi:
-  /// - hech qanday Telegram ilovasi yo'q → Telegram Web;
-  /// - faqat Telegram (muqobil klient aniqlanmadi) → to'g'ridan-to'g'ri Telegram;
-  /// - muqobil klientlar bor (iOS) → tanlash oynasi.
   Future<void> _start() async {
-    final apps = await widget.authService.telegramApps();
-    if (!mounted) return;
-    _hasTelegramApp = apps.anyApp;
-    final TelegramTarget target;
-    if (!apps.anyApp) {
-      target = TelegramTarget.web;
-    } else if (apps.otherApps.isEmpty) {
-      target = TelegramTarget.telegram;
-    } else {
-      final picked = await _pickApp(apps);
-      if (picked == null || !mounted) return;
-      target = picked;
-    }
-
     final nonce = widget.authService.newNonce();
     setState(() {
       _nonce = nonce;
       _error = null;
       _startedAt = DateTime.now();
     });
-    if (!await _open(nonce, target)) return;
-    _timer?.cancel();
-    _timer = Timer.periodic(_pollEvery, (_) => _pollOnce());
-  }
-
-  /// Joriy kod bilan boshqa joyda qayta ochish (kutish paytida).
-  Future<void> _reopen(TelegramTarget target) async {
-    final nonce = _nonce;
-    if (nonce != null) await _open(nonce, target);
-  }
-
-  Future<bool> _open(String nonce, TelegramTarget target) async {
-    final opened = await widget.authService.openBot(nonce, target);
-    if (!mounted) return false;
-    if (!opened && _nonce == nonce) {
-      _timer?.cancel();
+    final opened = await widget.authService.openBot(nonce);
+    if (!mounted) return;
+    if (!opened) {
       setState(() {
         _nonce = null;
         _error = context.tr("Telegram ochilmadi. Telegram ilovasi o'rnatilganini tekshiring.");
       });
+      return;
     }
-    return opened;
+    _timer?.cancel();
+    _timer = Timer.periodic(_pollEvery, (_) => _pollOnce());
   }
-
-  Future<TelegramTarget?> _pickApp(TelegramApps apps) => showModalBottomSheet<TelegramTarget>(
-    context: context,
-    showDragHandle: true,
-    builder: (ctx) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(AppSpace.page, 0, AppSpace.page, AppSpace.sm),
-            child: Text(context.tr("Qaysi ilovada ochilsin?"), style: AppType.label.copyWith(fontWeight: FontWeight.w600)),
-          ),
-          ListTile(
-            leading: const Icon(LucideIcons.send),
-            title: const Text('Telegram'),
-            onTap: () => Navigator.pop(ctx, TelegramTarget.telegram),
-          ),
-          ListTile(
-            leading: const Icon(LucideIcons.messageCircle),
-            title: Text(apps.otherApps.join(', ')),
-            subtitle: Text(context.tr("Telegram asosidagi boshqa ilova")),
-            onTap: () => Navigator.pop(ctx, TelegramTarget.otherApp),
-          ),
-          ListTile(
-            leading: const Icon(LucideIcons.globe),
-            title: Text(context.tr("Brauzerda (Telegram Web)")),
-            onTap: () => Navigator.pop(ctx, TelegramTarget.web),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    ),
-  );
 
   Future<void> _pollOnce() async {
     final nonce = _nonce;
@@ -251,23 +186,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                             ],
                             if (waiting) ...[
                               const _WaitingCard(),
-                              Wrap(
-                                alignment: WrapAlignment.center,
-                                children: [
-                                  // iOS'da Novagram kabi klientlarni alohida aniqlab bo'lmaydi —
-                                  // ular uchun `tg://` orqali ochish.
-                                  if (_hasTelegramApp && defaultTargetPlatform == TargetPlatform.iOS)
-                                    TextButton(
-                                      onPressed: () => _reopen(TelegramTarget.otherApp),
-                                      child: Text(context.tr("Boshqa ilovada ochish")),
-                                    ),
-                                  TextButton(
-                                    onPressed: () => _reopen(TelegramTarget.web),
-                                    child: Text(context.tr("Brauzerda ochish")),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: AppSpace.sm),
+                              const SizedBox(height: AppSpace.md),
                             ],
                           ],
                         ),
