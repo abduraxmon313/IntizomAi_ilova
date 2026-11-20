@@ -11,6 +11,7 @@ import '../../config/app_config.dart';
 import '../../config/store_policy.dart';
 import '../../models/extras.dart';
 import '../../services/ai_consent_store.dart';
+import '../../services/api_client.dart';
 import '../../services/intizom_api.dart';
 import '../../services/reminder_service.dart';
 import '../../state/app_state.dart';
@@ -202,6 +203,56 @@ class _ProfilePageState extends State<ProfilePage> {
     widget.onLogout();
   }
 
+  /// Hisobni butunlay o'chirish (App Store 5.1.1(v)). Ikki bosqichli tasdiq,
+  /// so'ng serverdan o'chiriladi va qurilmadagi sessiya tozalanadi.
+  Future<void> _deleteAccount() async {
+    if (!await confirmAction(
+      context,
+      title: context.tr("Hisobni o'chirish"),
+      message: context.tr("Profilingiz, reja, odat, maqsad, natija va yutuqlaringiz, siz yaratgan guruhlar hamda faol obunangiz butunlay o'chiriladi. Bu amalni qaytarib bo'lmaydi."),
+      confirmLabel: "Davom etish",
+    )) {
+      return;
+    }
+    if (!mounted) return;
+    if (!await confirmAction(
+      context,
+      title: context.tr("Rostdan ham o'chirilsinmi?"),
+      message: context.tr("Barcha ma'lumotlaringiz qayta tiklanmaydi."),
+      confirmLabel: "Butunlay o'chirish",
+    )) {
+      return;
+    }
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(canPop: false, child: Center(child: CircularProgressIndicator())),
+    );
+    try {
+      await s.api.deleteAccount();
+    } on ApiException catch (e) {
+      // 404 — hisob allaqachon yo'q: baribir qurilmadan chiqamiz.
+      if (e.statusCode != 404) {
+        if (mounted) {
+          Navigator.of(context).pop();
+          showApiError(context, e);
+        }
+        return;
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        showApiError(context, e);
+      }
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    toast(context, context.tr("Hisobingiz o'chirildi"));
+    widget.onLogout();
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -379,6 +430,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     GroupCard(
                       children: [
                         SettingTile(icon: LucideIcons.logOut, title: context.tr("Hisobdan chiqish"), danger: true, onTap: _logout),
+                        SettingTile(icon: LucideIcons.userX, title: context.tr("Hisobni o'chirish"), danger: true, onTap: _deleteAccount),
                       ],
                     ),
                     const SizedBox(height: 20),

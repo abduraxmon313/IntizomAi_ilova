@@ -37,6 +37,9 @@ class IntizomApi {
   // ── Profil, statistika, obuna ────────────────────────
   Future<Profile> profile() async => Profile.fromJson(_map(await _c.get('/profile')));
 
+  /// Hisobni va barcha ma'lumotlarni serverdan butunlay o'chiradi.
+  Future<void> deleteAccount() => _c.delete('/profile');
+
   Future<Profile> updateProfile({
     String? fullName,
     bool? notifications,
