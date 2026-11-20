@@ -1,17 +1,13 @@
-import 'package:flutter/foundation.dart';
-
-/// App Store qoidalariga moslik.
+/// Ilova ichidagi Premium sotuvi sozlamasi.
 ///
-/// Apple Guideline 3.1.1: ilova raqamli kontent/obuna uchun ilovadan TASHQARI
-/// to'lov usuliga (bu yerda — Telegram bot orqali Premium) yo'naltiruvchi
-/// tugma, havola yoki narx ko'rsata olmaydi.
-///
-/// Shu sababli iOS'da Premium sotuvchi CTA'lar (bot havolasi, "Tarifni tanlash",
-/// narxlar) yashiriladi — qulflangan imkoniyat neytral tarzda tushuntiriladi.
-/// Android'da (Google Play bu masalada yumshoqroq) hammasi avvalgidek ko'rinadi.
+/// Obuna ilova ichida (Paylov orqali) sotiladi — iOS va Android'da bir xil.
+/// Agar biror do'kon talab qilsa, sotuv tugmalarini build vaqtida o'chirish mumkin:
+/// `--dart-define=HIDE_PURCHASES=true` (qayta yig'ish kifoya, kod o'zgarmaydi).
 class StorePolicy {
   StorePolicy._();
 
-  /// Premium sotuvchi havola/tugmalarni ko'rsatish mumkinmi?
-  static bool get purchasesVisible => defaultTargetPlatform != TargetPlatform.iOS;
+  static const _hide = bool.fromEnvironment('HIDE_PURCHASES');
+
+  /// Premium sotuvchi tugma/narxlarni ko'rsatish mumkinmi?
+  static bool get purchasesVisible => !_hide;
 }

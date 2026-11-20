@@ -5,6 +5,9 @@ workflows:
   #
   # Codemagic → IntizomAi_ilova → Environment variables → guruh nomi: IntizomAi
   #   ANDROID_KEYSTORE_PASSWORD  — imzo kaliti paroli (Secure belgilang)
+  #   API_BASE_URL               — ilova backend'i (IntizomAi_ilova_database) Railway manzili
+  #   GOOGLE_SERVER_CLIENT_ID    — Google Cloud "Web application" OAuth client ID
+  #   GOOGLE_IOS_CLIENT_ID       — Google Cloud "iOS" OAuth client ID
   android-apk:
     name: Android APK
     instance_type: mac_mini_m2
@@ -16,9 +19,6 @@ workflows:
       java: 21
       groups:
         - IntizomAi
-      vars:
-        # Railway server (bot + Mini App). Maxfiy emas.
-        API_BASE_URL: https://intizom-aibot-production.up.railway.app
     triggering:
       events:
         - push
@@ -31,7 +31,11 @@ workflows:
       - name: Sozlamalarni tekshirish
         script: |
           if [ -z "$API_BASE_URL" ]; then
-            echo "XATO: API_BASE_URL bo'sh (codemagic.yaml → vars)."
+            echo "XATO: 'IntizomAi' guruhida API_BASE_URL yo'q (ilova backend'i manzili)."
+            exit 1
+          fi
+          if [ -z "$GOOGLE_SERVER_CLIENT_ID" ]; then
+            echo "XATO: 'IntizomAi' guruhida GOOGLE_SERVER_CLIENT_ID yo'q — Google orqali kirish ishlamaydi."
             exit 1
           fi
           if [ -z "$ANDROID_KEYSTORE_PASSWORD" ]; then
@@ -52,7 +56,8 @@ workflows:
         script: |
           flutter build apk --release \
             --build-number=$BUILD_NUMBER \
-            --dart-define=API_BASE_URL=$API_BASE_URL
+            --dart-define=API_BASE_URL=$API_BASE_URL \
+            --dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID
       - name: Imzoni tekshirish
         script: |
           APKSIGNER=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | sort -V | tail -1)
@@ -83,22 +88,33 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+      groups:
+        - IntizomAi
       vars:
-        # Railway server (bot + Mini App). Maxfiy emas — Android workflow bilan bir xil.
-        API_BASE_URL: https://intizom-aibot-production.up.railway.app
         IPA_NAME: IntizomAI-unsigned.ipa
     scripts:
       - name: Sozlamalarni tekshirish
         script: |
-          if [ -z "$API_BASE_URL" ]; then
-            echo "XATO: API_BASE_URL bo'sh (codemagic.yaml → vars)."
-            exit 1
-          fi
+          for v in API_BASE_URL GOOGLE_SERVER_CLIENT_ID GOOGLE_IOS_CLIENT_ID; do
+            if [ -z "${!v}" ]; then
+              echo "XATO: 'IntizomAi' guruhida $v yo'q."
+              exit 1
+            fi
+          done
           flutter --version
           xcodebuild -version
           pod --version
       - name: Paketlarni yuklash
         script: flutter pub get
+      - name: Google Sign-In URL sxemasini qo'shish (Info.plist)
+        script: |
+          set -euo pipefail
+          # 1234-abc.apps.googleusercontent.com → com.googleusercontent.apps.1234-abc
+          REVERSED=$(echo "$GOOGLE_IOS_CLIENT_ID" | awk -F. '{for(i=NF;i>0;i--) printf "%s%s",$i,(i>1?".":"")}')
+          PLIST=ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:1 string $REVERSED" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :GIDClientID string $GOOGLE_IOS_CLIENT_ID" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes" "$PLIST"
       - name: iOS loyihasini tayyorlash (Podfile, Swift Package'lar)
         script: |
           # Flutter iOS plaginlarini Swift Package Manager orqali ulaydi. SPM'ni
@@ -106,7 +122,9 @@ workflows:
           # shu yerda avtomatik yaratiladi.
           flutter build ios --config-only --release --no-codesign \
             --build-number=$BUILD_NUMBER \
-            --dart-define=API_BASE_URL=$API_BASE_URL
+            --dart-define=API_BASE_URL=$API_BASE_URL \
+            --dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID \
+            --dart-define=GOOGLE_IOS_CLIENT_ID=$GOOGLE_IOS_CLIENT_ID
       - name: CocoaPods bog'liqliklarini tekshirish
         script: |
           # Oldingi qadam (`--config-only`) `pod install`ni allaqachon bajargan;
@@ -124,7 +142,9 @@ workflows:
         script: |
           flutter build ios --release --no-codesign \
             --build-number=$BUILD_NUMBER \
-            --dart-define=API_BASE_URL=$API_BASE_URL
+            --dart-define=API_BASE_URL=$API_BASE_URL \
+            --dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID \
+            --dart-define=GOOGLE_IOS_CLIENT_ID=$GOOGLE_IOS_CLIENT_ID
       - name: Imzosiz IPA'ni qadoqlash (Payload/Runner.app)
         script: |
           set -euo pipefail

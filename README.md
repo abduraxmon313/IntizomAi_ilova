@@ -6,16 +6,19 @@ neytral fon, bitta ko'k aksent).
 ## Qanday ishlaydi
 
 ```
-Flutter ilova ──HTTPS──▶ Railway (IntizomAi_Bot_Pro_Copy, webapp/app.py) ──▶ PostgreSQL
-                              ▲
-                     Telegram bot (o'sha server, o'sha baza)
+Flutter ilova ──HTTPS──▶ Ilova backend (IntizomAi_ilova_database, Railway) ──▶ o'z PostgreSQL bazasi
+                                   │  faqat obuna sotib olishda (HMAC imzo)
+                                   ▼
+                         Bot backend (IntizomAi_Bot_Pro_Copy) ──▶ Paylov
 ```
 
-- Alohida backend yo'q. Ilova Mini App ishlatadigan `/api/webapp/*`
-  endpointlariga `Authorization: Bearer <token>` bilan murojaat qiladi.
-  Premium cheklovlari, ball/streak hisob-kitobi va vaqt qoidalari bot va
-  Mini App bilan bir xil.
-- To'lov faqat bot ichida. Ilovadagi "Premium" tugmalari botni ochadi.
+- Ilovaning o'z backend'i va bazasi bor; bot foydalanuvchilari bilan aralashmaydi.
+  Hamma so'rovlar `/api/v1/*` ga `Authorization: Bearer <token>` bilan boradi.
+- Kirish: **iOS — Apple yoki Google**, **Android — Google**.
+- Birinchi kirishda foydalanuvchi ism, yosh va username kiritadi.
+- Premium ilova ichida sotib olinadi (Payme / Click / Uzum / Paylov). To'lovni bot
+  backend'i Paylov orqali qabul qiladi, natija ilova backend'iga keladi va Premium avtomatik ochiladi.
+- Guruhlar faqat ilova ichida: ega do'stini **username** orqali taklif qiladi, u taklifni qabul qiladi.
 
 ## Ekranlar va navigatsiya
 
@@ -35,7 +38,8 @@ Pastki navigatsiyada 5 bo'lim:
   (odat o'chirilishidan oldin tasdiq so'raladi).
 - **Bajarildi** belgilanganda pastda "Qaytarish" tugmali xabar chiqadi.
 - **Do'stlar**: guruhlar ro'yxati → guruh → a'zoning kuni. Orqaga tugmasi (va tizim "orqaga"si) shu tartibda qaytaradi.
-  Guruh sozlamalari (Umumiy / Hisobot / A'zolar) va ruxsatlar — pastdan ochiladigan varaqlarda.
+  Kelgan takliflar ro'yxat tepasida (qabul qilish / rad etish / bloklash). Ega "Taklif qilish" orqali username yozadi.
+  Guruh sozlamalari (Umumiy / A'zolar: pauza, chiqarish, egalikni topshirish) va ruxsatlar — pastdan ochiladigan varaqlarda.
 
 ## Dizayn tizimi
 
@@ -59,7 +63,8 @@ Umumiy komponentlar:
   `EmptyView`, `PremiumGate`, `AddFab`, `toast`, `confirmAction`.
 - `lib/widgets/app_ui.dart` — `AppCard`, `surfaceDecoration`, `AppIconTile`, `AppProgressBar`,
   `ProgressRing`, `BrandMark`, `HabitGlyph`.
-- `lib/widgets/feedback.dart` — xato xabarlari, Premium oynasi, `ErrorRetry`.
+- `lib/widgets/feedback.dart` — xato xabarlari, `ErrorRetry`.
+- `lib/widgets/paywall.dart` — Premium sotib olish oynasi (tarif, to'lov usuli, promokod, to'lovni kutish).
 
 Interfeys 320–412 px kenglikdagi ekranlarga mo'ljallangan.
 
@@ -68,7 +73,7 @@ Interfeys 320–412 px kenglikdagi ekranlarga mo'ljallangan.
 ```
 lib/
   main.dart            ilova, mavzu, kirish ↔ asosiy ekran
-  config/              API manzili, bot nomi
+  config/              API manzili, Google client ID'lar, sotuv sozlamasi
   l10n/                tillar
   models/              server javoblari (Plan, Habit, Goal, Profile, Stats, friends ...)
   services/            ApiClient, IntizomApi, kirish va saqlash
@@ -84,15 +89,22 @@ lib/
 
 ## Kirish
 
-1. Ilovada **Telegram orqali kirish** bosiladi. Ilova bir martalik kod yaratadi va
-   `t.me/intizomAi_bot?start=applogin_<kod>` ochiladi.
-2. Botda **✅ Ilovaga kirishni tasdiqlash** bosiladi.
-3. Ilova `/api/webapp/app-auth/poll` orqali tasdiqni kutadi va tokenni o'zi oladi.
-   Token qurilmaning xavfsiz xotirasida saqlanadi (180 kun).
-4. Bugun sahifasidan oldin telefon bildirishnomalariga ruxsat so'raladi
-   (Android'da aniq vaqtda eslatish ruxsati ham). Profil → **Eslatmalar** kaliti
-   faqat telefondagi bildirishnomalarni yoqadi/o'chiradi; Telegram xabarlari o'zgarmaydi.
-   Bildirishnomadagi **Bajarildi** tugmasi reja/odatni ilovani ochmasdan belgilaydi.
+1. **iOS**: «Apple orqali kirish» yoki «Google orqali kirish». **Android**: faqat Google.
+2. Ilova provayderdan ID token oladi va `POST /api/v1/auth/{google|apple}` ga yuboradi.
+   Server tokenni tekshirib, o'z sessiya tokenini qaytaradi (qurilmaning xavfsiz xotirasida, 180 kun).
+3. Yangi foydalanuvchi **onboarding** sahifasida ism, yosh (13+) va username kiritadi
+   (username bandligi yozish paytida tekshiriladi). Ixtiyoriy: taklif qilgan do'stning username'i.
+4. Keyin bildirishnomalarga ruxsat so'raladi. Bildirishnomadagi **Bajarildi** tugmasi
+   reja/odatni ilovani ochmasdan belgilaydi.
+5. Chiqishda sessiya serverda ham bekor qilinadi. Hisobni o'chirish: Profil → Hisobni o'chirish.
+
+## Premium
+
+Profil → Premium kartasi yoki istalgan qulflangan imkoniyat → tarif tanlash → to'lov usuli →
+(promokod) → **To'lash**. To'lov sahifasi brauzerda ochiladi; ilovaga qaytganda holat avtomatik
+tekshiriladi. Obuna avtomatik yangilanmaydi.
+
+Sotuv tugmalarini build vaqtida o'chirish kerak bo'lsa: `--dart-define=HIDE_PURCHASES=true`.
 
 ## APK yig'ish (Codemagic)
 
@@ -103,9 +115,14 @@ Codemagic → IntizomAi_ilova → **Environment variables**, guruh nomi **`Intiz
 | O'zgaruvchi | Qiymat |
 |---|---|
 | `ANDROID_KEYSTORE_PASSWORD` | Imzo kaliti paroli (Secure) |
+| `API_BASE_URL` | Ilova backend'i manzili, masalan `https://intizom-app-production.up.railway.app` |
+| `GOOGLE_SERVER_CLIENT_ID` | Google Cloud → OAuth client (Web application) ID |
+| `GOOGLE_IOS_CLIENT_ID` | Google Cloud → OAuth client (iOS) ID (iOS workflow uchun) |
 
-Server manzili (`API_BASE_URL`) `codemagic.yaml` ichida yozilgan:
-`https://intizom-aibot-production.up.railway.app`.
+Android'da Google orqali kirish ishlashi uchun Google Cloud'da **Android** OAuth client yarating:
+paket `uz.intizomai.intizom_ai` va `intizomai-upload.p12` kalitining SHA-1'i
+(`keytool -list -v -keystore android/app/intizomai-upload.p12 -storetype pkcs12`).
+Play Market'ga chiqarilsa, Play App Signing kalitining SHA-1'ini ham qo'shing.
 
 ### Yangilash (qayta o'rnatmasdan)
 
@@ -121,9 +138,18 @@ telefondagi ilovani yangilab bo'lmaydi (o'chirib qayta o'rnatish kerak bo'ladi).
 `ios/` papkasi Flutter shablonidan yaratilgan (bundle ID `uz.intizomai.intizomAi`).
 iPhone'ga o'rnatish uchun Apple Developer imzosi kerak (Codemagic iOS workflow yoki Xcode).
 
+- `ios/Runner/Runner.entitlements` — **Sign in with Apple** huquqi. Apple Developer → Identifiers
+  → `uz.intizomai.intizomAi` → Sign In with Apple yoqilgan bo'lishi kerak.
+- Google uchun reversed client ID URL sxemasi Codemagic'da `GOOGLE_IOS_CLIENT_ID`dan Info.plist'ga qo'shiladi.
+  Xcode'da lokal yig'ishda uni `Info.plist → CFBundleURLTypes` ga qo'lda qo'shing.
+- Sideloadly (bepul Apple ID) bilan o'rnatilgan buildda Apple orqali kirish ishlamaydi — Google ishlaydi.
+
 ## Lokal ishga tushirish
 
 ```bash
 flutter pub get
-flutter run --dart-define=API_BASE_URL=https://xxx.up.railway.app
+flutter run \
+  --dart-define=API_BASE_URL=https://xxx.up.railway.app \
+  --dart-define=GOOGLE_SERVER_CLIENT_ID=xxx.apps.googleusercontent.com \
+  --dart-define=GOOGLE_IOS_CLIENT_ID=yyy.apps.googleusercontent.com
 ```

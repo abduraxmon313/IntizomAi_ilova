@@ -1,17 +1,18 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../config/app_config.dart';
 import '../../l10n/app_localizations.dart';
-import 'language_page.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/ui_kit.dart';
+import 'language_page.dart';
 
-/// Telegram orqali kirish. Kirish mantig'i: bir martalik kod → bot → so'rov (poll).
+/// Kirish: iOS'da Apple yoki Google, Android'da faqat Google.
 class LoginPage extends StatefulWidget {
   const LoginPage({
     super.key,
@@ -21,97 +22,42 @@ class LoginPage extends StatefulWidget {
   });
 
   final AuthService authService;
-  final VoidCallback onLoginSuccess;
+  final ValueChanged<AuthResult> onLoginSuccess;
   final ValueChanged<String>? onLanguageChanged;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
-  static const _pollEvery = Duration(seconds: 2);
-  static const _giveUpAfter = Duration(minutes: 10);
-
-  String? _nonce;
-  Timer? _timer;
-  DateTime? _startedAt;
-  bool _polling = false;
+class _LoginPageState extends State<LoginPage> {
+  String? _busy; // 'google' | 'apple'
   String? _error;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _nonce != null) _pollOnce();
-  }
-
-  Future<void> _start() async {
-    final nonce = widget.authService.newNonce();
+  Future<void> _run(String provider, Future<AuthResult> Function() action) async {
+    if (_busy != null) return;
     setState(() {
-      _nonce = nonce;
+      _busy = provider;
       _error = null;
-      _startedAt = DateTime.now();
     });
-    final opened = await widget.authService.openBot(nonce);
-    if (!mounted) return;
-    if (!opened) {
-      setState(() {
-        _nonce = null;
-        _error = context.tr("Telegram ochilmadi. Telegram ilovasi o'rnatilganini tekshiring.");
-      });
-      return;
-    }
-    _timer?.cancel();
-    _timer = Timer.periodic(_pollEvery, (_) => _pollOnce());
-  }
-
-  Future<void> _pollOnce() async {
-    final nonce = _nonce;
-    if (nonce == null || _polling) return;
-    if (_startedAt != null &&
-        DateTime.now().difference(_startedAt!) > _giveUpAfter) {
-      _stop(context.tr("Vaqt tugadi. Qaytadan urinib ko'ring."));
-      return;
-    }
-    _polling = true;
     try {
-      final status = await widget.authService.poll(nonce);
-      if (!mounted || _nonce != nonce) return;
-      if (status == 'approved') {
-        _timer?.cancel();
-        widget.onLoginSuccess();
-      }
+      final r = await action();
+      if (!mounted) return;
+      widget.onLoginSuccess(r);
+    } on AuthCancelled {
+      // Foydalanuvchi oynani yopdi — hech narsa ko'rsatmaymiz.
     } on ApiException catch (e) {
-      if (e.statusCode != 0 && e.statusCode != 429) _stop(e.message);
+      if (mounted) setState(() => _error = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _error = context.tr("Kirib bo'lmadi. Qaytadan urinib ko'ring."));
     } finally {
-      _polling = false;
+      if (mounted) setState(() => _busy = null);
     }
-  }
-
-  void _stop(String message) {
-    _timer?.cancel();
-    if (!mounted) return;
-    setState(() {
-      _nonce = null;
-      _error = message;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final waiting = _nonce != null;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -128,7 +74,6 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                       onPressed: () => showLanguagePicker(context, widget.onLanguageChanged!),
                     ),
                   ),
-                // ── Tanishtiruv (kichik ekranda aylantiriladi) ──
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, box) => SingleChildScrollView(
@@ -142,18 +87,19 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                             const SizedBox(height: AppSpace.xl),
                             const Align(alignment: Alignment.centerLeft, child: BrandMark(size: 56)),
                             const SizedBox(height: AppSpace.xl),
-                             Text(context.tr("Intizom — natijaning boshlanishi."), style: AppType.display),
+                            Text(context.tr("Intizom — natijaning boshlanishi."), style: AppType.display),
                             const SizedBox(height: AppSpace.md),
                             Text(
                               context.tr("Rejalar, odatlar va maqsadlar bitta joyda. AI murabbiy esa har kuni to'g'ri yo'nalish beradi."),
                               style: AppType.body.copyWith(color: scheme.onSurfaceVariant, height: 1.5),
                             ),
                             const SizedBox(height: AppSpace.xl),
-                             GroupCard(
+                            GroupCard(
                               indent: 50,
                               children: [
                                 SettingTile(icon: LucideIcons.calendarCheck, title: context.tr("Kunlik reja va vaqtida eslatma")),
                                 SettingTile(icon: LucideIcons.repeat, title: context.tr("Odatlar va uzluksiz seriya")),
+                                SettingTile(icon: LucideIcons.users, title: context.tr("Do'stlar bilan guruhlar")),
                                 SettingTile(icon: LucideIcons.sparkles, title: context.tr("Shaxsiy AI murabbiy")),
                               ],
                             ),
@@ -164,44 +110,80 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                     ),
                   ),
                 ),
-
-                // ── Amal (bosh barmoq yetadigan joyda) ──
                 Padding(
                   padding: const EdgeInsets.fromLTRB(AppSpace.page, AppSpace.sm, AppSpace.page, AppSpace.lg),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      AnimatedSize(
-                        duration: AppMotion.base,
-                        curve: AppMotion.curve,
-                        alignment: Alignment.bottomCenter,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (_error != null) ...[
-                              _ErrorNote(message: _error!),
-                              const SizedBox(height: AppSpace.md),
-                            ],
-                            if (waiting) ...[
-                              const _WaitingCard(),
-                              const SizedBox(height: AppSpace.md),
-                            ],
-                          ],
+                      if (_error != null) ...[
+                        _ErrorNote(message: _error!),
+                        const SizedBox(height: AppSpace.md),
+                      ],
+                      if (AuthService.appleAvailable) ...[
+                        SizedBox(
+                          height: 52,
+                          child: AbsorbPointer(
+                            absorbing: _busy != null,
+                            child: Opacity(
+                              opacity: _busy == null || _busy == 'apple' ? 1 : .5,
+                              child: SignInWithAppleButton(
+                                height: 52,
+                                text: context.tr("Apple orqali kirish"),
+                                style: dark ? SignInWithAppleButtonStyle.white : SignInWithAppleButtonStyle.black,
+                                borderRadius: BorderRadius.circular(AppRadius.md),
+                                onPressed: () => _run('apple', widget.authService.signInWithApple),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      FilledButton.icon(
-                        onPressed: _start,
-                        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                        icon: const Icon(LucideIcons.send, size: 18),
-                        label: Text(waiting ? context.tr("Telegram'ni qayta ochish") : context.tr("Telegram orqali kirish")),
+                        const SizedBox(height: AppSpace.md),
+                      ],
+                      OutlinedButton(
+                        onPressed: _busy != null ? null : () => _run('google', widget.authService.signInWithGoogle),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+                        ),
+                        child: _busy == 'google'
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const _GoogleMark(),
+                                  const SizedBox(width: 10),
+                                  Flexible(
+                                    child: Text(
+                                      context.tr("Google orqali kirish"),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppType.bodyStrong.copyWith(color: scheme.onSurface),
+                                    ),
+                                  ),
+                                ],
+                              ),
                       ),
                       const SizedBox(height: AppSpace.md),
-                      Text(
-                        context.tr("Hisobingiz IntizomAI botidagi bilan bir xil — rejalar va Premium saqlanadi."),
-                        textAlign: TextAlign.center,
-                        style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        children: [
+                          Text(
+                            context.tr("Davom etish orqali "),
+                            style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
+                          ),
+                          if (kApiBaseUrl.isNotEmpty)
+                            GestureDetector(
+                              onTap: () => launchUrl(Uri.parse('$kApiBaseUrl/privacy'), mode: LaunchMode.externalApplication),
+                              child: Text(
+                                context.tr("maxfiylik siyosatiga"),
+                                style: AppType.caption.copyWith(color: scheme.primary, decoration: TextDecoration.underline),
+                              ),
+                            ),
+                          Text(
+                            context.tr(" rozilik bildirasiz."),
+                            style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -215,51 +197,44 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   }
 }
 
-/// Kutish holati: uch qadam, joriysi — aylanuvchi belgi bilan.
-class _WaitingCard extends StatelessWidget {
-  const _WaitingCard();
+/// Google "G" belgisi (rasmsiz, rang bo'laklari bilan).
+class _GoogleMark extends StatelessWidget {
+  const _GoogleMark();
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    Widget step(Widget lead, String text, {bool active = false}) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: 20, height: 20, child: Center(child: lead)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: AppType.label.copyWith(
-                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                color: active ? scheme.onSurface : scheme.onSurfaceVariant,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-    return Semantics(
-      liveRegion: true,
-      child: AppCard(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-        child: Column(
-          children: [
-            step(Icon(LucideIcons.circleCheck, size: 18, color: scheme.tertiary), context.tr("Telegram ochildi")),
-            step(
-              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-              context.tr("Botda «Ilovaga kirishni tasdiqlash» tugmasini bosing va shu yerga qayting."),
-              active: true,
-            ),
-            step(Icon(LucideIcons.logIn, size: 17, color: scheme.outline), context.tr("Tasdiqlangach ilova o'zi kiradi.")),
-          ],
-        ),
-      ),
+  Widget build(BuildContext context) => SizedBox(
+    width: 20,
+    height: 20,
+    child: CustomPaint(painter: _GooglePainter()),
+  );
+}
+
+class _GooglePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = size.width / 2;
+    final rect = Rect.fromCircle(center: Offset(r, r), radius: r * .78);
+    final stroke = size.width * .2;
+    Paint p(Color c) => Paint()
+      ..color = c
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke;
+    const pi = 3.1415926535;
+    canvas.drawArc(rect, -pi * .25, -pi * .5, false, p(const Color(0xFFEA4335)));
+    canvas.drawArc(rect, -pi * .75, -pi * .5, false, p(const Color(0xFFFBBC05)));
+    canvas.drawArc(rect, pi * .75, -pi * .55, false, p(const Color(0xFF34A853)));
+    canvas.drawArc(rect, pi * .2, -pi * .2, false, p(const Color(0xFF4285F4)));
+    canvas.drawLine(
+      Offset(r, r),
+      Offset(r + r * .78 + stroke / 2, r),
+      Paint()
+        ..color = const Color(0xFF4285F4)
+        ..strokeWidth = stroke,
     );
   }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _ErrorNote extends StatelessWidget {

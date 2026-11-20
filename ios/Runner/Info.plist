@@ -14,6 +14,21 @@
 	<string>Profil rasmini suratga olish uchun kameraga ruxsat kerak.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Ilova havolalari: intizomai:// (to'lovdan qaytish). Google Sign-In uchun
+	     reversed client ID sxemasi Codemagic'da GOOGLE_IOS_CLIENT_ID'dan qo'shiladi. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>uz.intizomai.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>intizomai</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>tg</string>

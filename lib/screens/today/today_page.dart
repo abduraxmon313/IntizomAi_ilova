@@ -207,7 +207,6 @@ class TodayPageState extends State<TodayPage> {
           _Header(
             name: profile.fullName,
             avatar: profile.avatar,
-            telegramId: profile.telegramId,
             onProfile: _openProfile,
           ),
           const SizedBox(height: 20),
@@ -231,7 +230,7 @@ class TodayPageState extends State<TodayPage> {
               child: _HintRow(
                 icon: LucideIcons.calendarPlus,
                 title: context.tr("Bugunga reja yo'q"),
-                text: context.tr("Eng muhim bitta ishni yozing — bot vaqtida eslatadi."),
+                text: context.tr("Eng muhim bitta ishni yozing — telefoningiz vaqtida eslatadi."),
               ),
             )
           else
@@ -349,11 +348,10 @@ String _greeting(BuildContext context) {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.name, required this.avatar, required this.telegramId, required this.onProfile});
+  const _Header({required this.name, required this.avatar, required this.onProfile});
 
   final String name;
   final String? avatar;
-  final int telegramId;
   final VoidCallback onProfile;
 
   @override
@@ -394,7 +392,7 @@ class _Header extends StatelessWidget {
               tapFeedback();
               onProfile();
             },
-            child: ProfileAvatar(url: avatar, telegramId: telegramId, name: name, size: 44),
+            child: ProfileAvatar(url: avatar, name: name, size: 44),
           ),
         ),
       ],
