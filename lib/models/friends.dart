@@ -1,4 +1,6 @@
-/// Do'stlar (guruhlar) — server: webapp/routes/friends.py, bot/services/group_service.py.
+import 'profile.dart';
+
+/// Guruhlar — server: /api/v1/groups, /api/v1/invites (app/services/groups.py).
 class GroupSummary {
   const GroupSummary({
     required this.id,
@@ -23,32 +25,54 @@ class GroupSummary {
   );
 }
 
+/// Guruhlar ro'yxati + kelgan takliflar soni.
+class GroupList {
+  const GroupList({this.groups = const [], this.invitesCount = 0, this.canCreate = false});
+  final List<GroupSummary> groups;
+  final int invitesCount;
+  final bool canCreate;
+
+  factory GroupList.fromJson(Map<String, dynamic> j) => GroupList(
+    groups: (j['groups'] as List? ?? const [])
+        .whereType<Map>()
+        .map((e) => GroupSummary.fromJson(Map<String, dynamic>.from(e)))
+        .toList(),
+    invitesCount: j['invites_count'] as int? ?? 0,
+    canCreate: j['can_create'] as bool? ?? false,
+  );
+}
+
 class GroupDetail {
   const GroupDetail({
     required this.id,
     required this.name,
     this.description,
-    required this.inviteCode,
     this.isOwner = false,
     this.members = const [],
+    this.pendingInvites = const [],
   });
 
   final int id;
   final String name;
   final String? description;
-  final String inviteCode;
   final bool isOwner;
   final List<GroupMember> members;
+
+  /// Faqat ega uchun: javob kutilayotgan takliflar.
+  final List<OutgoingInvite> pendingInvites;
 
   factory GroupDetail.fromJson(Map<String, dynamic> j) => GroupDetail(
     id: j['id'] as int,
     name: j['name'] as String? ?? '',
     description: j['description'] as String?,
-    inviteCode: j['invite_code'] as String? ?? '',
     isOwner: j['is_owner'] as bool? ?? false,
     members: (j['members'] as List? ?? const [])
         .whereType<Map>()
         .map((e) => GroupMember.fromJson(Map<String, dynamic>.from(e)))
+        .toList(),
+    pendingInvites: (j['pending_invites'] as List? ?? const [])
+        .whereType<Map>()
+        .map((e) => OutgoingInvite.fromJson(Map<String, dynamic>.from(e)))
         .toList(),
   );
 }
@@ -56,8 +80,9 @@ class GroupDetail {
 class GroupMember {
   const GroupMember({
     required this.userId,
-    required this.telegramId,
     required this.name,
+    this.username,
+    this.photoUrl,
     this.role = 'member',
     this.isMe = false,
     this.streak = 0,
@@ -70,8 +95,9 @@ class GroupMember {
   });
 
   final int userId;
-  final int telegramId;
   final String name;
+  final String? username;
+  final String? photoUrl;
   final String role; // owner | member
   final bool isMe;
   final int streak;
@@ -88,8 +114,9 @@ class GroupMember {
     final s = Map<String, dynamic>.from(j['summary'] as Map? ?? const {});
     return GroupMember(
       userId: j['user_id'] as int,
-      telegramId: j['telegram_id'] as int? ?? 0,
       name: j['name'] as String? ?? 'Foydalanuvchi',
+      username: j['username'] as String?,
+      photoUrl: j['photo_url'] as String?,
       role: j['role'] as String? ?? 'member',
       isMe: j['is_me'] as bool? ?? false,
       streak: j['streak'] as int? ?? 0,
@@ -103,10 +130,55 @@ class GroupMember {
   }
 }
 
+/// Ega yuborgan, hali javob berilmagan taklif.
+class OutgoingInvite {
+  const OutgoingInvite({required this.id, required this.user});
+  final int id;
+  final UserCard user;
+
+  factory OutgoingInvite.fromJson(Map<String, dynamic> j) => OutgoingInvite(
+    id: j['id'] as int,
+    user: UserCard.fromJson(Map<String, dynamic>.from(j['user'] as Map? ?? const {})),
+  );
+}
+
+/// Menga kelgan guruh taklifi.
+class IncomingInvite {
+  const IncomingInvite({
+    required this.id,
+    required this.groupId,
+    required this.groupName,
+    this.groupDescription,
+    this.memberCount = 0,
+    required this.inviter,
+  });
+
+  final int id;
+  final int groupId;
+  final String groupName;
+  final String? groupDescription;
+  final int memberCount;
+  final UserCard inviter;
+
+  factory IncomingInvite.fromJson(Map<String, dynamic> j) {
+    final g = Map<String, dynamic>.from(j['group'] as Map? ?? const {});
+    return IncomingInvite(
+      id: j['id'] as int,
+      groupId: g['id'] as int? ?? 0,
+      groupName: g['name'] as String? ?? '',
+      groupDescription: g['description'] as String?,
+      memberCount: g['member_count'] as int? ?? 0,
+      inviter: UserCard.fromJson(Map<String, dynamic>.from(j['inviter'] as Map? ?? const {})),
+    );
+  }
+}
+
 class MemberView {
   const MemberView({
     required this.userId,
     required this.name,
+    this.username,
+    this.photoUrl,
     this.streak = 0,
     this.totalScore = 0,
     this.isMe = false,
@@ -122,6 +194,8 @@ class MemberView {
 
   final int userId;
   final String name;
+  final String? username;
+  final String? photoUrl;
   final int streak;
   final int totalScore;
   final bool isMe;
@@ -143,6 +217,8 @@ class MemberView {
     return MemberView(
       userId: m['user_id'] as int? ?? 0,
       name: m['name'] as String? ?? 'Foydalanuvchi',
+      username: m['username'] as String?,
+      photoUrl: m['photo_url'] as String?,
       streak: m['streak'] as int? ?? 0,
       totalScore: m['total_score'] as int? ?? 0,
       isMe: m['is_me'] as bool? ?? false,
@@ -202,64 +278,16 @@ class Permissions {
 }
 
 class PermissionEntry {
-  const PermissionEntry({required this.userId, required this.name, this.canManage = false});
+  const PermissionEntry({required this.userId, required this.name, this.photoUrl, this.canManage = false});
   final int userId;
   final String name;
+  final String? photoUrl;
   final bool canManage;
 
   factory PermissionEntry.fromJson(Map<String, dynamic> j) => PermissionEntry(
     userId: j['user_id'] as int,
     name: j['name'] as String? ?? '',
+    photoUrl: j['photo_url'] as String?,
     canManage: j['can_manage'] as bool? ?? false,
-  );
-}
-
-/// Guruhning Telegram hisobot sozlamalari (faqat ega).
-class DigestSettings {
-  const DigestSettings({
-    this.chatId,
-    this.chatTitle,
-    this.digestEnabled = false,
-    this.digestTime = '21:00',
-    this.plansEnabled = false,
-    this.plansTime = '07:00',
-    this.reportSource = 'both',
-    this.allowedTimes = const [],
-    this.lastError,
-  });
-
-  final int? chatId;
-  final String? chatTitle;
-  final bool digestEnabled;
-  final String digestTime;
-  final bool plansEnabled;
-  final String plansTime;
-  final String reportSource; // plans | habits | both
-  final List<String> allowedTimes;
-  final String? lastError;
-
-  factory DigestSettings.fromJson(Map<String, dynamic> j) => DigestSettings(
-    chatId: j['telegram_chat_id'] as int?,
-    chatTitle: j['telegram_chat_title'] as String?,
-    digestEnabled: j['digest_enabled'] as bool? ?? false,
-    digestTime: j['digest_time'] as String? ?? '21:00',
-    plansEnabled: j['plans_enabled'] as bool? ?? false,
-    plansTime: j['plans_time'] as String? ?? '07:00',
-    reportSource: j['report_source'] as String? ?? 'both',
-    allowedTimes: (j['allowed_times'] as List? ?? const []).map((e) => '$e').toList(),
-    lastError: (j['digest_last_error'] ?? j['plans_last_error']) as String?,
-  );
-}
-
-class TelegramChat {
-  const TelegramChat({required this.chatId, required this.title, this.canSend = true});
-  final int chatId;
-  final String title;
-  final bool canSend;
-
-  factory TelegramChat.fromJson(Map<String, dynamic> j) => TelegramChat(
-    chatId: j['chat_id'] as int,
-    title: j['chat_title'] as String? ?? '',
-    canSend: j['can_send'] as bool? ?? true,
   );
 }

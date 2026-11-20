@@ -139,7 +139,8 @@ Future<bool> showPlanForm(
         } else if (plan == null) {
           await api.createPlan(title: t, description: d, scheduledTime: tm, planDate: ymd(date));
         } else {
-          await api.updatePlan(plan.id, title: t, description: d ?? '', scheduledTime: tm);
+          // Bo'sh qator — serverda tavsif/vaqtni tozalash degani.
+          await api.updatePlan(plan.id, title: t, description: d ?? '', scheduledTime: tm ?? '');
         }
         saved = true;
         return true;

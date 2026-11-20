@@ -1,23 +1,17 @@
 import '../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../config/app_config.dart';
 import '../config/store_policy.dart';
 import '../services/api_client.dart';
 import '../theme/app_theme.dart';
+import 'paywall.dart';
 import 'ui_kit.dart';
 
-/// Premium to'lovi faqat bot ichida — botning Premium oynasini ochadi.
-Future<void> openPremiumInBot() async {
-  try {
-    await launchUrl(botUri('premium'), mode: LaunchMode.externalApplication);
-  } catch (_) {}
-}
+/// Premium oynasini ochadi (ilova ichida sotib olish).
+Future<void> openPremium(BuildContext context) => showPremiumDialog(context, '');
 
-/// iOS uchun neytral oyna: qulflangan imkoniyat haqida, hech qanday
-/// to'lov havolasi/narxsiz (App Store 3.1.1).
+/// Sotuv o'chirilgan build uchun (HIDE_PURCHASES) neytral oyna.
 Future<void> _showFeatureUnavailable(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
@@ -60,67 +54,10 @@ void showApiError(BuildContext context, Object error) {
     ..showSnackBar(SnackBar(content: Text(error.toString())));
 }
 
-/// Premium taklifi (Mini App'dagi paywall'ning ilova varianti).
-///
-/// iOS'da (App Store 3.1.1) tashqi to'lovga yo'naltiradigan tugma/narx
-/// ko'rsatilmaydi — faqat neytral tushuntirish beriladi.
+/// Premium taklifi: tariflar, to'lov usuli va promokod — ilova ichida.
 Future<void> showPremiumDialog(BuildContext context, String message) {
   if (!StorePolicy.purchasesVisible) return _showFeatureUnavailable(context);
-  return showModalBottomSheet<void>(
-    context: context,
-    useSafeArea: true,
-    isScrollControlled: true,
-    builder: (ctx) {
-      final scheme = Theme.of(ctx).colorScheme;
-      Widget row(IconData icon, String title, String text) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 19, color: scheme.tertiary)),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: AppType.bodyStrong),
-                  Text(text, style: AppType.label.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-      return SheetScaffold(
-        title: context.tr("IntizomAI Premium"),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(message, style: AppType.body.copyWith(color: scheme.onSurfaceVariant)),
-            const SizedBox(height: 12),
-            row(LucideIcons.infinity, context.tr("Cheklovsiz"), context.tr("Reja, odat, maqsad va AI murabbiy — chegarasiz")),
-            row(LucideIcons.chartColumn, context.tr("Chuqur tahlil"), context.tr("Batafsil statistika va umumiy reyting")),
-            row(LucideIcons.users, context.tr("Do'stlar bilan"), context.tr("Guruhlar va Telegram hisobotlari")),
-            const SizedBox(height: 18),
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                openPremiumInBot();
-              },
-              child:  Text(context.tr("Tarifni tanlash")),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              context.tr("To'lov IntizomAI Telegram boti orqali amalga oshiriladi."),
-              textAlign: TextAlign.center,
-              style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400),
-            ),
-          ],
-        ),
-      );
-    },
-  );
+  return showPaywall(context, message: message.isEmpty ? null : message);
 }
 
 /// Yuklashda xato bo'lsa ko'rsatiladigan blok.

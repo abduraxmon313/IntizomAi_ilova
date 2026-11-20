@@ -2,10 +2,9 @@ import '../../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../config/app_config.dart';
 import '../../models/friends.dart';
+import '../../models/profile.dart';
 import '../../services/api_client.dart';
 import '../../services/intizom_api.dart';
 import '../../state/app_state.dart';
@@ -15,7 +14,7 @@ import '../../widgets/app_ui.dart';
 import '../../widgets/feedback.dart';
 import '../../widgets/ui_kit.dart';
 import '../forms.dart';
-import '../profile/profile_page.dart' show ProfileAvatar;
+import '../profile/profile_page.dart' show LowerCaseFormatter, ProfileAvatar;
 
 /// Do'stlar: guruhlar → guruh a'zolari → a'zoning kuni.
 ///
@@ -35,6 +34,8 @@ class FriendsPageState extends State<FriendsPage> {
   AppState get s => widget.state;
 
   List<GroupSummary>? _groups;
+  List<IncomingInvite> _invites = const [];
+  bool _canCreate = false;
   GroupDetail? _group;
   MemberView? _member;
   int? _memberUid;
@@ -90,10 +91,13 @@ class FriendsPageState extends State<FriendsPage> {
       _error = null;
     });
     try {
-      final g = await s.api.groups();
+      final r = await Future.wait([s.api.groups(), s.api.invites()]);
       if (!mounted) return;
+      final list = r[0] as GroupList;
       setState(() {
-        _groups = g;
+        _groups = list.groups;
+        _canCreate = list.canCreate;
+        _invites = r[1] as List<IncomingInvite>;
         _premiumMessage = null;
       });
     } on ApiException catch (e) {
@@ -151,8 +155,188 @@ class FriendsPageState extends State<FriendsPage> {
     }
   }
 
+  // ── Takliflar ──────────────────────────────────────
+  Future<void> _acceptInvite(IncomingInvite inv) async {
+    try {
+      await s.api.acceptInvite(inv.id);
+      successFeedback();
+      if (!mounted) return;
+      toast(context, context.tr("«{v0}» guruhiga qo'shildingiz", {'v0': inv.groupName}));
+      await _loadGroups();
+      if (mounted) _pushGroup(inv.groupId);
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+      _loadGroups();
+    }
+  }
+
+  Future<void> _declineInvite(IncomingInvite inv) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(LucideIcons.x),
+              title: Text(context.tr("Rad etish")),
+              onTap: () => Navigator.pop(ctx, 'decline'),
+            ),
+            ListTile(
+              leading: Icon(LucideIcons.ban, color: Theme.of(ctx).colorScheme.error),
+              title: Text(
+                context.tr("Rad etish va @{v0} ni bloklash", {'v0': inv.inviter.username ?? ''}),
+                style: AppType.body.copyWith(color: Theme.of(ctx).colorScheme.error),
+              ),
+              subtitle: Text(context.tr("U sizga boshqa taklif yubora olmaydi")),
+              onTap: () => Navigator.pop(ctx, 'block'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (choice == null) return;
+    try {
+      await s.api.declineInvite(inv.id, block: choice == 'block');
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    }
+    _loadGroups();
+  }
+
+  /// Ega username orqali taklif yuboradi: avval foydalanuvchi kartasi ko'rsatiladi.
+  Future<void> _invite(GroupDetail g) async {
+    final ctrl = TextEditingController();
+    UserCard? found;
+    String? note;
+    var busy = false;
+    final sent = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          final scheme = Theme.of(ctx).colorScheme;
+          Future<void> lookup() async {
+            final u = ctrl.text.trim();
+            if (u.length < 3) return;
+            setSheet(() {
+              busy = true;
+              note = null;
+              found = null;
+            });
+            try {
+              final card = await s.api.lookupUser(u);
+              setSheet(() => found = card);
+            } on ApiException catch (e) {
+              setSheet(() => note = e.message);
+            } finally {
+              setSheet(() => busy = false);
+            }
+          }
+
+          Future<void> send() async {
+            final f = found;
+            if (f?.username == null) return;
+            setSheet(() => busy = true);
+            try {
+              await s.api.inviteToGroup(g.id, f!.username!);
+              if (ctx.mounted) Navigator.pop(ctx, true);
+            } on ApiException catch (e) {
+              setSheet(() {
+                note = e.message;
+                busy = false;
+              });
+            }
+          }
+
+          return SheetScaffold(
+            title: context.tr("Guruhga taklif qilish"),
+            subtitle: g.name,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  context.tr("Do'stingizning username'ini yozing. U taklifni ilovada ko'radi va qabul qilsa, guruhga qo'shiladi."),
+                  style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant, height: 1.45),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: ctrl,
+                        autofocus: true,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        maxLength: 20,
+                        textInputAction: TextInputAction.search,
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9_]')), LowerCaseFormatter()],
+                        decoration: const InputDecoration(prefixText: '@', hintText: 'username', counterText: ''),
+                        onChanged: (_) => setSheet(() {
+                          found = null;
+                          note = null;
+                        }),
+                        onSubmitted: (_) => lookup(),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton(onPressed: busy ? null : lookup, child: Text(context.tr("Topish"))),
+                  ],
+                ),
+                if (note != null) ...[
+                  const SizedBox(height: 10),
+                  Text(note!, style: AppType.label.copyWith(color: scheme.error)),
+                ],
+                if (found != null) ...[
+                  const SizedBox(height: 14),
+                  GroupCard(
+                    children: [
+                      ListTile(
+                        leading: ProfileAvatar(url: found!.photoUrl, name: found!.name, size: 40),
+                        title: Text(found!.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.bodyStrong),
+                        subtitle: Text('@${found!.username}'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    onPressed: busy ? null : send,
+                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                    icon: const Icon(LucideIcons.send, size: 18),
+                    label: Text(context.tr("Taklif yuborish")),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    if (sent == true && mounted) {
+      toast(context, context.tr("Taklif yuborildi"));
+      _reloadGroup();
+    }
+  }
+
+  Future<void> _cancelInvite(GroupDetail g, OutgoingInvite inv) async {
+    try {
+      await s.api.cancelInvite(g.id, inv.id);
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    }
+    _reloadGroup();
+  }
+
   // ── Guruh amallari ─────────────────────────────────
   Future<void> _createGroup() async {
+    if (!_canCreate) {
+      showPremiumDialog(context, context.tr("Guruh yaratish Premium bilan ochiladi. Do'stingiz taklif qilsa, guruhga bepul qo'shilasiz."));
+      return;
+    }
     final name = TextEditingController();
     final desc = TextEditingController();
     await showFormSheet<void>(
@@ -193,19 +377,6 @@ class FriendsPageState extends State<FriendsPage> {
         }
       },
     );
-  }
-
-  String _inviteLink(GroupDetail g) => 'https://t.me/$kBotUsername?start=grp_${g.inviteCode}';
-
-  Future<void> _invite(GroupDetail g) async {
-    final link = _inviteLink(g);
-    final text = context.tr("«{v0}» guruhiga taklif qilinyapsiz! IntizomAI botiga qo'shiling va birga intizomli bo'laylik.", {'v0': g.name});
-    final share = Uri.https('t.me', '/share/url', {'url': link, 'text': text});
-    try {
-      if (await launchUrl(share, mode: LaunchMode.externalApplication)) return;
-    } catch (_) {}
-    await Clipboard.setData(ClipboardData(text: link));
-    if (mounted) toast(context, context.tr("Taklif havolasi nusxalandi"));
   }
 
   Future<void> _permissions(GroupDetail g) async {
@@ -342,24 +513,34 @@ class FriendsPageState extends State<FriendsPage> {
                     child: PremiumGate(
                       icon: LucideIcons.users,
                       title: context.tr("Do'stlar Premium bilan ochiladi"),
-                      message: context.tr("Oila, do'stlar yoki jamoa bilan guruh tuzing, bir-biringizning kunini kuzating va Telegram guruhga kunlik hisobot yuboring."),
+                      message: context.tr("Oila, do'stlar yoki jamoa bilan guruh tuzing va bir-biringizning kunini kuzating."),
                       onOpen: () => showPremiumDialog(context, _premiumMessage!),
                     ),
                   );
                 }
                 if (_error != null) return ErrorRetry(message: _error!, onRetry: _loadGroups);
+                final invites = _invitesSection();
                 if (groups.isEmpty) {
-                  return EmptyView(
-                    icon: LucideIcons.users,
-                    title: context.tr("Hozircha guruh yo'q"),
-                    message: context.tr("Guruh yarating va do'stlaringizni taklif qiling — birga intizom oson."),
-                    actionLabel: context.tr("Yangi guruh"),
-                    onAction: _createGroup,
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ...invites,
+                      EmptyView(
+                        icon: LucideIcons.users,
+                        title: context.tr("Hozircha guruh yo'q"),
+                        message: _invites.isEmpty
+                            ? context.tr("Guruh yarating va do'stlaringizni username orqali taklif qiling. Yoki do'stingiz sizni taklif qilsin — taklif shu yerda chiqadi.")
+                            : null,
+                        actionLabel: context.tr("Yangi guruh"),
+                        onAction: _createGroup,
+                      ),
+                    ],
                   );
                 }
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    ...invites,
                     SectionBar(title: context.tr("Guruhlar"), count: '${groups.length}', actionLabel: context.tr("Yangi guruh"), onAction: _createGroup, top: 8),
                     GroupCard(
                       indent: 68,
@@ -418,6 +599,74 @@ class FriendsPageState extends State<FriendsPage> {
     );
   }
 
+  List<Widget> _invitesSection() {
+    if (_invites.isEmpty) return const [];
+    final scheme = Theme.of(context).colorScheme;
+    return [
+      SectionBar(title: context.tr("Takliflar"), count: '${_invites.length}', top: 8),
+      for (final inv in _invites)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: AppCard(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    ProfileAvatar(url: inv.inviter.photoUrl, name: inv.inviter.name, size: 40),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(inv.groupName, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.bodyStrong),
+                          const SizedBox(height: 2),
+                          Text(
+                            context.tr("{v0} taklif qildi · {v1} a'zo", {
+                              'v0': inv.inviter.username == null ? inv.inviter.name : '@${inv.inviter.username}',
+                              'v1': inv.memberCount,
+                            }),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (inv.groupDescription?.isNotEmpty == true) ...[
+                  const SizedBox(height: 8),
+                  Text(inv.groupDescription!, style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant)),
+                ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => _declineInvite(inv),
+                        style: OutlinedButton.styleFrom(minimumSize: const Size(0, 42)),
+                        child: Text(context.tr("Rad etish")),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => _acceptInvite(inv),
+                        style: FilledButton.styleFrom(minimumSize: const Size(0, 42)),
+                        child: Text(context.tr("Qo'shilish")),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+    ];
+  }
+
   // ── 2. Guruh ichi ──────────────────────────────────
   Widget _groupView(GroupDetail g) {
     final scheme = Theme.of(context).colorScheme;
@@ -442,17 +691,19 @@ class FriendsPageState extends State<FriendsPage> {
                 LayoutBuilder(
                   builder: (_, box) {
                     const pad = EdgeInsets.symmetric(horizontal: 12);
-                    final invite = FilledButton.icon(
-                      onPressed: () => _invite(g),
-                      style: FilledButton.styleFrom(padding: pad, minimumSize: const Size(0, 48)),
-                      icon: const Icon(LucideIcons.userPlus, size: 18),
-                      label:  Text(context.tr("Taklif qilish"), maxLines: 1),
-                    );
                     final perms = OutlinedButton.icon(
                       onPressed: () => _permissions(g),
                       style: OutlinedButton.styleFrom(padding: pad, minimumSize: const Size(0, 48)),
                       icon: const Icon(LucideIcons.shield, size: 18),
                       label:  Text(context.tr("Ruxsatlar"), maxLines: 1),
+                    );
+                    // Taklifni faqat ega yuboradi.
+                    if (!g.isOwner) return perms;
+                    final invite = FilledButton.icon(
+                      onPressed: () => _invite(g),
+                      style: FilledButton.styleFrom(padding: pad, minimumSize: const Size(0, 48)),
+                      icon: const Icon(LucideIcons.userPlus, size: 18),
+                      label:  Text(context.tr("Taklif qilish"), maxLines: 1),
                     );
                     // Ikki tugma yonma-yon sig'masa — ustma-ust.
                     if (box.maxWidth < 300) {
@@ -494,7 +745,7 @@ class FriendsPageState extends State<FriendsPage> {
                           padding: const EdgeInsets.fromLTRB(16, 12, 14, 12),
                           child: Row(
                             children: [
-                              ProfileAvatar(url: null, telegramId: m.telegramId, name: m.name, size: 38),
+                              ProfileAvatar(url: m.photoUrl, name: m.name, size: 38),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
@@ -562,25 +813,24 @@ class FriendsPageState extends State<FriendsPage> {
                       ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Center(
-                  child: TextButton.icon(
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: _inviteLink(g)));
-                      toast(context, context.tr("Taklif havolasi nusxalandi"));
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: scheme.onSurfaceVariant,
-                      textStyle: AppType.label.copyWith(
-                        fontFamily: AppTheme.fontFamily,
-                        fontWeight: FontWeight.w500,
-                        fontFeatures: tabularFigures,
-                      ),
-                    ),
-                    icon: const Icon(LucideIcons.copy, size: 15),
-                    label: Text(context.tr("Taklif kodi: {v0}", {'v0': g.inviteCode})),
+                if (g.isOwner && g.pendingInvites.isNotEmpty) ...[
+                  SectionBar(title: context.tr("Javob kutilmoqda"), count: '${g.pendingInvites.length}'),
+                  GroupCard(
+                    indent: 66,
+                    children: [
+                      for (final inv in g.pendingInvites)
+                        ListTile(
+                          leading: ProfileAvatar(url: inv.user.photoUrl, name: inv.user.name, size: 38),
+                          title: Text(inv.user.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: inv.user.username == null ? null : Text('@${inv.user.username}'),
+                          trailing: TextButton(
+                            onPressed: () => _cancelInvite(g, inv),
+                            child: Text(context.tr("Bekor qilish")),
+                          ),
+                        ),
+                    ],
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -749,7 +999,7 @@ class FriendsPageState extends State<FriendsPage> {
   }
 }
 
-/// Guruh sozlamalari: Umumiy / Hisobot / A'zolar (ega uchun), a'zo uchun — chiqish.
+/// Guruh sozlamalari: Umumiy / A'zolar (ega uchun), a'zo uchun — chiqish.
 class _GroupSettingsSheet extends StatefulWidget {
   const _GroupSettingsSheet({
     required this.api,
@@ -772,7 +1022,6 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
   late final _desc = TextEditingController(text: widget.group.description ?? '');
   late GroupDetail _g = widget.group;
   String _tab = 'general';
-  DigestSettings? _digest;
   bool _busy = false;
 
   IntizomApi get _api => widget.api.api;
@@ -785,71 +1034,6 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
       if (mounted) showApiError(context, e);
     } finally {
       if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _loadDigest() async {
-    try {
-      final d = await _api.digestSettings(_g.id);
-      if (mounted) setState(() => _digest = d);
-    } catch (e) {
-      if (mounted) showApiError(context, e);
-    }
-  }
-
-  Future<void> _updateDigest(Map<String, dynamic> body) => _run(() async {
-    final d = await _api.updateDigest(_g.id, body);
-    if (mounted) setState(() => _digest = d);
-  });
-
-  Future<void> _pickChat() async {
-    List<TelegramChat> chats;
-    try {
-      chats = await _api.digestCandidates(_g.id);
-    } catch (e) {
-      if (mounted) showApiError(context, e);
-      return;
-    }
-    if (!mounted) return;
-    final picked = await showModalBottomSheet<TelegramChat>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (ctx) => SheetScaffold(
-        title: context.tr("Telegram guruhni tanlang"),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _SheetNote(
-              context.tr("Bot va siz a'zo bo'lgan guruhlar. Ro'yxatda bo'lmasa — botni guruhga qo'shing va u yerda bir marta xabar yozing."),
-              boxed: false,
-            ),
-            const SizedBox(height: 14),
-            if (chats.isEmpty)
-               _SheetNote(context.tr("Mos guruh topilmadi"))
-            else
-              GroupCard(
-                indent: 50,
-                children: [
-                  for (final c in chats)
-                    SettingTile(
-                      icon: LucideIcons.send,
-                      title: c.title,
-                      subtitle: c.canSend ? null : context.tr("Bot xabar yubora olmaydi — botni admin qiling"),
-                      onTap: () => Navigator.pop(ctx, c),
-                    ),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-    if (picked != null) {
-      await _run(() async {
-        await _api.linkTelegram(_g.id, picked);
-      });
-      _loadDigest();
     }
   }
 
@@ -891,11 +1075,8 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
           ] else ...[
             SegmentTabs<String>(
               value: _tab,
-              items:  [('general', context.tr("Umumiy")), ('digest', context.tr("Hisobot")), ('members', context.tr("A'zolar"))],
-              onChanged: (v) {
-                setState(() => _tab = v);
-                if (v == 'digest' && _digest == null) _loadDigest();
-              },
+              items:  [('general', context.tr("Umumiy")), ('members', context.tr("A'zolar"))],
+              onChanged: (v) => setState(() => _tab = v),
             ),
             const SizedBox(height: 4),
             AnimatedSize(
@@ -907,7 +1088,6 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: switch (_tab) {
-                  'digest' => _digestPane(scheme),
                   'members' => _members(scheme),
                   _ => _general(),
                 },
@@ -970,116 +1150,13 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
     ),
   ];
 
-  List<Widget> _digestPane(ColorScheme scheme) {
-    final d = _digest;
-    if (d == null) return const [LoadingView()];
-    final times = d.allowedTimes.isEmpty
-        ? [for (var h = 0; h < 24; h++) '${h.toString().padLeft(2, '0')}:00']
-        : d.allowedTimes;
-    return [
-      const SizedBox(height: 12),
-      _SheetNote(
-        context.tr("Belgilangan vaqtda har bir a'zoning rejasi (ertalab) va natijasi (kechqurun) Telegram guruhga yuboriladi."),
-        boxed: false,
-      ),
-      const SizedBox(height: 12),
-      GroupCard(
-        children: [
-          SettingTile(
-            icon: LucideIcons.send,
-            title: context.tr("Telegram guruh"),
-            subtitle: d.chatTitle ?? context.tr("Tanlanmagan"),
-            onTap: _busy ? null : _pickChat,
-            trailing: d.chatId == null
-                ? null
-                : TextButton(
-                    onPressed: _busy
-                        ? null
-                        : () async {
-                            await _run(() => _api.unlinkTelegram(_g.id));
-                            _loadDigest();
-                          },
-                    child:  Text(context.tr("Uzish")),
-                  ),
-          ),
-        ],
-      ),
-       FieldLabel(context.tr("Nima yuborilsin")),
-      SegmentTabs<String>(
-        value: d.reportSource,
-        items:  [('plans', context.tr("Rejalar")), ('both', context.tr("Ikkisi")), ('habits', context.tr("Odatlar"))],
-        onChanged: (v) => _updateDigest({'report_source': v}),
-      ),
-      const SizedBox(height: 12),
-      GroupCard(
-        indent: 50,
-        children: [
-          _DigestRow(
-            icon: LucideIcons.sunrise,
-            title: context.tr("Kunlik reja"),
-            subtitle: context.tr("Ertalab — bugun nima qilinadi"),
-            enabled: d.plansEnabled,
-            time: d.plansTime,
-            times: times,
-            busy: _busy,
-            onEnabled: (v) => _updateDigest({'plans_enabled': v}),
-            onTime: (v) => _updateDigest({'plans_time': v}),
-          ),
-          _DigestRow(
-            icon: LucideIcons.moon,
-            title: context.tr("Kunlik hisobot"),
-            subtitle: context.tr("Kechqurun — nima bajarildi"),
-            enabled: d.digestEnabled,
-            time: d.digestTime,
-            times: times,
-            busy: _busy,
-            onEnabled: (v) => _updateDigest({'digest_enabled': v}),
-            onTime: (v) => _updateDigest({'digest_time': v}),
-          ),
-        ],
-      ),
-      const SizedBox(height: 14),
-      Row(
-        children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: _busy || d.chatId == null ? null : () => _test('plans'),
-              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10), minimumSize: const Size(0, 46)),
-              child:  Text(context.tr("Rejani sinash"), maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: OutlinedButton(
-              onPressed: _busy || d.chatId == null ? null : () => _test('report'),
-              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10), minimumSize: const Size(0, 46)),
-              child:  Text(context.tr("Hisobotni sinash"), maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
-          ),
-        ],
-      ),
-      if (d.lastError?.isNotEmpty == true) ...[
-        const SizedBox(height: 10),
-        Text(
-          context.tr("Oxirgi xato: {v0}", {'v0': d.lastError}),
-          style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.error),
-        ),
-      ],
-    ];
-  }
-
-  Future<void> _test(String kind) => _run(() async {
-    final (ok, reason) = await _api.testDigest(_g.id, kind);
-    if (mounted) toast(context, ok ? context.tr("Telegram guruhga yuborildi") : context.tr("Yuborilmadi: {v0}", {'v0': reason ?? 'noma\'lum sabab'}));
-  });
-
   List<Widget> _members(ColorScheme scheme) {
     final others = _g.members.where((m) => !m.isMe).toList();
     if (others.isEmpty) return  [SizedBox(height: 12), _SheetNote(context.tr("Boshqa a'zo yo'q"))];
     return [
       const SizedBox(height: 12),
       _SheetNote(
-        context.tr("O'chirilgan (pauza) a'zoning ma'lumotlari boshqalarga va Telegram hisobotiga ko'rinmaydi."),
+        context.tr("Pauzadagi a'zoning reja va odatlari boshqa a'zolarga ko'rinmaydi."),
         boxed: false,
       ),
       const SizedBox(height: 12),
@@ -1100,20 +1177,43 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
                       if (mounted) setState(() => _g = g);
                       widget.onChanged();
                     }),
-              trailing: IconButton(
-                tooltip: context.tr("Chiqarib yuborish"),
-                onPressed: _busy
-                    ? null
-                    : () async {
-                        if (!await confirmAction(context, title: context.tr("Guruhdan chiqarish"), message: m.name, confirmLabel: context.tr("Chiqarish"))) return;
-                        await _run(() async {
-                          await _api.removeMember(_g.id, m.userId);
-                          final g = await _api.group(_g.id);
-                          if (mounted) setState(() => _g = g);
-                          widget.onChanged();
-                        });
-                      },
-                icon: Icon(LucideIcons.userX, size: 19, color: scheme.error),
+              trailing: PopupMenuButton<String>(
+                enabled: !_busy,
+                tooltip: context.tr("Amallar"),
+                icon: Icon(LucideIcons.ellipsisVertical, size: 19, color: scheme.onSurfaceVariant),
+                onSelected: (action) async {
+                  if (action == 'remove') {
+                    if (!await confirmAction(context, title: context.tr("Guruhdan chiqarish"), message: m.name, confirmLabel: context.tr("Chiqarish"))) return;
+                    await _run(() async {
+                      await _api.removeMember(_g.id, m.userId);
+                      final g = await _api.group(_g.id);
+                      if (mounted) setState(() => _g = g);
+                      widget.onChanged();
+                    });
+                  } else if (action == 'transfer') {
+                    if (!await confirmAction(
+                      context,
+                      title: context.tr("Egalikni topshirish"),
+                      message: context.tr("{v0} guruh egasi bo'ladi. Siz oddiy a'zo bo'lib qolasiz.", {'v0': m.name}),
+                      confirmLabel: context.tr("Topshirish"),
+                      danger: false,
+                    )) {
+                      return;
+                    }
+                    await _run(() async {
+                      await _api.transferGroup(_g.id, m.userId);
+                      widget.onChanged();
+                      if (mounted) Navigator.pop(context);
+                    });
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: 'transfer', child: Text(context.tr("Egalikni topshirish"))),
+                  PopupMenuItem(
+                    value: 'remove',
+                    child: Text(context.tr("Chiqarib yuborish"), style: TextStyle(color: scheme.error)),
+                  ),
+                ],
               ),
             ),
         ],
@@ -1241,7 +1341,7 @@ class _MemberSwitchRow extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(16, 8, trailing == null ? 12 : 4, 8),
           child: Row(
             children: [
-              ProfileAvatar(url: null, telegramId: member?.telegramId ?? 0, name: name, size: 36),
+              ProfileAvatar(url: member?.photoUrl, name: name, size: 36),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1260,81 +1360,6 @@ class _MemberSwitchRow extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Hisobot qatori: nom va izoh, o'ngda kalit; pastida yuborish vaqti.
-class _DigestRow extends StatelessWidget {
-  const _DigestRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.enabled,
-    required this.time,
-    required this.times,
-    required this.busy,
-    required this.onEnabled,
-    required this.onTime,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool enabled;
-  final String time;
-  final List<String> times;
-  final bool busy;
-  final ValueChanged<bool> onEnabled;
-  final ValueChanged<String> onTime;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 20, color: scheme.onSurfaceVariant),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: AppType.body.copyWith(fontWeight: FontWeight.w500)),
-                    Text(subtitle, style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant)),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Switch(value: enabled, onChanged: busy ? null : onEnabled),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 34, top: 2),
-            child: Row(
-              children: [
-                Text(context.tr("Vaqt"), style: AppType.label.copyWith(color: scheme.onSurfaceVariant)),
-                const SizedBox(width: 12),
-                DropdownButton<String>(
-                  value: times.contains(time) ? time : null,
-                  hint: Text(time, style: AppType.bodyStrong.copyWith(fontFeatures: tabularFigures)),
-                  isDense: true,
-                  underline: const SizedBox(),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  icon: Icon(LucideIcons.chevronDown, size: 16, color: scheme.onSurfaceVariant),
-                  style: AppType.bodyStrong.copyWith(fontFamily: AppTheme.fontFamily, color: scheme.onSurface, fontFeatures: tabularFigures),
-                  items: [for (final t in times) DropdownMenuItem(value: t, child: Text(t))],
-                  onChanged: busy ? null : (v) => v == null ? null : onTime(v),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

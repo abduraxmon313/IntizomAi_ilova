@@ -147,7 +147,7 @@ class _CoachPageState extends State<CoachPage> {
             padding: const EdgeInsets.fromLTRB(AppSpace.page, 0, AppSpace.page, 4),
             child: StorePolicy.purchasesVisible
                 ? TextButton(
-                    onPressed: openPremiumInBot,
+                    onPressed: () => openPremium(context),
                     style: TextButton.styleFrom(minimumSize: const Size(0, 36)),
                     child: Text(_remaining == 0 ? context.tr("Bugungi bepul xabarlar tugadi · Premium") : context.tr("1 ta bepul xabar qoldi · Premium")),
                   )

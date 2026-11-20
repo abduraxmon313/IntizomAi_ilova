@@ -218,7 +218,7 @@ class _StatsPageState extends State<StatsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(st.rankTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.heading),
+                      Text(context.tr(st.rankTitle), maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.heading),
                       const SizedBox(height: 2),
                       Text(
                         context.tr("{v0}-daraja · {v1}/{v2} XP", {'v0': st.level, 'v1': st.xpInLevel, 'v2': st.xpNeeded}),

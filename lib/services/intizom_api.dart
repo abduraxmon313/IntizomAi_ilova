@@ -8,8 +8,8 @@ import '../models/profile.dart';
 import '../models/stats.dart';
 import 'api_client.dart';
 
-/// Mini App bilan bir xil endpointlar (webapp/routes/*). Premium cheklovlari,
-/// ball/streak hisob-kitobi va vaqt qoidalari server tomonda — bot bilan bir xil.
+/// Ilova backend'i endpointlari (/api/v1/*, IntizomAi_ilova_database). Premium
+/// cheklovlari, ball/seriya hisob-kitobi va vaqt qoidalari server tomonda.
 class IntizomApi {
   IntizomApi({ApiClient? client}) : _c = client ?? ApiClient();
 
@@ -31,9 +31,6 @@ class IntizomApi {
     return '$base$path';
   }
 
-  /// Telegram profil rasmi (bot orqali proksi, autentifikatsiya talab qilmaydi).
-  static String telegramAvatar(int telegramId) => absoluteUrl('/api/webapp/avatar/$telegramId')!;
-
   // ── Profil, statistika, obuna ────────────────────────
   Future<Profile> profile() async => Profile.fromJson(_map(await _c.get('/profile')));
 
@@ -42,7 +39,10 @@ class IntizomApi {
 
   Future<Profile> updateProfile({
     String? fullName,
+    String? username,
+    int? age,
     bool? notifications,
+    bool? leaderboardVisible,
     String? customPhotoUrl,
     bool removeCustomPhoto = false,
   }) async => Profile.fromJson(
@@ -51,7 +51,10 @@ class IntizomApi {
         '/profile',
         body: {
           'full_name': ?fullName,
+          'username': ?username,
+          'age': ?age,
           'notifications_enabled': ?notifications,
+          'leaderboard_visible': ?leaderboardVisible,
           'custom_photo_url': ?customPhotoUrl,
           if (removeCustomPhoto) 'remove_custom_photo': true,
         },
@@ -59,10 +62,55 @@ class IntizomApi {
     ),
   );
 
+  /// Birinchi kirishdan keyin: ism, yosh, username va (ixtiyoriy) taklif qilgan do'st.
+  Future<Profile> completeOnboarding({
+    required String fullName,
+    required int age,
+    required String username,
+    String? referrerUsername,
+  }) async => Profile.fromJson(
+    _map(
+      await _c.post(
+        '/profile/onboarding',
+        body: {
+          'full_name': fullName,
+          'age': age,
+          'username': username,
+          'referrer_username': ?referrerUsername,
+        },
+      ),
+    ),
+  );
+
+  Future<UsernameCheck> checkUsername(String username) async =>
+      UsernameCheck.fromJson(_map(await _c.get('/users/username-available', query: {'username': username})));
+
+  /// Aniq username bo'yicha foydalanuvchi (taklif yuborishdan oldin ko'rsatish uchun).
+  Future<UserCard> lookupUser(String username) async =>
+      UserCard.fromJson(_map(await _c.get('/users/lookup', query: {'username': username})));
+
   Future<UserStats> stats() async => UserStats.fromJson(_map(await _c.get('/stats')));
 
-  Future<Subscription> subscription() async =>
-      Subscription.fromJson(_map(await _c.get('/subscription')));
+  Future<Subscription> subscription({String? promoCode}) async => Subscription.fromJson(
+    _map(await _c.get('/subscription', query: promoCode == null || promoCode.isEmpty ? null : {'promo_code': promoCode})),
+  );
+
+  Future<PaymentOrder> checkout({required String plan, required String provider, String? promoCode}) async =>
+      PaymentOrder.fromJson(
+        _map(
+          await _c.post(
+            '/payments/checkout',
+            body: {'plan': plan, 'provider': provider, 'promo_code': ?promoCode},
+          ),
+        ),
+      );
+
+  Future<PaymentOrder> paymentStatus(String orderId) async =>
+      PaymentOrder.fromJson(_map(await _c.get('/payments/$orderId')));
+
+  /// Bepul Premium beruvchi promokod. Natija: qo'shilgan kunlar.
+  Future<int> redeemPromo(String code) async =>
+      (_map(await _c.post('/promo/redeem', body: {'code': code}))['days'] as int?) ?? 0;
 
   Future<Leaderboard> leaderboard(String period) async =>
       Leaderboard.fromJson(_map(await _c.get('/leaderboard', query: {'period': period})));
@@ -212,39 +260,55 @@ class IntizomApi {
     );
   }
 
-  // ── Do'stlar ─────────────────────────────────────────
-  Future<List<GroupSummary>> groups() async {
-    final r = _map(await _c.get('/friends/groups'));
-    return _list(r['groups']).map(GroupSummary.fromJson).toList();
-  }
+  // ── Guruhlar ─────────────────────────────────────────
+  Future<GroupList> groups() async => GroupList.fromJson(_map(await _c.get('/groups')));
 
   Future<void> createGroup(String name, String? description) =>
-      _c.post('/friends/groups', body: {'name': name, 'description': description});
+      _c.post('/groups', body: {'name': name, 'description': description});
 
-  Future<GroupDetail> group(int id) async => GroupDetail.fromJson(_map(await _c.get('/friends/groups/$id')));
+  Future<GroupDetail> group(int id) async => GroupDetail.fromJson(_map(await _c.get('/groups/$id')));
 
   Future<void> updateGroup(int id, {required String name, String? description}) =>
-      _c.patch('/friends/groups/$id', body: {'name': name, 'description': description});
+      _c.patch('/groups/$id', body: {'name': name, 'description': description});
 
-  Future<void> deleteGroup(int id) => _c.delete('/friends/groups/$id');
+  Future<void> deleteGroup(int id) => _c.delete('/groups/$id');
 
-  Future<void> leaveGroup(int id) => _c.post('/friends/groups/$id/leave');
+  Future<void> leaveGroup(int id) => _c.post('/groups/$id/leave');
+
+  Future<void> transferGroup(int id, int userId) => _c.post('/groups/$id/transfer', body: {'user_id': userId});
+
+  Future<void> inviteToGroup(int groupId, String username) =>
+      _c.post('/groups/$groupId/invites', body: {'username': username});
+
+  Future<void> cancelInvite(int groupId, int inviteId) => _c.delete('/groups/$groupId/invites/$inviteId');
+
+  Future<List<IncomingInvite>> invites() async =>
+      _list(_map(await _c.get('/invites'))['invites']).map(IncomingInvite.fromJson).toList();
+
+  Future<void> acceptInvite(int inviteId) => _c.post('/invites/$inviteId/accept');
+
+  Future<void> declineInvite(int inviteId, {bool block = false}) =>
+      _c.post('/invites/$inviteId/decline', body: {'block': block});
+
+  Future<List<UserCard>> blockedUsers() async =>
+      _list(_map(await _c.get('/blocks'))['users']).map(UserCard.fromJson).toList();
+
+  Future<void> unblockUser(int userId) => _c.delete('/blocks/$userId');
 
   Future<MemberView> member(int groupId, int userId, DateTime day) async => MemberView.fromJson(
-    _map(await _c.get('/friends/groups/$groupId/members/$userId', query: {'date': ymd(day)})),
+    _map(await _c.get('/groups/$groupId/members/$userId', query: {'date': ymd(day)})),
   );
 
   Future<Permissions> permissions(int groupId) async =>
-      Permissions.fromJson(_map(await _c.get('/friends/groups/$groupId/permissions')));
+      Permissions.fromJson(_map(await _c.get('/groups/$groupId/permissions')));
 
   Future<void> setPermission(int groupId, int granteeId, {required bool canManage}) =>
-      _c.put('/friends/groups/$groupId/permissions/$granteeId', body: {'can_manage': canManage});
+      _c.put('/groups/$groupId/permissions/$granteeId', body: {'can_manage': canManage});
 
-  Future<void> removeMember(int groupId, int userId) =>
-      _c.delete('/friends/groups/$groupId/members/$userId');
+  Future<void> removeMember(int groupId, int userId) => _c.delete('/groups/$groupId/members/$userId');
 
   Future<void> setMemberActive(int groupId, int userId, bool active) =>
-      _c.put('/friends/groups/$groupId/members/$userId/active', body: {'is_active': active});
+      _c.put('/groups/$groupId/members/$userId/active', body: {'is_active': active});
 
   Future<void> createPlanForMember(
     int groupId,
@@ -254,7 +318,7 @@ class IntizomApi {
     String? scheduledTime,
     required String planDate,
   }) => _c.post(
-    '/friends/groups/$groupId/members/$userId/plans',
+    '/groups/$groupId/members/$userId/plans',
     body: {
       'title': title,
       'description': ?description,
@@ -264,31 +328,7 @@ class IntizomApi {
   );
 
   Future<void> createHabitForMember(int groupId, int userId, HabitInput h) =>
-      _c.post('/friends/groups/$groupId/members/$userId/habits', body: _habitBody(h));
-
-  Future<DigestSettings> digestSettings(int groupId) async =>
-      DigestSettings.fromJson(_map(await _c.get('/friends/groups/$groupId/telegram/settings')));
-
-  Future<DigestSettings> updateDigest(int groupId, Map<String, dynamic> body) async =>
-      DigestSettings.fromJson(_map(await _c.put('/friends/groups/$groupId/telegram/settings', body: body)));
-
-  Future<List<TelegramChat>> digestCandidates(int groupId) async {
-    final r = _map(await _c.get('/friends/groups/$groupId/telegram/candidates'));
-    return _list(r['candidates']).map(TelegramChat.fromJson).toList();
-  }
-
-  Future<void> linkTelegram(int groupId, TelegramChat chat) => _c.post(
-    '/friends/groups/$groupId/telegram/link',
-    body: {'telegram_chat_id': chat.chatId, 'telegram_chat_title': chat.title},
-  );
-
-  Future<void> unlinkTelegram(int groupId) => _c.post('/friends/groups/$groupId/telegram/unlink');
-
-  /// [kind]: 'plans' — kunlik reja, 'report' — kunlik hisobot. Natija: (ok, sabab).
-  Future<(bool, String?)> testDigest(int groupId, String kind) async {
-    final r = _map(await _c.post('/friends/groups/$groupId/telegram/$kind-test'));
-    return (r['ok'] == true, r['reason'] as String?);
-  }
+      _c.post('/groups/$groupId/members/$userId/habits', body: _habitBody(h));
 }
 
 /// Odat yaratish/tahrirlash formasi.

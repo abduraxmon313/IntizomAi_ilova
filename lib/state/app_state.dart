@@ -5,11 +5,25 @@ import '../models/habit.dart';
 import '../models/profile.dart';
 import '../models/stats.dart';
 import '../services/intizom_api.dart';
+import '../widgets/paywall.dart' show premiumChanged;
 
 /// Bir nechta bo'limda ishlatiladigan ma'lumotlar: profil, statistika,
 /// odatlar, maqsadlar. Biror bo'limda o'zgarish bo'lsa, qolganlari ham yangilanadi.
 class AppState extends ChangeNotifier {
-  AppState(this.api);
+  AppState(this.api) {
+    premiumChanged.addListener(_onPremiumChanged);
+  }
+
+  void _onPremiumChanged() {
+    refreshStats();
+    refreshProfile();
+  }
+
+  @override
+  void dispose() {
+    premiumChanged.removeListener(_onPremiumChanged);
+    super.dispose();
+  }
 
   final IntizomApi api;
 

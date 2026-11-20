@@ -6,7 +6,10 @@ class AuthStore {
   AuthStore({FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
 
-  static const _tokenKey = 'intizom_ai.auth.token.v1';
+  // v2: yangi (alohida) backend tokeni. Eski bot tokeni (v1) bilan aralashmaydi.
+  static const _tokenKey = 'intizom_ai.auth.token.v2';
+  static const _onboardedKey = 'intizom_ai.auth.onboarded.v2';
+  static const _legacyTokenKey = 'intizom_ai.auth.token.v1';
 
   final FlutterSecureStorage _storage;
 
@@ -24,9 +27,26 @@ class AuthStore {
 
   Future<bool> isLoggedIn() async => (await getToken()) != null;
 
-  Future<void> clear() async {
+  /// Profil to'ldirilganmi (oflayn ishga tushganda ham to'g'ri sahifani ko'rsatish uchun).
+  Future<bool> isOnboarded() async {
     try {
-      await _storage.delete(key: _tokenKey);
+      return await _storage.read(key: _onboardedKey) == '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> setOnboarded(bool value) async {
+    try {
+      await _storage.write(key: _onboardedKey, value: value ? '1' : '0');
     } catch (_) {}
+  }
+
+  Future<void> clear() async {
+    for (final k in [_tokenKey, _onboardedKey, _legacyTokenKey]) {
+      try {
+        await _storage.delete(key: k);
+      } catch (_) {}
+    }
   }
 }

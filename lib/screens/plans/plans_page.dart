@@ -219,7 +219,7 @@ class PlansPageState extends State<PlansPage> {
                         key: ValueKey('empty${ymd(_day)}'),
                         icon: LucideIcons.calendarPlus,
                         title: past ? context.tr("Bu kunda reja bo'lmagan") : context.tr("Bu kunga hali reja yo'q"),
-                        message: past ? null : context.tr("Vaqtini belgilasangiz, bot o'z vaqtida eslatadi."),
+                        message: past ? null : context.tr("Vaqtini belgilasangiz, telefoningiz o'z vaqtida eslatadi."),
                         actionLabel: context.tr("Reja qo'shish"),
                         onAction: past ? null : _addPlan,
                       )

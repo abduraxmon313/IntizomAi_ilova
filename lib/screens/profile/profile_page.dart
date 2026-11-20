@@ -1,8 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -10,6 +12,7 @@ import '../auth/language_page.dart';
 import '../../config/app_config.dart';
 import '../../config/store_policy.dart';
 import '../../models/extras.dart';
+import '../../models/profile.dart';
 import '../../services/ai_consent_store.dart';
 import '../../services/api_client.dart';
 import '../../services/intizom_api.dart';
@@ -19,6 +22,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/dates.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/feedback.dart';
+import '../../widgets/paywall.dart';
 import '../../widgets/reminder_setup.dart';
 import '../../widgets/ui_kit.dart';
 
@@ -95,9 +99,135 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _shareInvite() async {
-    final link = s.profile?.referralLink;
-    if (link == null) return;
-    await _open(Uri.https('t.me', '/share/url', {'url': link, 'text': context.tr('Birga intizomli bo‘laylik! IntizomAI bilan reja va odatlaringizni kuzating.')}).toString());
+    final p = s.profile;
+    final link = p?.referralLink;
+    if (p == null || link == null) return;
+    final text = context.tr(
+      "Birga intizomli bo'laylik! IntizomAI'ni o'rnating va ro'yxatdan o'tishda meni taklif qilgan deb @{v0} ni yozing: {v1}",
+      {'v0': p.username ?? '', 'v1': link},
+    );
+    try {
+      await SharePlus.instance.share(ShareParams(text: text));
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (mounted) toast(context, context.tr("Taklif matni nusxalandi"));
+    }
+  }
+
+  Future<void> _editUsername() async {
+    final ctrl = TextEditingController(text: s.profile?.username ?? '');
+    await showFormSheet<void>(
+      context,
+      title: context.tr("Username"),
+      subtitle: context.tr("Do'stlaringiz sizni shu nom bilan topib, guruhga taklif qiladi"),
+      builder: (ctx, _) => TextField(
+        controller: ctrl,
+        autofocus: true,
+        maxLength: 20,
+        autocorrect: false,
+        enableSuggestions: false,
+        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9_]')), LowerCaseFormatter()],
+        decoration: InputDecoration(prefixText: '@', hintText: 'username', counterText: ''),
+      ),
+      onSave: () async {
+        final u = ctrl.text.trim();
+        if (u.isEmpty || u == s.profile?.username) return u.isNotEmpty;
+        try {
+          s.setProfile(await s.api.updateProfile(username: u));
+          return true;
+        } catch (e) {
+          if (mounted) showApiError(context, e);
+          return false;
+        }
+      },
+    );
+  }
+
+  Future<void> _editAge() async {
+    final ctrl = TextEditingController(text: s.profile?.age?.toString() ?? '');
+    await showFormSheet<void>(
+      context,
+      title: context.tr("Yosh"),
+      builder: (ctx, _) => TextField(
+        controller: ctrl,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        maxLength: 3,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        decoration: InputDecoration(hintText: context.tr("Yoshingiz"), counterText: ''),
+      ),
+      onSave: () async {
+        final age = int.tryParse(ctrl.text.trim());
+        if (age == null) return false;
+        try {
+          s.setProfile(await s.api.updateProfile(age: age));
+          return true;
+        } catch (e) {
+          if (mounted) showApiError(context, e);
+          return false;
+        }
+      },
+    );
+  }
+
+  Future<void> _setLeaderboardVisible(bool v) async {
+    try {
+      s.setProfile(await s.api.updateProfile(leaderboardVisible: v));
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    }
+  }
+
+  Future<void> _blockedUsers() async {
+    List<UserCard> users;
+    try {
+      users = await s.api.blockedUsers();
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+      return;
+    }
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => SheetScaffold(
+          title: context.tr("Bloklanganlar"),
+          child: users.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    context.tr("Hech kim bloklanmagan. Guruh taklifini rad etishda bloklash mumkin."),
+                    textAlign: TextAlign.center,
+                    style: AppType.label.copyWith(color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+                  ),
+                )
+              : GroupCard(
+                  indent: 64,
+                  children: [
+                    for (final u in users)
+                      ListTile(
+                        leading: ProfileAvatar(url: u.photoUrl, name: u.name, size: 36),
+                        title: Text(u.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        subtitle: u.username == null ? null : Text('@${u.username}'),
+                        trailing: TextButton(
+                          onPressed: () async {
+                            try {
+                              await s.api.unblockUser(u.userId);
+                              setSheet(() => users = users.where((x) => x.userId != u.userId).toList());
+                            } catch (e) {
+                              if (ctx.mounted) showApiError(ctx, e);
+                            }
+                          },
+                          child: Text(context.tr("Blokdan chiqarish")),
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+      ),
+    );
   }
 
   Future<void> _editName() async {
@@ -148,7 +278,7 @@ class _ProfilePageState extends State<ProfilePage> {
             if (hasCustom)
               ListTile(
                 leading: Icon(LucideIcons.trash2, color: Theme.of(ctx).colorScheme.error),
-                title: Text(context.tr("Telegram rasmiga qaytish"), style: AppType.body.copyWith(color: Theme.of(ctx).colorScheme.error)),
+                title: Text(context.tr("Rasmni o'chirish"), style: AppType.body.copyWith(color: Theme.of(ctx).colorScheme.error)),
                 onTap: () => Navigator.pop(ctx, 'remove'),
               ),
             const SizedBox(height: 8),
@@ -195,7 +325,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _logout() async {
-    if (!await confirmAction(context, title: context.tr("Hisobdan chiqish"), message: context.tr("Qayta kirish uchun Telegram orqali tasdiqlaysiz."), confirmLabel: context.tr("Chiqish"))) {
+    if (!await confirmAction(context, title: context.tr("Hisobdan chiqish"), message: context.tr("Qayta kirish uchun Google yoki Apple hisobingiz bilan kirasiz."), confirmLabel: context.tr("Chiqish"))) {
       return;
     }
     if (!mounted) return;
@@ -209,8 +339,8 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!await confirmAction(
       context,
       title: context.tr("Hisobni o'chirish"),
-      message: context.tr("Profilingiz, reja, odat, maqsad, natija va yutuqlaringiz, siz yaratgan guruhlar hamda faol obunangiz butunlay o'chiriladi. Bu amalni qaytarib bo'lmaydi."),
-      confirmLabel: "Davom etish",
+      message: context.tr("Profilingiz, reja, odat, maqsad, natija va yutuqlaringiz hamda faol obunangiz butunlay o'chiriladi. Siz egasi bo'lgan guruhlar boshqa a'zoga topshiriladi. Bu amalni qaytarib bo'lmaydi."),
+      confirmLabel: context.tr("Davom etish"),
     )) {
       return;
     }
@@ -219,7 +349,7 @@ class _ProfilePageState extends State<ProfilePage> {
       context,
       title: context.tr("Rostdan ham o'chirilsinmi?"),
       message: context.tr("Barcha ma'lumotlaringiz qayta tiklanmaydi."),
-      confirmLabel: "Butunlay o'chirish",
+      confirmLabel: context.tr("Butunlay o'chirish"),
     )) {
       return;
     }
@@ -287,7 +417,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               child: Stack(
                                 clipBehavior: Clip.none,
                                 children: [
-                                  ProfileAvatar(url: p.avatar, telegramId: p.telegramId, name: p.fullName, size: 72),
+                                  ProfileAvatar(url: p.avatar, name: p.fullName, size: 72),
                                   Positioned(
                                     right: -2,
                                     bottom: -2,
@@ -342,6 +472,13 @@ class _ProfilePageState extends State<ProfilePage> {
                       indent: 50,
                       children: [
                         SettingTile(icon: LucideIcons.userRound, title: context.tr("Ism"), subtitle: p.fullName, onTap: _editName),
+                        SettingTile(icon: LucideIcons.atSign, title: context.tr("Username"), subtitle: p.username == null ? null : '@${p.username}', onTap: _editUsername),
+                        SettingTile(
+                          icon: LucideIcons.cake,
+                          title: context.tr("Yosh"),
+                          subtitle: p.age == null ? null : context.tr("{v0} yosh", {'v0': p.age}),
+                          onTap: _editAge,
+                        ),
                         SettingTile(
                           icon: LucideIcons.gift,
                           title: context.tr("Do'stni taklif qilish"),
@@ -352,6 +489,12 @@ class _ProfilePageState extends State<ProfilePage> {
                                     : context.tr("Do'stlaringizni ilovaga taklif qiling")),
                           onTap: _shareInvite,
                         ),
+                        if (StorePolicy.purchasesVisible)
+                          SettingTile(
+                            icon: LucideIcons.ticket,
+                            title: context.tr("Promokodni faollashtirish"),
+                            onTap: () => showPromoRedeem(context),
+                          ),
                       ],
                     ),
 
@@ -381,6 +524,18 @@ class _ProfilePageState extends State<ProfilePage> {
                           trailing: Switch(value: _phoneReminders, onChanged: _setPhoneReminders),
                         ),
                         SettingTile(
+                          icon: LucideIcons.trophy,
+                          title: context.tr("Reytingda ko'rinish"),
+                          subtitle: context.tr("Ismingiz va ballingiz umumiy reytingda ko'rinadi"),
+                          trailing: Switch(value: p.leaderboardVisible, onChanged: _setLeaderboardVisible),
+                        ),
+                        SettingTile(
+                          icon: LucideIcons.userX,
+                          title: context.tr("Bloklanganlar"),
+                          subtitle: context.tr("Guruhga taklif yubora olmaydigan foydalanuvchilar"),
+                          onTap: _blockedUsers,
+                        ),
+                        SettingTile(
                           icon: LucideIcons.sparkles,
                           title: context.tr("AI murabbiyga ruxsat"),
                           subtitle: context.tr("Xabarlar va rejalar javob uchun OpenAI'ga yuboriladi"),
@@ -404,19 +559,19 @@ class _ProfilePageState extends State<ProfilePage> {
                           icon: LucideIcons.messageCircle,
                           title: context.tr("Qo'llab-quvvatlash"),
                           subtitle: context.tr("Savol va takliflar"),
-                          onTap: () => _open('https://t.me/IntizomAI_Admin_bot'),
+                          onTap: () => _open(kSupportUrl),
                         ),
                         SettingTile(
                           icon: LucideIcons.megaphone,
                           title: context.tr("Telegram kanal"),
                           subtitle: context.tr("Yangiliklar va maslahatlar"),
-                          onTap: () => _open('https://t.me/Intizom_AI'),
+                          onTap: () => _open(kChannelUrl),
                         ),
                         SettingTile(
                           icon: LucideIcons.atSign,
                           title: 'Instagram',
                           subtitle: '@intizomai.uz',
-                          onTap: () => _open('https://www.instagram.com/intizomai.uz'),
+                          onTap: () => _open(kInstagramUrl),
                         ),
                         if (kApiBaseUrl.isNotEmpty)
                           SettingTile(
@@ -435,7 +590,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      'IntizomAI · ID ${p.telegramId}',
+                      'IntizomAI · ID ${p.id}${p.providers.isEmpty ? '' : ' · ${p.providers.map((e) => e == 'apple' ? 'Apple' : 'Google').join(', ')}'}',
                       textAlign: TextAlign.center,
                       style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400, fontFeatures: tabularFigures),
                     ),
@@ -464,10 +619,8 @@ class _SubscriptionCard extends StatelessWidget {
     final days = sub?.daysLeft ?? 0;
     final canPurchase = StorePolicy.purchasesVisible;
     return AppCard(
-      // iOS'da (App Store 3.1.1) botga yo'naltiruvchi "uzaytirish" bo'lmaydi;
-      // bepul foydalanuvchi uchun neytral oyna chiqadi.
       onTap: premium
-          ? (canPurchase ? openPremiumInBot : null)
+          ? (canPurchase ? () => openPremium(context) : null)
           : () => showPremiumDialog(context, context.tr("Barcha imkoniyatlarni oching.")),
       padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
       child: Column(
@@ -518,18 +671,16 @@ class _SubscriptionCard extends StatelessWidget {
   }
 }
 
-/// Profil rasmi: maxsus rasm (URL/base64) → Telegram rasmi (bot proksi) → bosh harf.
+/// Profil rasmi: yuklangan yoki Google rasmi (URL/base64) → bosh harf.
 class ProfileAvatar extends StatelessWidget {
   const ProfileAvatar({
     super.key,
     required this.url,
-    required this.telegramId,
     required this.name,
     this.size = 36,
   });
 
   final String? url;
-  final int telegramId;
   final String name;
   final double size;
 
@@ -543,7 +694,7 @@ class ProfileAvatar extends StatelessWidget {
         } catch (_) {}
       }
     }
-    final abs = IntizomApi.absoluteUrl(u) ?? (telegramId > 0 ? IntizomApi.telegramAvatar(telegramId) : null);
+    final abs = IntizomApi.absoluteUrl(u);
     return abs == null ? null : NetworkImage(abs);
   }
 
@@ -575,4 +726,11 @@ class ProfileAvatar extends StatelessWidget {
     initial,
     style: AppType.bodyStrong.copyWith(fontSize: size * .42, height: 1, fontWeight: FontWeight.w700, color: scheme.onPrimaryContainer),
   );
+}
+
+/// Kiritilgan matnni kichik harfga o'tkazadi (username uchun).
+class LowerCaseFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) =>
+      newValue.copyWith(text: newValue.text.toLowerCase());
 }

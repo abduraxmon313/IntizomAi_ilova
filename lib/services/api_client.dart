@@ -50,6 +50,12 @@ class ApiClient {
   /// Global: sessiya tugaganda chaqiriladi (main.dart o'rnatadi).
   static void Function()? onUnauthorized;
 
+  /// Global: server profilni to'ldirishni so'raganda (onboarding sahifasiga o'tadi).
+  static void Function()? onOnboardingRequired;
+
+  /// Joriy ilova tili (uz/ru/en) — server xato matnlarini shu tilda qaytaradi.
+  static String language = 'uz';
+
   /// Oflayn holati — saqlangan ma'lumot ko'rsatilayotganini bildiradi.
   /// Har muvaffaqiyatli so'rovdan keyin o'chadi. UI banner uchun.
   static final ValueNotifier<bool> offline = ValueNotifier<bool>(false);
@@ -165,6 +171,7 @@ class ApiClient {
     final headers = <String, String>{
       'Accept': 'application/json',
       'X-App-Platform': defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
+      'Accept-Language': language,
       if (body != null) 'Content-Type': 'application/json',
     };
     if (auth) {
@@ -212,6 +219,10 @@ class ApiClient {
       unawaited(_authStore.clear());
       unawaited(ResponseCache.instance.clear());
       onUnauthorized?.call();
+    }
+    // Profil to'ldirilmagan (masalan boshqa qurilmada kirib, onboarding'ni tugatmagan).
+    if (code == 403 && response.headers['x-onboarding-required'] == '1') {
+      onOnboardingRequired?.call();
     }
     throw ApiException(message, statusCode: code);
   }
