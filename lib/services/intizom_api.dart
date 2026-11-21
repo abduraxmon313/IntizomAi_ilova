@@ -27,8 +27,7 @@ class IntizomApi {
   static String? absoluteUrl(String? path) {
     if (path == null || path.isEmpty) return null;
     if (path.startsWith('http') || path.startsWith('data:')) return path;
-    final base = kApiBaseUrl.trim().replaceAll(RegExp(r'/+$'), '');
-    return '$base$path';
+    return '$kApiBaseUrl$path';
   }
 
   // ── Profil, statistika, obuna ────────────────────────

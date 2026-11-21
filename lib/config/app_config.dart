@@ -6,7 +6,21 @@
 /// Codemagic ularni `IntizomAi` guruhidagi o'zgaruvchilardan oladi.
 library;
 
-const kApiBaseUrl = String.fromEnvironment('API_BASE_URL');
+const _rawApiBaseUrl = String.fromEnvironment('API_BASE_URL');
+
+/// Server manzili. `https://` yozilmay qolgan bo'lsa ham to'g'ri ishlaydi,
+/// oxiridagi `/` olib tashlanadi.
+final String kApiBaseUrl = _normalizeBase(_rawApiBaseUrl);
+
+String _normalizeBase(String raw) {
+  var s = raw.trim().replaceAll(RegExp(r'/+$'), '');
+  if (s.isEmpty) return s;
+  if (!s.startsWith('http://') && !s.startsWith('https://')) s = 'https://$s';
+  return s;
+}
+
+/// Maxfiylik siyosati sahifasi (build vaqtida `--dart-define=PRIVACY_URL=...` bilan almashtirsa bo'ladi).
+const kPrivacyUrl = String.fromEnvironment('PRIVACY_URL', defaultValue: 'https://intizom.app/privacy');
 
 /// Google Cloud → OAuth "Web application" client ID. Android'da ID token shu
 /// auditoriya bilan beriladi va server uni tekshiradi.
@@ -22,6 +36,5 @@ const kInstagramUrl = 'https://www.instagram.com/intizomai.uz';
 
 /// Ilova API'si: /api/v1/...
 Uri apiUri(String path, [Map<String, String>? query]) {
-  final base = kApiBaseUrl.trim().replaceAll(RegExp(r'/+$'), '');
-  return Uri.parse('$base/api/v1$path').replace(queryParameters: query);
+  return Uri.parse('$kApiBaseUrl/api/v1$path').replace(queryParameters: query);
 }
