@@ -531,6 +531,9 @@ const interfaceTranslations = <String, (String, String)>{
   "Olib tashlash": ("Убрать", "Remove"),
   "Bepul Premium yoki chegirma promokodi": ("Промокод на бесплатный Premium или скидку", "Free Premium or discount promo code"),
 
+  "Faqat: {v0}": ("Только: {v0}", "Only: {v0}"),
+  "E'lon": ("Объявление", "Announcement"),
+
   // ── Ro'yxatdan o'tish ──
   "{v0}-qadam, jami {v1}": ("Шаг {v0} из {v1}", "Step {v0} of {v1}"),
   "Ismingiz nima?": ("Как вас зовут?", "What's your name?"),

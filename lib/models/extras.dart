@@ -156,12 +156,15 @@ class PayProvider {
 }
 
 class PromoInfo {
-  const PromoInfo({required this.code, this.valid = false, this.isFree = false, this.discountPercent = 0, this.bonusDays = 0});
+  const PromoInfo({required this.code, this.valid = false, this.isFree = false, this.discountPercent = 0, this.bonusDays = 0, this.planKeys});
   final String code;
   final bool valid;
   final bool isFree;
   final int discountPercent;
   final int bonusDays;
+
+  /// Faqat shu tariflarga amal qiladi (null — hammasiga).
+  final List<String>? planKeys;
 
   factory PromoInfo.fromJson(Map<String, dynamic> j) => PromoInfo(
     code: j['code'] as String? ?? '',
@@ -169,6 +172,7 @@ class PromoInfo {
     isFree: j['is_free'] as bool? ?? false,
     discountPercent: j['discount_percent'] as int? ?? 0,
     bonusDays: j['bonus_days'] as int? ?? 0,
+    planKeys: (j['plan_keys'] as List?)?.whereType<String>().toList(),
   );
 }
 
@@ -204,5 +208,24 @@ class PaymentOrder {
     subscription: j['subscription'] is Map
         ? Subscription.fromJson(Map<String, dynamic>.from(j['subscription'] as Map))
         : null,
+  );
+}
+
+/// Admin paneldan yozilgan e'lon — /api/v1/announcements. «Bugun» sahifasida ko'rinadi.
+class Announcement {
+  const Announcement({required this.id, required this.title, required this.body, this.buttonLabel, this.buttonUrl});
+
+  final int id;
+  final String title;
+  final String body;
+  final String? buttonLabel;
+  final String? buttonUrl;
+
+  factory Announcement.fromJson(Map<String, dynamic> j) => Announcement(
+    id: j['id'] as int? ?? 0,
+    title: j['title'] as String? ?? '',
+    body: j['body'] as String? ?? '',
+    buttonLabel: j['button_label'] as String?,
+    buttonUrl: j['button_url'] as String?,
   );
 }
