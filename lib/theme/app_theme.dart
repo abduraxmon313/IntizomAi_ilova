@@ -19,12 +19,12 @@ abstract final class AppPalette {
   static const gold = Color(0xFFB7791F); // reytingda 1-o'rin, afsonaviy yutuq
   static const bronze = Color(0xFFA9714B); // reytingda 3-o'rin
 
-  // ── Premium (yashil, ✅ belgisiga yaqin, logodagi ko'kka moslangan) ──
-  static const premium = Color(0xFF10B981); // faqat Premium belgisi/yuzasi
-  static const premiumInk = Color(0xFF047857); // yorug' fonda: tugma (oq matn bilan AA), kichik matn
-  static const premiumBright = Color(0xFF34D399); // qorong'i fonda: tugma, matn
-  static const premiumDeep = Color(0xFF053B2C); // premiumBright ustidagi matn
-  static const premiumTint = Color(0xFFE6F7EF); // yorug' yuzalar foni
+  // ── Premium (oltin) ──────────────────────────────────
+  static const premium = Color(0xFFF2B705); // Premium belgisi/yuzasi, yorug' fonda tugma (to'q matn bilan)
+  static const premiumInk = Color(0xFF8F6200); // yorug' fonda kichik matn va ikonka (AA)
+  static const premiumBright = Color(0xFFFFC933); // qorong'i fonda: tugma, matn
+  static const premiumDeep = Color(0xFF3B2A00); // oltin tugma ustidagi matn
+  static const premiumTint = Color(0xFFFFF6DB); // yorug' yuzalar foni
 
   // ── Neytral (yorug') ─────────────────────────────────
   static const ink = Color(0xFF0B1720);
@@ -71,8 +71,8 @@ abstract final class AppPalette {
   }
 
   /// Premium tugma/plita to'ldirish rangi va uning ustidagi matn rangi.
-  static Color premiumFill(Brightness b) => b == Brightness.dark ? premiumBright : premiumInk;
-  static Color onPremium(Brightness b) => b == Brightness.dark ? premiumDeep : paper;
+  static Color premiumFill(Brightness b) => b == Brightness.dark ? premiumBright : premium;
+  static Color onPremium(Brightness b) => premiumDeep;
 }
 
 abstract final class AppRadius {

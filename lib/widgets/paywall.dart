@@ -28,15 +28,15 @@ Future<void> showPaywall(BuildContext context, {String? message, String? promo})
 
 enum _Stage { choose, waiting, success }
 
-/// Premium rangi (yashil): tugma va tanlangan holat. Yorug' rejimda to'q ton (oq matn bilan AA).
+/// Premium rangi (oltin): tugma va tanlangan holat. Ustidagi matn to'q jigarrang (AA).
 Color _premiumFill(Brightness b) => AppPalette.premiumFill(b);
 Color _onPremium(Brightness b) => AppPalette.onPremium(b);
 
-/// Toj plitasi: ikkala rejimda ham bir xil yashil gradient, oq ikonka.
+/// Toj plitasi: ikkala rejimda ham bir xil oltin gradient, to'q ikonka.
 const _crownGradient = LinearGradient(
   begin: Alignment.topLeft,
   end: Alignment.bottomRight,
-  colors: [AppPalette.premium, AppPalette.premiumInk],
+  colors: [Color(0xFFFFD54F), Color(0xFFE0A100)],
 );
 
 class _PaywallSheet extends StatefulWidget {
@@ -342,8 +342,8 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: dark
-              ? const [Color(0xFF0E2E24), Color(0xFF0C1814)]
-              : const [AppPalette.premiumTint, Color(0xFFCDEFDF)],
+              ? const [Color(0xFF2E2408), Color(0xFF17130A)]
+              : const [AppPalette.premiumTint, Color(0xFFFFE9A8)],
         ),
         border: Border.all(color: AppPalette.premium.withValues(alpha: dark ? .35 : .25)),
       ),
@@ -361,7 +361,7 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
                   gradient: _crownGradient,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(LucideIcons.crown, size: 26, color: Colors.white),
+                child: const Icon(LucideIcons.crown, size: 26, color: AppPalette.premiumDeep),
               ),
               const Spacer(),
               _closeButton(),
@@ -427,7 +427,7 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
       (LucideIcons.repeat, context.tr("Odatlar"), context.tr("{v0} ta", {'v0': f.habits}), unlimited),
       (LucideIcons.target, context.tr("Maqsadlar"), context.tr("{v0} ta", {'v0': f.goals}), unlimited),
       (LucideIcons.sparkles, context.tr("AI murabbiy"), context.tr("Kuniga {v0} ta", {'v0': f.aiPerDay}), unlimited),
-      (LucideIcons.users, context.tr("Guruh yaratish"), null, ''),
+      (LucideIcons.users, context.tr("Guruhlar"), null, ''),
     ];
     final head = AppType.micro.copyWith(fontWeight: FontWeight.w600, letterSpacing: .3);
     Widget cell(String? text, {required bool premium}) {
@@ -487,20 +487,21 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
     final base = _perMonth(shortest);
     int saving(PricePlan p) => base <= 0 || p.key == shortest.key ? 0 : ((1 - _perMonth(p) / base) * 100).round();
     final best = plans.reduce((a, b) => saving(a) >= saving(b) ? a : b);
-    return [for (final p in plans) _planTile(p, saving(p), best.key == p.key && saving(p) >= 5)];
+    return [for (final p in plans) _planTile(p, best.key == p.key && saving(p) >= 5)];
   }
 
-  Widget _planTile(PricePlan p, int savingPct, bool bestValue) {
+  Widget _planTile(PricePlan p, bool bestValue) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final on = _plan == p.key;
     final accent = AppPalette.textTone(AppPalette.premium, theme.brightness);
-    final badge = (p.tag != null && p.tag!.isNotEmpty)
-        ? p.tag!
-        : (savingPct >= 5 ? context.tr("{v0}% tejaysiz", {'v0': savingPct}) : null);
-    final sub = p.days > 31 && p.monthlyLabel != null
-        ? context.tr("≈ {v0} / oy", {'v0': p.monthlyLabel})
-        : context.tr("{v0} kun", {'v0': p.days});
+    // Tarif ostida bitta qator: belgi (masalan, "33% tejaysiz") bo'lsa — faqat u;
+    // bo'lmasa uzun tarifda oylik narx ("≈ 14 990 so'm / oy"), oylikda — kunlar soni.
+    final badge = (p.tag != null && p.tag!.isNotEmpty) ? p.tag! : null;
+    final sub = badge ??
+        (p.days > 31 && p.monthlyLabel != null
+            ? context.tr("≈ {v0} / oy", {'v0': p.monthlyLabel})
+            : context.tr("{v0} kun", {'v0': p.days}));
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Semantics(
@@ -551,7 +552,7 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          badge == null ? sub : '$sub · $badge',
+                          sub,
                           style: AppType.caption.copyWith(
                             color: badge == null ? scheme.onSurfaceVariant : accent,
                             fontWeight: badge == null ? FontWeight.w400 : FontWeight.w600,
@@ -860,7 +861,7 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
             width: 72,
             height: 72,
             decoration: BoxDecoration(gradient: _crownGradient, borderRadius: BorderRadius.circular(22)),
-            child: const Icon(LucideIcons.crown, size: 34, color: Colors.white),
+            child: const Icon(LucideIcons.crown, size: 34, color: AppPalette.premiumDeep),
           ),
         ),
         const SizedBox(height: 18),

@@ -714,7 +714,7 @@ class _Heatmap extends StatelessWidget {
   }
 }
 
-/// Reytingda Premium foydalanuvchi belgisi: yashil doirachada toj.
+/// Reytingda Premium foydalanuvchi belgisi: oltin doirachada toj.
 class _PremiumMark extends StatelessWidget {
   const _PremiumMark();
 

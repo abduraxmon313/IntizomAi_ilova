@@ -624,7 +624,7 @@ class _SubscriptionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              AppIconTile(icon: LucideIcons.crown, tone: AppPalette.premium, size: 40),
+              AppIconTile(icon: LucideIcons.crown, tone: AppPalette.premiumInk, size: 40),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
