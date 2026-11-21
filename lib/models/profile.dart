@@ -77,14 +77,18 @@ class UserCard {
 
 /// Username tekshiruvi natijasi.
 class UsernameCheck {
-  const UsernameCheck({required this.username, required this.available, this.reason});
+  const UsernameCheck({required this.username, required this.available, this.reason, this.suggestions = const []});
   final String username;
   final bool available;
   final String? reason;
+
+  /// Band yoki yaroqsiz bo'lsa — server taklif qilgan bo'sh variantlar.
+  final List<String> suggestions;
 
   factory UsernameCheck.fromJson(Map<String, dynamic> j) => UsernameCheck(
     username: j['username'] as String? ?? '',
     available: j['available'] as bool? ?? false,
     reason: j['reason'] as String?,
+    suggestions: (j['suggestions'] as List? ?? const []).whereType<String>().toList(),
   );
 }

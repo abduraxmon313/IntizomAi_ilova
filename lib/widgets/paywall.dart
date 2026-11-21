@@ -16,20 +16,26 @@ final premiumChanged = ValueNotifier<int>(0);
 
 /// Ilova ichida Premium sotib olish oynasi: tarif → to'lov usuli → (promokod) → to'lash.
 /// To'lov Paylov sahifasida bo'ladi; ilovaga qaytgach holat avtomatik tekshiriladi.
-Future<void> showPaywall(BuildContext context, {String? message}) {
+/// [promo] berilsa — promokod oldindan qo'llanadi (Profil → Promokod'dan kelganda).
+Future<void> showPaywall(BuildContext context, {String? message, String? promo}) {
   return showModalBottomSheet<void>(
     context: context,
     useSafeArea: true,
     isScrollControlled: true,
-    builder: (_) => _PaywallSheet(message: message),
+    builder: (_) => _PaywallSheet(message: message, initialPromo: promo),
   );
 }
 
 enum _Stage { choose, waiting, success }
 
+/// Premium oltin rangi: yorug' rejimda to'qroq ton (oq matn bilan AA).
+Color _goldFill(Brightness b) => b == Brightness.dark ? AppPalette.gold : AppPalette.goldInk;
+Color _onGold(Brightness b) => b == Brightness.dark ? const Color(0xFF1F1405) : Colors.white;
+
 class _PaywallSheet extends StatefulWidget {
-  const _PaywallSheet({this.message});
+  const _PaywallSheet({this.message, this.initialPromo});
   final String? message;
+  final String? initialPromo;
 
   @override
   State<_PaywallSheet> createState() => _PaywallSheetState();
@@ -37,15 +43,17 @@ class _PaywallSheet extends StatefulWidget {
 
 class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserver {
   final _api = IntizomApi();
-  final _promo = TextEditingController();
+  late final _promo = TextEditingController(text: widget.initialPromo ?? '');
 
   Subscription? _sub;
   String? _error;
   String? _plan;
   String? _provider;
   String? _appliedPromo;
+  String? _promoError;
   bool _busy = false;
-  bool _showPromo = false;
+  bool _promoBusy = false;
+  late bool _showPromo = (widget.initialPromo ?? '').isNotEmpty;
 
   _Stage _stage = _Stage.choose;
   PaymentOrder? _order;
@@ -57,7 +65,8 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _load();
+    final p = widget.initialPromo?.trim();
+    _load(promo: p == null || p.isEmpty ? null : p);
   }
 
   @override
@@ -76,8 +85,13 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
 
   Future<void> _load({String? promo}) async {
     setState(() {
-      _busy = true;
+      if (promo == null) {
+        _busy = true;
+      } else {
+        _promoBusy = true;
+      }
       _error = null;
+      _promoError = null;
     });
     try {
       final s = await _api.subscription(promoCode: promo);
@@ -89,15 +103,29 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
           _provider = s.providers.isEmpty ? null : s.providers.first.key;
         }
         _appliedPromo = (s.promo?.valid ?? false) ? s.promo!.code : null;
+        if (promo != null && (s.promo == null || !s.promo!.valid)) {
+          _promoError = context.tr("Promokod yaroqsiz yoki muddati tugagan");
+        }
       });
-      if (promo != null && s.promo != null && !s.promo!.valid && mounted) {
-        toast(context, context.tr("Promokod yaroqsiz"));
-      }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _promoBusy = false;
+        });
+      }
     }
+  }
+
+  void _removePromo() {
+    _promo.clear();
+    setState(() {
+      _appliedPromo = null;
+      _showPromo = false;
+    });
+    _load();
   }
 
   PricePlan? get _selected => _sub?.plans.where((p) => p.key == _plan).firstOrNull;
@@ -175,6 +203,7 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
       final days = await _api.redeemPromo(code);
       premiumChanged.value++;
       if (!mounted) return;
+      successFeedback();
       setState(() {
         _grantedDays = days;
         _stage = _Stage.success;
@@ -186,246 +215,364 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
     }
   }
 
+  // ── Qobiq ──────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    return SheetScaffold(
-      title: context.tr("IntizomAI Premium"),
-      child: AnimatedSize(
-        duration: AppMotion.base,
-        curve: AppMotion.curve,
-        alignment: Alignment.topCenter,
-        child: switch (_stage) {
-          _Stage.success => _successView(),
-          _Stage.waiting => _waitingView(),
-          _Stage.choose => _chooseView(),
-        },
-      ),
-    );
-  }
-
-  Widget _benefit(IconData icon, String title, String text) {
-    final scheme = Theme.of(context).colorScheme;
+    final maxH = MediaQuery.sizeOf(context).height * .94;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 19, color: AppPalette.gold)),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: AppType.bodyStrong),
-                Text(text, style: AppType.label.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400)),
-              ],
-            ),
-          ),
-        ],
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxH),
+        child: AnimatedSize(
+          duration: AppMotion.base,
+          curve: AppMotion.curve,
+          alignment: Alignment.topCenter,
+          child: switch (_stage) {
+            _Stage.success => _scrollable(_successView()),
+            _Stage.waiting => _scrollable(_waitingView()),
+            _Stage.choose => _chooseView(),
+          },
+        ),
       ),
     );
   }
 
-  Widget _chooseView() {
+  Widget _scrollable(Widget child) => SingleChildScrollView(
+    padding: const EdgeInsets.fromLTRB(AppSpace.page, 10, AppSpace.page, 24),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [_handle(), Align(alignment: Alignment.centerRight, child: _closeButton()), child],
+    ),
+  );
+
+  Widget _handle() {
     final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Container(
+        width: 36,
+        height: 4,
+        decoration: BoxDecoration(color: scheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(2)),
+      ),
+    );
+  }
+
+  Widget _closeButton() => IconButton(
+    tooltip: context.tr("Yopish"),
+    onPressed: () => Navigator.pop(context),
+    icon: Icon(LucideIcons.x, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
+  );
+
+  // ── Tanlash ────────────────────────────────────────────
+  Widget _chooseView() {
     final s = _sub;
-    if (s == null) {
-      return _error != null
-          ? Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Column(
-                children: [
-                  Text(_error!, textAlign: TextAlign.center, style: AppType.label.copyWith(color: scheme.error)),
-                  const SizedBox(height: 12),
-                  OutlinedButton(onPressed: _load, child: Text(context.tr("Qayta urinish"))),
-                ],
-              ),
-            )
-          : const Padding(padding: EdgeInsets.symmetric(vertical: 40), child: LoadingView());
-    }
-    final selected = _selected;
-    final freePromo = s.promo?.valid == true && s.promo!.isFree;
     return Column(
       key: const ValueKey('choose'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (widget.message != null && widget.message!.isNotEmpty) ...[
-          Text(widget.message!, style: AppType.body.copyWith(color: scheme.onSurfaceVariant)),
-          const SizedBox(height: 8),
-        ],
-        if (s.isPremium)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Pill(context.tr("Premium faol · {v0} kun qoldi", {'v0': s.daysLeft}), color: AppPalette.gold),
-          ),
-        _benefit(LucideIcons.infinity, context.tr("Cheklovsiz"), context.tr("Reja, odat, maqsad va AI murabbiy — chegarasiz")),
-        _benefit(LucideIcons.users, context.tr("Guruhlar"), context.tr("Oila va do'stlar bilan guruh tuzing, bir-biringizni kuzating")),
-        _benefit(LucideIcons.trophy, context.tr("Reyting"), context.tr("Umumiy reytingda o'z o'rningizni ko'ring")),
-        FieldLabel(context.tr("Tarif")),
-        for (final p in s.plans) _planTile(p),
-        if (s.providers.isNotEmpty) ...[
-          FieldLabel(context.tr("To'lov usuli")),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final pr in s.providers)
-                ChoiceChip(
-                  label: Text(pr.title),
-                  selected: _provider == pr.key,
-                  onSelected: (_) => setState(() => _provider = pr.key),
-                ),
-            ],
-          ),
-        ],
-        const SizedBox(height: 8),
-        if (!_showPromo && _appliedPromo == null)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => setState(() => _showPromo = true),
-              icon: const Icon(LucideIcons.ticket, size: 16),
-              label: Text(context.tr("Promokod bormi?")),
-            ),
-          )
-        else
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Row(
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(AppSpace.page, 10, AppSpace.page, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _promo,
-                    textCapitalization: TextCapitalization.characters,
-                    maxLength: 40,
-                    decoration: InputDecoration(
-                      hintText: context.tr("Promokod"),
-                      counterText: '',
-                      isDense: true,
-                      suffixIcon: _appliedPromo == null ? null : Icon(LucideIcons.circleCheck, size: 18, color: AppPalette.success),
-                    ),
-                    onSubmitted: (v) => _load(promo: v.trim()),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton(
-                  onPressed: _busy ? null : () => _load(promo: _promo.text.trim()),
-                  child: Text(context.tr("Qo'llash")),
-                ),
+                _handle(),
+                const SizedBox(height: 12),
+                _hero(s),
+                if (s == null)
+                  _error != null ? _loadError() : const Padding(padding: EdgeInsets.symmetric(vertical: 40), child: LoadingView())
+                else ...[
+                  SectionBar(title: context.tr("Tarifni tanlang"), top: 22),
+                  ..._planTiles(s.plans),
+                  if (s.providers.length > 1) ...[
+                    SectionBar(title: context.tr("To'lov usuli"), top: 18),
+                    _providers(s.providers),
+                  ],
+                  const SizedBox(height: 14),
+                  _promoBlock(s),
+                  SectionBar(title: context.tr("Nimalar ochiladi"), top: 22),
+                  _comparison(s.freeLimits),
+                ],
               ],
             ),
           ),
-        if (s.promo?.valid == true && !freePromo && (s.promo!.discountPercent > 0 || s.promo!.bonusDays > 0))
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              [
-                if (s.promo!.discountPercent > 0) context.tr("{v0}% chegirma", {'v0': s.promo!.discountPercent}),
-                if (s.promo!.bonusDays > 0) context.tr("+{v0} kun bonus", {'v0': s.promo!.bonusDays}),
-              ].join(' · '),
-              style: AppType.label.copyWith(color: AppPalette.success),
-            ),
-          ),
-        const SizedBox(height: 18),
-        if (freePromo)
-          FilledButton.icon(
-            onPressed: _busy ? null : _redeemFree,
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-            icon: const Icon(LucideIcons.gift, size: 18),
-            label: Text(context.tr("{v0} kun Premiumni faollashtirish", {'v0': s.promo!.bonusDays})),
-          )
-        else if (!s.paymentsEnabled)
-          Text(
-            context.tr("To'lov tizimi vaqtincha ishlamayapti. Birozdan keyin urinib ko'ring."),
-            textAlign: TextAlign.center,
-            style: AppType.label.copyWith(color: scheme.onSurfaceVariant),
-          )
-        else
-          FilledButton(
-            onPressed: _busy || selected == null || _provider == null ? null : _pay,
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-            child: _busy
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : Text(
-                    selected == null
-                        ? context.tr("Tarifni tanlang")
-                        : context.tr("To'lash · {v0}", {'v0': selected.priceLabel}),
-                  ),
-          ),
-        const SizedBox(height: 10),
-        Text(
-          context.tr("To'lov Paylov orqali xavfsiz amalga oshiriladi. Obuna avtomatik yangilanmaydi — muddat tugagach o'zingiz uzaytirasiz."),
-          textAlign: TextAlign.center,
-          style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400),
         ),
+        if (s != null) _bottomBar(s),
       ],
     );
   }
 
-  Widget _planTile(PricePlan p) {
+  Widget _loadError() {
     final scheme = Theme.of(context).colorScheme;
-    final on = _plan == p.key;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(vertical: 28),
+      child: Column(
+        children: [
+          Icon(LucideIcons.cloudOff, size: 28, color: scheme.outline),
+          const SizedBox(height: 10),
+          Text(_error!, textAlign: TextAlign.center, style: AppType.label.copyWith(color: scheme.onSurfaceVariant)),
+          const SizedBox(height: 14),
+          OutlinedButton(onPressed: _load, child: Text(context.tr("Qayta urinish"))),
+        ],
+      ),
+    );
+  }
+
+  /// Sarlavha bloki: toj, nom, qisqa va'da, (bo'lsa) qulflangan imkoniyat sababi.
+  Widget _hero(Subscription? s) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final gold = AppPalette.textTone(AppPalette.gold, theme.brightness);
+    final reason = widget.message;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 14, 8, 18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: dark
+              ? const [Color(0xFF2B2213), Color(0xFF17130C)]
+              : const [Color(0xFFFFF7E8), Color(0xFFFBE7C3)],
+        ),
+        border: Border.all(color: AppPalette.gold.withValues(alpha: dark ? .35 : .25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                margin: const EdgeInsets.only(top: 4),
+                decoration: BoxDecoration(
+                  color: _goldFill(theme.brightness),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(LucideIcons.crown, size: 26, color: _onGold(theme.brightness)),
+              ),
+              const Spacer(),
+              _closeButton(),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(context.tr("IntizomAI Premium"), style: AppType.title.copyWith(fontSize: 24)),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: Text(
+              context.tr("Cheklovsiz rejalar, AI murabbiy va do'stlar bilan guruhlar — intizomingizni keyingi bosqichga olib chiqing."),
+              style: AppType.body.copyWith(color: scheme.onSurfaceVariant, height: 1.45),
+            ),
+          ),
+          if (s?.isPremium == true) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(LucideIcons.badgeCheck, size: 16, color: gold),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    context.tr("Premium faol · {v0} kun qoldi", {'v0': s!.daysLeft}),
+                    style: AppType.label.copyWith(color: gold, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (reason != null && reason.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              margin: const EdgeInsets.only(right: 10),
+              decoration: BoxDecoration(
+                color: (dark ? Colors.black : Colors.white).withValues(alpha: dark ? .25 : .7),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(padding: const EdgeInsets.only(top: 2), child: Icon(LucideIcons.lock, size: 15, color: gold)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(reason, style: AppType.label.copyWith(fontWeight: FontWeight.w500, height: 1.4))),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Bepul va Premium solishtirish jadvali.
+  Widget _comparison(FreeLimits f) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final gold = AppPalette.textTone(AppPalette.gold, theme.brightness);
+    final unlimited = context.tr("Cheksiz");
+    final rows = <(IconData, String, String?, String)>[
+      (LucideIcons.listChecks, context.tr("Kunlik rejalar"), context.tr("{v0} ta", {'v0': f.plansPerDay}), unlimited),
+      (LucideIcons.repeat, context.tr("Odatlar"), context.tr("{v0} ta", {'v0': f.habits}), unlimited),
+      (LucideIcons.target, context.tr("Maqsadlar"), context.tr("{v0} ta", {'v0': f.goals}), unlimited),
+      (LucideIcons.sparkles, context.tr("AI murabbiy"), context.tr("Kuniga {v0} ta", {'v0': f.aiPerDay}), unlimited),
+      (LucideIcons.users, context.tr("Guruh yaratish"), null, ''),
+      (LucideIcons.trophy, context.tr("Umumiy reyting"), null, ''),
+    ];
+    final head = AppType.micro.copyWith(fontWeight: FontWeight.w600, letterSpacing: .3);
+    Widget cell(String? text, {required bool premium}) {
+      if (text == null) return Icon(LucideIcons.minus, size: 16, color: scheme.outline);
+      if (text.isEmpty) return Icon(LucideIcons.check, size: 18, color: gold);
+      return Text(
+        text,
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppType.label.copyWith(
+          color: premium ? gold : scheme.onSurfaceVariant,
+          fontWeight: premium ? FontWeight.w600 : FontWeight.w500,
+          fontFeatures: tabularFigures,
+        ),
+      );
+    }
+
+    return Container(
+      decoration: surfaceDecoration(context, color: scheme.surfaceContainerLow),
+      padding: const EdgeInsets.fromLTRB(14, 10, 6, 6),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Expanded(child: SizedBox()),
+              SizedBox(width: 82, child: Text(context.tr("Bepul"), textAlign: TextAlign.center, style: head.copyWith(color: scheme.onSurfaceVariant))),
+              SizedBox(width: 82, child: Text(context.tr("Premium"), textAlign: TextAlign.center, style: head.copyWith(color: gold))),
+            ],
+          ),
+          for (final (icon, label, free, prem) in rows)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              child: Row(
+                children: [
+                  Icon(icon, size: 17, color: scheme.onSurfaceVariant),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.body.copyWith(fontWeight: FontWeight.w500)),
+                  ),
+                  SizedBox(width: 82, child: Center(child: cell(free, premium: false))),
+                  SizedBox(width: 82, child: Center(child: cell(prem, premium: true))),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Oyiga necha so'm (eng qisqa tarifga nisbatan tejash foizini hisoblash uchun).
+  static double _perMonth(PricePlan p) => p.days <= 0 ? p.price.toDouble() : p.price * 30 / p.days;
+
+  List<Widget> _planTiles(List<PricePlan> plans) {
+    if (plans.isEmpty) return const [];
+    final shortest = plans.reduce((a, b) => a.days <= b.days ? a : b);
+    final base = _perMonth(shortest);
+    int saving(PricePlan p) => base <= 0 || p.key == shortest.key ? 0 : ((1 - _perMonth(p) / base) * 100).round();
+    final best = plans.reduce((a, b) => saving(a) >= saving(b) ? a : b);
+    return [for (final p in plans) _planTile(p, saving(p), best.key == p.key && saving(p) >= 5)];
+  }
+
+  Widget _planTile(PricePlan p, int savingPct, bool bestValue) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final on = _plan == p.key;
+    final gold = AppPalette.textTone(AppPalette.gold, theme.brightness);
+    final badge = (p.tag != null && p.tag!.isNotEmpty)
+        ? p.tag!
+        : (savingPct >= 5 ? context.tr("{v0}% tejaysiz", {'v0': savingPct}) : null);
+    final sub = p.days > 31 && p.monthlyLabel != null
+        ? context.tr("≈ {v0} / oy", {'v0': p.monthlyLabel})
+        : context.tr("{v0} kun", {'v0': p.days});
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
       child: Semantics(
         selected: on,
         button: true,
-        child: InkWell(
+        child: Material(
+          color: on ? AppPalette.gold.withValues(alpha: theme.brightness == Brightness.dark ? .12 : .07) : scheme.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          onTap: () {
-            tapFeedback();
-            setState(() => _plan = p.key);
-          },
-          child: AnimatedContainer(
-            duration: AppMotion.fast,
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(color: on ? AppPalette.gold : scheme.outlineVariant, width: on ? 2 : 1),
-              color: on ? AppPalette.gold.withValues(alpha: .06) : null,
-            ),
-            child: Row(
-              children: [
-                Icon(on ? LucideIcons.circleCheck : LucideIcons.circle, size: 20, color: on ? AppPalette.gold : scheme.outline),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(child: Text(context.tr(p.title), style: AppType.bodyStrong)),
-                          if (p.tag != null && p.tag!.isNotEmpty) ...[
-                            const SizedBox(width: 8),
-                            Flexible(child: Pill(p.tag!, color: AppPalette.gold)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            onTap: () {
+              tapFeedback();
+              setState(() => _plan = p.key);
+            },
+            child: AnimatedContainer(
+              duration: AppMotion.fast,
+              padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: on ? _goldFill(theme.brightness) : scheme.outlineVariant, width: on ? 2 : 1),
+              ),
+              child: Row(
+                children: [
+                  AnimatedContainer(
+                    duration: AppMotion.fast,
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: on ? _goldFill(theme.brightness) : Colors.transparent,
+                      border: Border.all(color: on ? _goldFill(theme.brightness) : scheme.outline, width: 1.6),
+                    ),
+                    child: on ? Icon(LucideIcons.check, size: 14, color: _onGold(theme.brightness)) : null,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(context.tr(p.title), style: AppType.heading),
+                            if (bestValue) Pill(context.tr("Eng foydali"), color: AppPalette.gold),
                           ],
-                        ],
-                      ),
-                      if (p.monthlyLabel != null && p.days > 31)
+                        ),
+                        const SizedBox(height: 3),
                         Text(
-                          context.tr("≈ {v0} / oy", {'v0': p.monthlyLabel}),
-                          style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400),
+                          badge == null ? sub : '$sub · $badge',
+                          style: AppType.caption.copyWith(
+                            color: badge == null ? scheme.onSurfaceVariant : gold,
+                            fontWeight: badge == null ? FontWeight.w400 : FontWeight.w600,
+                            fontFeatures: tabularFigures,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(p.priceLabel, style: AppType.bodyStrong.copyWith(fontFeatures: tabularFigures)),
+                      if (p.originalPriceLabel != null)
+                        Text(
+                          p.originalPriceLabel!,
+                          style: AppType.caption.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            decoration: TextDecoration.lineThrough,
+                            fontFeatures: tabularFigures,
+                          ),
                         ),
                     ],
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(p.priceLabel, style: AppType.bodyStrong.copyWith(fontFeatures: tabularFigures)),
-                    if (p.originalPriceLabel != null)
-                      Text(
-                        p.originalPriceLabel!,
-                        style: AppType.caption.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          decoration: TextDecoration.lineThrough,
-                          fontFeatures: tabularFigures,
-                        ),
-                      ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -433,6 +580,211 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
     );
   }
 
+  Widget _providers(List<PayProvider> providers) {
+    return Row(
+      children: [
+        for (var i = 0; i < providers.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Expanded(
+            child: ChoiceChipBox(
+              selected: _provider == providers[i].key,
+              onTap: () => setState(() => _provider = providers[i].key),
+              child: Text(providers[i].title),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Promokod: yig'ilgan havola → maydon → qo'llangan holat (olib tashlash bilan).
+  Widget _promoBlock(Subscription s) {
+    final scheme = Theme.of(context).colorScheme;
+    final promo = s.promo;
+    if (_appliedPromo != null && promo != null && promo.valid) {
+      final parts = [
+        if (promo.isFree) context.tr("{v0} kun bepul Premium", {'v0': promo.bonusDays}),
+        if (!promo.isFree && promo.discountPercent > 0) context.tr("{v0}% chegirma", {'v0': promo.discountPercent}),
+        if (!promo.isFree && promo.bonusDays > 0) context.tr("+{v0} kun bonus", {'v0': promo.bonusDays}),
+      ];
+      return Container(
+        padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+        decoration: BoxDecoration(
+          color: AppPalette.success.withValues(alpha: .1),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Row(
+          children: [
+            const Icon(LucideIcons.ticketCheck, size: 18, color: AppPalette.success),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_appliedPromo!.toUpperCase(), style: AppType.bodyStrong.copyWith(letterSpacing: .5)),
+                  if (parts.isNotEmpty)
+                    Text(parts.join(' · '), style: AppType.caption.copyWith(color: AppPalette.success, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: context.tr("Olib tashlash"),
+              onPressed: _busy ? null : _removePromo,
+              icon: Icon(LucideIcons.x, size: 18, color: scheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
+    if (!_showPromo) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => setState(() => _showPromo = true),
+          icon: const Icon(LucideIcons.ticket, size: 16),
+          label: Text(context.tr("Promokod bormi?")),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _promo,
+                autofocus: (widget.initialPromo ?? '').isEmpty,
+                textCapitalization: TextCapitalization.characters,
+                maxLength: 40,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  hintText: context.tr("Promokodni kiriting"),
+                  counterText: '',
+                  isDense: true,
+                  prefixIcon: Icon(LucideIcons.ticket, size: 18, color: scheme.outline),
+                ),
+                onChanged: (_) {
+                  if (_promoError != null) setState(() => _promoError = null);
+                },
+                onSubmitted: (v) {
+                  if (v.trim().isNotEmpty) _load(promo: v.trim());
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              height: 48,
+              child: OutlinedButton(
+                onPressed: _promoBusy ? null : () {
+                  final v = _promo.text.trim();
+                  if (v.isNotEmpty) _load(promo: v);
+                },
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                child: _promoBusy
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Text(context.tr("Qo'llash")),
+              ),
+            ),
+          ],
+        ),
+        if (_promoError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 4),
+            child: Text(_promoError!, style: AppType.caption.copyWith(color: scheme.error)),
+          ),
+      ],
+    );
+  }
+
+  /// Pastga yopishgan to'lov tugmasi — ro'yxat qancha uzun bo'lmasin, doim ko'rinadi.
+  Widget _bottomBar(Subscription s) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final selected = _selected;
+    final freePromo = s.promo?.valid == true && s.promo!.isFree;
+    final style = FilledButton.styleFrom(
+      minimumSize: const Size.fromHeight(54),
+      backgroundColor: _goldFill(theme.brightness),
+      foregroundColor: _onGold(theme.brightness),
+      textStyle: AppType.bodyStrong.copyWith(fontSize: 16, fontFamily: AppTheme.fontFamily),
+    );
+    final spinner = SizedBox(
+      width: 20,
+      height: 20,
+      child: CircularProgressIndicator(strokeWidth: 2, color: _onGold(theme.brightness)),
+    );
+
+    Widget button;
+    if (freePromo) {
+      button = FilledButton.icon(
+        onPressed: _busy ? null : _redeemFree,
+        style: style,
+        icon: _busy ? spinner : const Icon(LucideIcons.gift, size: 18),
+        label: Text(context.tr("{v0} kun Premiumni faollashtirish", {'v0': s.promo!.bonusDays})),
+      );
+    } else if (!s.paymentsEnabled) {
+      button = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(
+          context.tr("To'lov tizimi vaqtincha ishlamayapti. Birozdan keyin urinib ko'ring."),
+          textAlign: TextAlign.center,
+          style: AppType.label.copyWith(color: scheme.onSurfaceVariant),
+        ),
+      );
+    } else {
+      button = FilledButton(
+        onPressed: _busy || selected == null || _provider == null ? null : _pay,
+        style: style,
+        child: _busy
+            ? spinner
+            : Text(
+                selected == null
+                    ? context.tr("Tarifni tanlang")
+                    : context.tr("{v0} uchun to'lash · {v1}", {'v0': context.tr(selected.title), 'v1': selected.priceLabel}),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+      );
+    }
+
+    final provider = s.providers.where((p) => p.key == _provider).firstOrNull?.title ?? 'Paylov';
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(AppSpace.page, 12, AppSpace.page, 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            button,
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(LucideIcons.shieldCheck, size: 14, color: scheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    freePromo
+                        ? context.tr("To'lov talab qilinmaydi")
+                        : context.tr("{v0} orqali xavfsiz to'lov · Avtomatik yechilmaydi", {'v0': provider}),
+                    textAlign: TextAlign.center,
+                    style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── To'lov kutilmoqda ──────────────────────────────────
   Widget _waitingView() {
     final scheme = Theme.of(context).colorScheme;
     return Column(
@@ -440,7 +792,7 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(height: 18),
+        const SizedBox(height: 6),
         const Center(child: SizedBox(width: 34, height: 34, child: CircularProgressIndicator(strokeWidth: 3))),
         const SizedBox(height: 18),
         Text(context.tr("To'lov kutilmoqda"), textAlign: TextAlign.center, style: AppType.heading),
@@ -481,16 +833,24 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
     );
   }
 
+  // ── Muvaffaqiyat ───────────────────────────────────────
   Widget _successView() {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Column(
       key: const ValueKey('success'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(height: 12),
-        Center(child: AppIconTile(icon: LucideIcons.crown, tone: AppPalette.gold, size: 56)),
-        const SizedBox(height: 16),
+        Center(
+          child: Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(color: _goldFill(theme.brightness), borderRadius: BorderRadius.circular(22)),
+            child: Icon(LucideIcons.crown, size: 34, color: _onGold(theme.brightness)),
+          ),
+        ),
+        const SizedBox(height: 18),
         Text(context.tr("Premium faollashdi!"), textAlign: TextAlign.center, style: AppType.title),
         const SizedBox(height: 6),
         Text(
@@ -500,10 +860,14 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
           textAlign: TextAlign.center,
           style: AppType.body.copyWith(color: scheme.onSurfaceVariant),
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 24),
         FilledButton(
           onPressed: () => Navigator.pop(context),
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(52),
+            backgroundColor: _goldFill(theme.brightness),
+            foregroundColor: _onGold(theme.brightness),
+          ),
           child: Text(context.tr("Davom etish")),
         ),
       ],
@@ -511,33 +875,59 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
   }
 }
 
-/// Faqat bepul promokodni faollashtirish (Profil → Promokod).
+/// Profil → "Promokodni faollashtirish". Bitta joyda ikkala tur:
+///   • bepul (Premium kunlari) — shu yerning o'zida faollashadi;
+///   • chegirma — Premium oynasi promokod qo'llangan holda ochiladi.
 Future<void> showPromoRedeem(BuildContext context) async {
   final ctrl = TextEditingController();
   final api = IntizomApi();
+  String? error;
+  String? discountCode;
   await showFormSheet<void>(
     context,
     title: context.tr("Promokodni faollashtirish"),
+    subtitle: context.tr("Bepul Premium yoki chegirma promokodi"),
     saveLabel: context.tr("Faollashtirish"),
-    builder: (ctx, _) => TextField(
+    builder: (ctx, setSheet) => TextField(
       controller: ctrl,
       autofocus: true,
       maxLength: 40,
       textCapitalization: TextCapitalization.characters,
-      decoration: InputDecoration(hintText: context.tr("Promokod"), counterText: ''),
+      onChanged: (_) {
+        if (error != null) setSheet(() => error = null);
+      },
+      decoration: InputDecoration(
+        hintText: context.tr("Promokodni kiriting"),
+        counterText: '',
+        errorText: error,
+        prefixIcon: const Icon(LucideIcons.ticket, size: 18),
+      ),
     ),
     onSave: () async {
       final code = ctrl.text.trim();
       if (code.isEmpty) return false;
       try {
+        final sub = await api.subscription(promoCode: code);
+        final promo = sub.promo;
+        if (promo == null || !promo.valid) {
+          error = context.mounted ? context.tr("Promokod yaroqsiz yoki muddati tugagan") : null;
+          return false;
+        }
+        if (!promo.isFree) {
+          // Chegirma promokodi to'lov bilan ishlaydi — Premium oynasini ochamiz.
+          discountCode = promo.code;
+          return true;
+        }
         final days = await api.redeemPromo(code);
         premiumChanged.value++;
         if (context.mounted) toast(context, context.tr("Hisobingizga {v0} kun qo'shildi. Rahmat!", {'v0': days}));
         return true;
       } catch (e) {
-        if (context.mounted) toast(context, e.toString());
+        error = e.toString();
         return false;
       }
     },
   );
+  final code = discountCode;
+  if (code != null && context.mounted) await showPaywall(context, promo: code);
 }

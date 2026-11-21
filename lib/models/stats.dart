@@ -62,6 +62,35 @@ class UserStats {
   );
 }
 
+/// Bir kunlik faollik — /api/v1/stats/activity. Server hisoblaydi: o'chirilgan
+/// odatlar tarixi ham kiradi, bugungi bajarilmagan ish "o'tkazib yuborilgan" emas.
+class DayActivity {
+  const DayActivity({
+    required this.date,
+    this.done = 0,
+    this.plansDone = 0,
+    this.plansDue = 0,
+    this.habitsDone = 0,
+    this.habitsDue = 0,
+  });
+
+  final String date; // YYYY-MM-DD
+  final int done;
+  final int plansDone;
+  final int plansDue;
+  final int habitsDone;
+  final int habitsDue;
+
+  factory DayActivity.fromJson(Map<String, dynamic> j) => DayActivity(
+    date: j['date'] as String? ?? '',
+    done: j['done'] as int? ?? 0,
+    plansDone: j['plans_done'] as int? ?? 0,
+    plansDue: j['plans_due'] as int? ?? 0,
+    habitsDone: j['habits_done'] as int? ?? 0,
+    habitsDue: j['habits_due'] as int? ?? 0,
+  );
+}
+
 class Achievement {
   const Achievement({
     required this.code,

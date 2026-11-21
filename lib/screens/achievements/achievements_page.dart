@@ -43,7 +43,8 @@ class AchievementsPage extends StatelessWidget {
       builder: (context, _) {
         final scheme = Theme.of(context).colorScheme;
         final st = state.stats;
-        final items = achievementMilestones(st.streak, st.totalScore, state.goals.where((g) => g.completed).length);
+        // Seriya bosqichi bir marta ochilsa, seriya uzilganda yopilib qolmaydi — rekord bo'yicha.
+        final items = achievementMilestones(st.longestStreak, st.totalScore, state.goals.where((g) => g.completed).length);
         final unlocked = items.where((a) => a.unlocked).length;
         return RefreshIndicator(
           onRefresh: state.refreshStats,
