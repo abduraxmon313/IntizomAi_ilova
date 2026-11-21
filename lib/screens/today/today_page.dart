@@ -1,11 +1,13 @@
 import '../../l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/extras.dart';
 import '../../models/goal.dart';
 import '../../models/habit.dart';
 import '../../models/plan.dart';
+import '../../services/announcement_store.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/dates.dart';
@@ -50,6 +52,8 @@ class TodayPageState extends State<TodayPage> {
   int _seenVersion = -1;
   Checkin _checkin = const Checkin();
   bool _checkinLoaded = false;
+  final _annStore = AnnouncementStore();
+  List<Announcement> _announcements = const [];
 
   @override
   void initState() {
@@ -58,6 +62,7 @@ class TodayPageState extends State<TodayPage> {
     _seenVersion = s.plansVersion;
     _loadPlans();
     _loadCheckin();
+    _loadAnnouncements();
   }
 
   @override
@@ -98,7 +103,35 @@ class TodayPageState extends State<TodayPage> {
     if (mounted) setState(() => _checkinLoaded = true);
   }
 
-  Future<void> _refresh() => Future.wait([s.loadAll(), _loadPlans(), _loadCheckin()]);
+  /// Admin e'lonlari: yopilganlari ko'rsatilmaydi, yangisi serverga "ko'rildi" deb yuboriladi.
+  Future<void> _loadAnnouncements() async {
+    try {
+      final list = await s.api.announcements();
+      final hidden = await _annStore.dismissed();
+      final visible = list.where((a) => !hidden.contains(a.id)).take(2).toList();
+      if (!mounted) return;
+      setState(() => _announcements = visible);
+      for (final a in visible) {
+        if (await _annStore.markSeen(a.id)) s.api.announcementSeen(a.id);
+      }
+    } catch (_) {
+      // E'lon ixtiyoriy — xato bo'lsa sahifa odatdagidek ishlayveradi.
+    }
+  }
+
+  Future<void> _dismissAnnouncement(Announcement a) async {
+    setState(() => _announcements = [for (final x in _announcements) if (x.id != a.id) x]);
+    await _annStore.dismiss(a.id);
+  }
+
+  Future<void> _openAnnouncement(Announcement a) async {
+    final url = Uri.tryParse(a.buttonUrl ?? '');
+    if (url == null) return;
+    final ok = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) toast(context, context.tr("Sahifani ochib bo'lmadi: {v0}", {'v0': a.buttonUrl}));
+  }
+
+  Future<void> _refresh() => Future.wait([s.loadAll(), _loadPlans(), _loadCheckin(), _loadAnnouncements()]);
 
   Future<void> _saveCheckin({String? mood, int? energy}) async {
     final prev = _checkin;
@@ -210,6 +243,16 @@ class TodayPageState extends State<TodayPage> {
             onProfile: _openProfile,
           ),
           const SizedBox(height: 20),
+          for (final a in _announcements)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _AnnouncementCard(
+                key: ValueKey('ann${a.id}'),
+                announcement: a,
+                onClose: () => _dismissAnnouncement(a),
+                onOpen: a.buttonUrl == null ? null : () => _openAnnouncement(a),
+              ),
+            ),
           _DayCard(loaded: _loaded, done: done, total: total, streak: st.streak, discipline: st.disciplineScore),
           ?_insight(),
 
@@ -331,6 +374,73 @@ class TodayPageState extends State<TodayPage> {
                   Text(text, style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant, height: 1.4)),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Admin e'loni: brend fonida sarlavha, matn, ixtiyoriy tugma va yopish.
+class _AnnouncementCard extends StatelessWidget {
+  const _AnnouncementCard({super.key, required this.announcement, required this.onClose, this.onOpen});
+
+  final Announcement announcement;
+  final VoidCallback onClose;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final a = announcement;
+    return Semantics(
+      container: true,
+      label: context.tr("E'lon"),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 6, 14),
+        decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(AppRadius.lg)),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Icon(LucideIcons.megaphone, size: 18, color: scheme.tertiary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Text(a.title, style: AppType.bodyStrong.copyWith(color: scheme.onPrimaryContainer)),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    a.body,
+                    style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onPrimaryContainer, height: 1.45),
+                  ),
+                  if (onOpen != null && (a.buttonLabel ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    FilledButton.tonal(
+                      onPressed: onOpen,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 38),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        backgroundColor: scheme.surfaceContainerLowest,
+                        foregroundColor: scheme.tertiary,
+                      ),
+                      child: Text(a.buttonLabel!),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: context.tr("Yopish"),
+              onPressed: onClose,
+              icon: Icon(LucideIcons.x, size: 18, color: scheme.onPrimaryContainer),
             ),
           ],
         ),

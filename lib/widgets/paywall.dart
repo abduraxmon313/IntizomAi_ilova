@@ -624,6 +624,13 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
                   Text(_appliedPromo!.toUpperCase(), style: AppType.bodyStrong.copyWith(letterSpacing: .5)),
                   if (parts.isNotEmpty)
                     Text(parts.join(' · '), style: AppType.caption.copyWith(color: AppPalette.success, fontWeight: FontWeight.w600)),
+                  if (!promo.isFree && promo.planKeys != null && promo.planKeys!.isNotEmpty)
+                    Text(
+                      context.tr("Faqat: {v0}", {
+                        'v0': [for (final p in s.plans) if (promo.planKeys!.contains(p.key)) context.tr(p.title)].join(', '),
+                      }),
+                      style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400),
+                    ),
                 ],
               ),
             ),

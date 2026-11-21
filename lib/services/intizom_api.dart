@@ -90,6 +90,19 @@ class IntizomApi {
 
   Future<UserStats> stats() async => UserStats.fromJson(_map(await _c.get('/stats')));
 
+  /// Admin e'lonlari (hammaga / tarif bo'yicha / shaxsan menga).
+  Future<List<Announcement>> announcements() async {
+    final r = _map(await _c.get('/announcements'));
+    return _list(r['announcements']).map(Announcement.fromJson).toList();
+  }
+
+  /// E'lon ko'rildi (admin paneldagi hisob uchun). Xato bo'lsa jim o'tadi.
+  Future<void> announcementSeen(int id) async {
+    try {
+      await _c.post('/announcements/$id/seen');
+    } catch (_) {}
+  }
+
   /// Oxirgi [days] kun bo'yicha kunma-kun faollik (bugun ham kiradi).
   Future<List<DayActivity>> activity(int days) async {
     final r = _map(await _c.get('/stats/activity', query: {'days': '$days'}));
