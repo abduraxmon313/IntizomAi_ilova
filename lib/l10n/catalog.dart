@@ -517,7 +517,6 @@ const interfaceTranslations = <String, (String, String)>{
   "Kunlik rejalar": ("Планы в день", "Daily plans"),
   "AI murabbiy": ("AI-коуч", "AI coach"),
   "Guruh yaratish": ("Создание групп", "Create groups"),
-  "Guruhlar": ("Группы", "Groups"),
   "Umumiy reyting": ("Общий рейтинг", "Global leaderboard"),
   "{v0} ta": ("{v0}", "{v0}"),
   "Kuniga {v0} ta": ("{v0} в день", "{v0} a day"),
