@@ -6,7 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../models/extras.dart';
 import '../../models/habit.dart';
-import '../../models/plan.dart';
+import '../../models/stats.dart';
 import '../../services/api_client.dart';
 import '../../services/intizom_api.dart';
 import '../../state/app_state.dart';
@@ -32,9 +32,14 @@ class StatsPage extends StatefulWidget {
 class _StatsPageState extends State<StatsPage> {
   AppState get s => widget.state;
 
+  static const _days = 98; // 14 hafta — issiqlik xaritasi uchun
+
   String _view = 'mine';
-  List<Plan>? _plans; // oxirgi 98 kun (14 hafta)
+
+  /// Kunma-kun faollik (server hisoblaydi), kalit — YYYY-MM-DD.
+  Map<String, DayActivity>? _activity;
   String? _error;
+  List<Habit>? _seenHabits;
 
   String _lbPeriod = 'all';
   Leaderboard? _lb;
@@ -57,11 +62,14 @@ class _StatsPageState extends State<StatsPage> {
     super.dispose();
   }
 
-  /// Rejalar o'zgarsa (boshqa bo'limda) — statistika qayta hisoblanadi.
+  /// Reja yoki odat o'zgarsa (boshqa bo'limda) — faollik qayta yuklanadi.
   void _onState() {
     if (s.plansVersion != _seenVersion) {
       _seenVersion = s.plansVersion;
-      _load();
+      _loadActivity();
+    } else if (!identical(s.habits, _seenHabits)) {
+      _seenHabits = s.habits;
+      _loadActivity();
     } else if (mounted) {
       setState(() {});
     }
@@ -70,15 +78,23 @@ class _StatsPageState extends State<StatsPage> {
   Future<void> _load() async {
     setState(() => _error = null);
     try {
-      final t = tashkentToday();
-      final r = await Future.wait([
-        s.api.plansBetween(t.subtract(const Duration(days: 97)), t),
-        s.refreshHabits(),
-        s.refreshStats(),
-      ]);
-      if (mounted) setState(() => _plans = r[0] as List<Plan>);
+      await Future.wait([_fetchActivity(), s.refreshHabits(), s.refreshStats()]);
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
+    }
+  }
+
+  Future<void> _fetchActivity() async {
+    final days = await s.api.activity(_days);
+    _seenHabits = s.habits;
+    if (mounted) setState(() => _activity = {for (final d in days) d.date: d});
+  }
+
+  Future<void> _loadActivity() async {
+    try {
+      await _fetchActivity();
+    } catch (_) {
+      // Tarmoq xatosi — eski ma'lumot qoladi, keyingi o'zgarishda qayta urinamiz.
     }
   }
 
@@ -131,9 +147,10 @@ class _StatsPageState extends State<StatsPage> {
 
   // ── Shaxsiy ────────────────────────────────────────
   Widget _mine() {
-    if (_error != null) return ErrorRetry(message: _error!, onRetry: _load);
-    final plans = _plans;
-    if (plans == null) return const LoadingView();
+    final activity = _activity;
+    if (activity == null) {
+      return _error != null ? ErrorRetry(message: _error!, onRetry: _load) : const LoadingView();
+    }
 
     final scheme = Theme.of(context).colorScheme;
     final st = s.stats;
@@ -142,13 +159,10 @@ class _StatsPageState extends State<StatsPage> {
     final today = tashkentToday();
     final d7 = today.subtract(const Duration(days: 6));
     final d30 = today.subtract(const Duration(days: 29));
-    DateTime pd(Plan p) => parseYmd(p.planDate) ?? today;
+    final last30 = [for (var i = 0; i < 30; i++) activity[ymd(d30.add(Duration(days: i)))]].nonNulls.toList();
 
-    // Bir kunda bajarilgan ishlar: rejalar + odatlar.
-    int dayCount(DateTime d) {
-      final k = ymd(d);
-      return plans.where((p) => p.planDate == k && p.isDone).length + habits.where((h) => h.logDates.contains(k)).length;
-    }
+    // Bir kunda bajarilgan ishlar: rejalar + odatlar (o'chirilgan odatlar tarixi ham).
+    int dayCount(DateTime d) => activity[ymd(d)]?.done ?? 0;
 
     final week = [for (var i = 0; i < 7; i++) dayCount(d7.add(Duration(days: i)))];
     final weekTotal = week.fold<int>(0, (a, b) => a + b);
@@ -162,27 +176,29 @@ class _StatsPageState extends State<StatsPage> {
         ? context.tr("Oxirgi 7 kunda {v0} ta ish — oldingi haftadan {v1} ta kam.", {'v0': weekTotal, 'v1': -diff})
         : context.tr("Oxirgi 7 kunda {v0} ta ish — oldingi hafta bilan bir xil.", {'v0': weekTotal});
 
-    // 30 kun: rejalar bajarilishi va faol kunlar.
-    final p30 = plans.where((p) => !pd(p).isBefore(d30)).toList();
-    final done30 = p30.where((p) => p.isDone).length;
-    final rate = p30.isEmpty ? null : (done30 * 100 / p30.length).round();
-    final activeDays = [for (var i = 0; i < 30; i++) dayCount(d30.add(Duration(days: i)))].where((c) => c > 0).length;
+    // 30 kun: rejalar bajarilishi (faqat vaqti o'tgan yoki bajarilganlar) va faol kunlar.
+    final done30 = last30.fold<int>(0, (a, d) => a + d.plansDone);
+    final due30 = last30.fold<int>(0, (a, d) => a + d.plansDue);
+    final rate = due30 == 0 ? null : (done30 * 100 / due30).round();
+    final activeDays = last30.where((d) => d.done > 0).length;
 
     // Odatlar: 30 kunlik bajarilish — eng sustidan boshlab (e'tibor kerak joy).
+    // Bugun hali belgilanmagan bo'lsa — bugun hisobga kirmaydi (kun tugamagan).
     final habitRates = <(Habit, int, int)>[];
     for (final h in habits.where((h) => !h.finished)) {
       var due = 0, did = 0;
       for (var i = 0; i < 30; i++) {
         final d = d30.add(Duration(days: i));
-        if (!h.dueOn(d)) continue;
+        final done = h.doneOn(d);
+        if (!done && (!h.dueOn(d) || sameDay(d, today))) continue;
         due++;
-        if (h.doneOn(d)) did++;
+        if (done) did++;
       }
       if (due > 0) habitRates.add((h, did, due));
     }
     habitRates.sort((a, b) => (a.$2 / a.$3).compareTo(b.$2 / b.$3));
 
-    final milestones = achievementMilestones(st.streak, st.totalScore, goals.where((g) => g.completed).length);
+    final milestones = achievementMilestones(st.longestStreak, st.totalScore, goals.where((g) => g.completed).length);
     final unlocked = milestones.where((a) => a.unlocked).length;
     final chart = Theme.of(context).brightness == Brightness.dark ? AppPalette.brandOnDark : AppPalette.brandBright;
 
@@ -241,7 +257,7 @@ class _StatsPageState extends State<StatsPage> {
           _FactGrid(
             items: [
               (context.tr("{v0} kun", {'v0': st.streak}), context.tr("Joriy seriya"), context.tr("Rekord: {v0} kun", {'v0': st.longestStreak})),
-              (rate == null ? '—' : '$rate%', context.tr("Rejalar bajarilishi"), rate == null ? context.tr("30 kunda reja yo'q") : context.tr("30 kunda {v0}/{v1}", {'v0': done30, 'v1': p30.length})),
+              (rate == null ? '—' : '$rate%', context.tr("Rejalar bajarilishi"), rate == null ? context.tr("30 kunda reja yo'q") : context.tr("30 kunda {v0}/{v1}", {'v0': done30, 'v1': due30})),
               ('$activeDays/30', context.tr("Faol kunlar"), context.tr("Oxirgi 30 kun")),
               ('${st.perfectDays}', context.tr("Mukammal kunlar"), context.tr("Hammasi bajarilgan")),
             ],

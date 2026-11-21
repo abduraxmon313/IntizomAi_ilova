@@ -90,6 +90,12 @@ class IntizomApi {
 
   Future<UserStats> stats() async => UserStats.fromJson(_map(await _c.get('/stats')));
 
+  /// Oxirgi [days] kun bo'yicha kunma-kun faollik (bugun ham kiradi).
+  Future<List<DayActivity>> activity(int days) async {
+    final r = _map(await _c.get('/stats/activity', query: {'days': '$days'}));
+    return _list(r['days']).map(DayActivity.fromJson).toList();
+  }
+
   Future<Subscription> subscription({String? promoCode}) async => Subscription.fromJson(
     _map(await _c.get('/subscription', query: promoCode == null || promoCode.isEmpty ? null : {'promo_code': promoCode})),
   );

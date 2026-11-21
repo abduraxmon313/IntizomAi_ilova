@@ -63,6 +63,7 @@ class Subscription {
     this.providers = const [],
     this.promo,
     this.paymentsEnabled = false,
+    this.freeLimits = const FreeLimits(),
   });
 
   final bool isPremium;
@@ -73,6 +74,7 @@ class Subscription {
   final List<PayProvider> providers;
   final PromoInfo? promo;
   final bool paymentsEnabled;
+  final FreeLimits freeLimits;
 
   factory Subscription.fromJson(Map<String, dynamic> j) => Subscription(
     isPremium: j['is_premium'] as bool? ?? false,
@@ -89,6 +91,25 @@ class Subscription {
         .toList(),
     promo: j['promo'] is Map ? PromoInfo.fromJson(Map<String, dynamic>.from(j['promo'] as Map)) : null,
     paymentsEnabled: j['payments_enabled'] as bool? ?? false,
+    freeLimits: j['free_limits'] is Map
+        ? FreeLimits.fromJson(Map<String, dynamic>.from(j['free_limits'] as Map))
+        : const FreeLimits(),
+  );
+}
+
+/// Bepul tarif cheklovlari (server sozlamasi) — Premium oynasidagi solishtirish uchun.
+class FreeLimits {
+  const FreeLimits({this.plansPerDay = 5, this.habits = 3, this.goals = 3, this.aiPerDay = 3});
+  final int plansPerDay;
+  final int habits;
+  final int goals;
+  final int aiPerDay;
+
+  factory FreeLimits.fromJson(Map<String, dynamic> j) => FreeLimits(
+    plansPerDay: j['plans_per_day'] as int? ?? 5,
+    habits: j['habits'] as int? ?? 3,
+    goals: j['goals'] as int? ?? 3,
+    aiPerDay: j['ai_per_day'] as int? ?? 3,
   );
 }
 
