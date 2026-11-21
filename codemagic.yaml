@@ -61,7 +61,7 @@ workflows:
       - name: Imzoni tekshirish
         script: |
           APKSIGNER=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | sort -V | tail -1)
-          "$APKSIGNER" verify --print-certs build/app/outputs/flutter-apk/app-release.apk | grep -E "SHA-256 digest" | head -1
+          "$APKSIGNER" verify --print-certs build/app/outputs/flutter-apk/app-release.apk | grep -E "SHA-1 digest|SHA-256 digest"
           rm -f android/key.properties
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
