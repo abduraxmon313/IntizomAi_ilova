@@ -334,7 +334,7 @@ class FriendsPageState extends State<FriendsPage> {
   // ── Guruh amallari ─────────────────────────────────
   Future<void> _createGroup() async {
     if (!_canCreate) {
-      showPremiumDialog(context, context.tr("Guruh yaratish Premium bilan ochiladi. Do'stingiz taklif qilsa, guruhga bepul qo'shilasiz."));
+      showPremiumDialog(context, context.tr("Guruh yaratish va guruhga qo'shilish Premium bilan ochiladi."));
       return;
     }
     final name = TextEditingController();
