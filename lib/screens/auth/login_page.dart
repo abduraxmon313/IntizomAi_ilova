@@ -45,6 +45,13 @@ class _LoginPageState extends State<LoginPage> {
       widget.onLoginSuccess(r);
     } on AuthCancelled {
       // Foydalanuvchi oynani yopdi — hech narsa ko'rsatmaymiz.
+    } on GoogleConfigError catch (e) {
+      if (mounted) {
+        setState(() => _error = context.tr(
+          "Google kirishni tasdiqlamadi. Google Cloud'dagi Android client (paket nomi va SHA-1) hamda Web client bitta loyihada ekanini tekshiring. ({v0})",
+          {'v0': e.toString()},
+        ));
+      }
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
@@ -52,6 +59,16 @@ class _LoginPageState extends State<LoginPage> {
     } finally {
       if (mounted) setState(() => _busy = null);
     }
+  }
+
+  Future<void> _openPrivacy() async {
+    final uri = Uri.parse('${kApiBaseUrl.trim().replaceAll(RegExp(r'/+$'), '')}/privacy');
+    for (final mode in [LaunchMode.externalApplication, LaunchMode.inAppBrowserView, LaunchMode.platformDefault]) {
+      try {
+        if (await launchUrl(uri, mode: mode)) return;
+      } catch (_) {}
+    }
+    if (mounted) toast(context, context.tr("Sahifani ochib bo'lmadi: {v0}", {'v0': uri.toString()}));
   }
 
   @override
@@ -164,27 +181,19 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                       ),
                       const SizedBox(height: AppSpace.md),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        children: [
-                          Text(
-                            context.tr("Davom etish orqali "),
-                            style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
-                          ),
-                          if (kApiBaseUrl.isNotEmpty)
-                            GestureDetector(
-                              onTap: () => launchUrl(Uri.parse('$kApiBaseUrl/privacy'), mode: LaunchMode.externalApplication),
-                              child: Text(
-                                context.tr("maxfiylik siyosatiga"),
-                                style: AppType.caption.copyWith(color: scheme.primary, decoration: TextDecoration.underline),
-                              ),
-                            ),
-                          Text(
-                            context.tr(" rozilik bildirasiz."),
-                            style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
-                          ),
-                        ],
+                      Text(
+                        context.tr("Davom etish orqali maxfiylik siyosatiga rozilik bildirasiz."),
+                        textAlign: TextAlign.center,
+                        style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
                       ),
+                      if (kApiBaseUrl.isNotEmpty)
+                        Center(
+                          child: TextButton(
+                            onPressed: _openPrivacy,
+                            style: TextButton.styleFrom(minimumSize: const Size(0, 40)),
+                            child: Text(context.tr("Maxfiylik siyosati")),
+                          ),
+                        ),
                     ],
                   ),
                 ),
