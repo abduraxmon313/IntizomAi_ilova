@@ -28,15 +28,15 @@ Future<void> showPaywall(BuildContext context, {String? message, String? promo})
 
 enum _Stage { choose, waiting, success }
 
-/// Premium rangi (binafsha): tugma va tanlangan holat. Yorug' rejimda to'q ton (oq matn bilan AA).
+/// Premium rangi (yashil): tugma va tanlangan holat. Yorug' rejimda to'q ton (oq matn bilan AA).
 Color _premiumFill(Brightness b) => AppPalette.premiumFill(b);
 Color _onPremium(Brightness b) => AppPalette.onPremium(b);
 
-/// Toj plitasi: ikkala rejimda ham bir xil binafsha gradient, oq ikonka.
+/// Toj plitasi: ikkala rejimda ham bir xil yashil gradient, oq ikonka.
 const _crownGradient = LinearGradient(
   begin: Alignment.topLeft,
   end: Alignment.bottomRight,
-  colors: [Color(0xFF8B5CF6), AppPalette.premiumInk],
+  colors: [AppPalette.premium, AppPalette.premiumInk],
 );
 
 class _PaywallSheet extends StatefulWidget {
@@ -342,8 +342,8 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: dark
-              ? const [Color(0xFF251A40), Color(0xFF15111F)]
-              : const [AppPalette.premiumTint, Color(0xFFE6DCFF)],
+              ? const [Color(0xFF0E2E24), Color(0xFF0C1814)]
+              : const [AppPalette.premiumTint, Color(0xFFCDEFDF)],
         ),
         border: Border.all(color: AppPalette.premium.withValues(alpha: dark ? .35 : .25)),
       ),

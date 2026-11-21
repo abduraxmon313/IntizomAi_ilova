@@ -19,6 +19,9 @@ String _normalizeBase(String raw) {
   return s;
 }
 
+/// Ilova sayti: do'stga yuborilgan taklifda yuklab olish havolasi sifatida.
+const kSiteUrl = 'https://intizom.app';
+
 /// Maxfiylik siyosati sahifasi (build vaqtida `--dart-define=PRIVACY_URL=...` bilan almashtirsa bo'ladi).
 const kPrivacyUrl = String.fromEnvironment('PRIVACY_URL', defaultValue: 'https://intizom.app/privacy');
 

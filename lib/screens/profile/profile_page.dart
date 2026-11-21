@@ -99,12 +99,9 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _shareInvite() async {
-    final p = s.profile;
-    final link = p?.referralLink;
-    if (p == null || link == null) return;
     final text = context.tr(
-      "Birga intizomli bo'laylik! IntizomAI'ni o'rnating va ro'yxatdan o'tishda meni taklif qilgan deb @{v0} ni yozing: {v1}",
-      {'v0': p.username ?? '', 'v1': link},
+      "Birga intizomli bo'laylik! IntizomAI — kunlik reja va odatlar uchun ilova. Yuklab oling: {v0}",
+      {'v0': kSiteUrl},
     );
     try {
       await SharePlus.instance.share(ShareParams(text: text));

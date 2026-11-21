@@ -19,12 +19,12 @@ abstract final class AppPalette {
   static const gold = Color(0xFFB7791F); // reytingda 1-o'rin, afsonaviy yutuq
   static const bronze = Color(0xFFA9714B); // reytingda 3-o'rin
 
-  // ── Premium (binafsha) ───────────────────────────────
-  static const premium = Color(0xFF7C3AED); // faqat Premium belgisi/yuzasi
-  static const premiumInk = Color(0xFF6D28D9); // yorug' fonda: tugma (oq matn bilan AA), kichik matn
-  static const premiumBright = Color(0xFFA78BFA); // qorong'i fonda: tugma, matn
-  static const premiumDeep = Color(0xFF2E1065); // premiumBright ustidagi matn
-  static const premiumTint = Color(0xFFF3EEFF); // yorug' yuzalar foni
+  // ── Premium (yashil, ✅ belgisiga yaqin, logodagi ko'kka moslangan) ──
+  static const premium = Color(0xFF10B981); // faqat Premium belgisi/yuzasi
+  static const premiumInk = Color(0xFF047857); // yorug' fonda: tugma (oq matn bilan AA), kichik matn
+  static const premiumBright = Color(0xFF34D399); // qorong'i fonda: tugma, matn
+  static const premiumDeep = Color(0xFF053B2C); // premiumBright ustidagi matn
+  static const premiumTint = Color(0xFFE6F7EF); // yorug' yuzalar foni
 
   // ── Neytral (yorug') ─────────────────────────────────
   static const ink = Color(0xFF0B1720);

@@ -414,7 +414,7 @@ const interfaceTranslations = <String, (String, String)>{
   "Amallar": ("Действия", "Actions"),
   "Apple orqali kirish": ("Войти через Apple", "Sign in with Apple"),
   "Barcha imkoniyatlar ochildi. Rahmat!": ("Все возможности открыты. Спасибо!", "Everything is unlocked. Thank you!"),
-  "Birga intizomli bo'laylik! IntizomAI'ni o'rnating va ro'yxatdan o'tishda meni taklif qilgan deb @{v0} ni yozing: {v1}": ("Давай вместе станем дисциплинированнее! Установи IntizomAI и при регистрации укажи, что тебя пригласил @{v0}: {v1}", "Let's build discipline together! Install IntizomAI and enter @{v0} as the friend who invited you: {v1}"),
+  "Birga intizomli bo'laylik! IntizomAI — kunlik reja va odatlar uchun ilova. Yuklab oling: {v0}": ("Давай вместе станем дисциплинированнее! IntizomAI — приложение для планов и привычек. Скачай: {v0}", "Let's build discipline together! IntizomAI is an app for daily plans and habits. Download it: {v0}"),
   "Blokdan chiqarish": ("Разблокировать", "Unblock"),
   "Bloklanganlar": ("Заблокированные", "Blocked users"),
   "Boshlash": ("Начать", "Get started"),
