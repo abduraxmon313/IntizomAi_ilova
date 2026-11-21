@@ -6,6 +6,7 @@ class LeaderRow {
     this.photoUrl,
     this.value = 0,
     this.isMe = false,
+    this.isPremium = false,
   });
 
   final int rank;
@@ -13,6 +14,7 @@ class LeaderRow {
   final String? photoUrl; // nisbiy yo'l (/api/v1/avatars/...) yoki to'liq URL
   final int value;
   final bool isMe;
+  final bool isPremium;
 
   factory LeaderRow.fromJson(Map<String, dynamic> j) => LeaderRow(
     rank: j['rank'] as int? ?? 0,
@@ -20,6 +22,7 @@ class LeaderRow {
     photoUrl: j['photo_url'] as String?,
     value: j['value'] as int? ?? 0,
     isMe: j['is_me'] as bool? ?? false,
+    isPremium: j['is_premium'] as bool? ?? false,
   );
 }
 

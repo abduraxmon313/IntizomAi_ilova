@@ -83,6 +83,7 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
   late bool _onboarded;
   late bool _askReminders;
   String? _nameHint;
+  String? _photoHint;
 
   late final ApiClient _client;
   late final AuthService _auth;
@@ -124,7 +125,10 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
         await widget.authStore.setOnboarded(true);
         await _afterOnboarded();
       } else {
-        setState(() => _nameHint = p.fullName);
+        setState(() {
+          _nameHint = p.fullName;
+          _photoHint = p.avatar;
+        });
       }
     } catch (_) {}
   }
@@ -151,6 +155,7 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
         _loggedIn = true;
         _onboarded = false;
         _nameHint = r.profile?.fullName;
+        _photoHint = r.profile?.avatar;
       });
       return;
     }
@@ -199,6 +204,7 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
         key: ValueKey('onboarding-$_nameHint'),
         api: _api,
         initialName: _nameHint,
+        initialPhoto: _photoHint,
         onDone: (_) => _afterOnboarded(),
         onSignOut: _logout,
       );

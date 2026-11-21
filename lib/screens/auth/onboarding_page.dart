@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert' show base64Encode;
 import 'dart:math' show Random;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -12,9 +14,9 @@ import '../../services/intizom_api.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/ui_kit.dart';
-import '../profile/profile_page.dart' show LowerCaseFormatter;
+import '../profile/profile_page.dart' show LowerCaseFormatter, ProfileAvatar;
 
-/// Birinchi kirishdan keyin — 3 ta qisqa qadam: ism → yosh → username
+/// Birinchi kirishdan keyin — 4 ta qisqa qadam: ism → profil rasmi → yosh → username
 /// (+ ixtiyoriy "kim taklif qildi"). Har qadamda bitta savol, tugma doim
 /// klaviatura ustida, xato o'sha maydonning o'zida ko'rsatiladi.
 class OnboardingPage extends StatefulWidget {
@@ -24,12 +26,16 @@ class OnboardingPage extends StatefulWidget {
     required this.onDone,
     required this.onSignOut,
     this.initialName,
+    this.initialPhoto,
   });
 
   final IntizomApi api;
   final ValueChanged<Profile> onDone;
   final VoidCallback onSignOut;
   final String? initialName;
+
+  /// Kirish provayderidan kelgan rasm (masalan Google) — rasm qadamida oldindan ko'rinadi.
+  final String? initialPhoto;
 
   @override
   State<OnboardingPage> createState() => _OnboardingPageState();
@@ -41,7 +47,10 @@ const _maxAge = 100;
 final _usernameRe = RegExp(r'^[a-z][a-z0-9_]{2,19}$');
 
 class _OnboardingPageState extends State<OnboardingPage> {
-  static const _steps = 3;
+  static const _steps = 4;
+  static const _photoStep = 1;
+  static const _ageStep = 2;
+  static const _usernameStep = 3;
 
   late final _name = TextEditingController(text: _cleanInitial(widget.initialName));
   final _age = TextEditingController();
@@ -62,6 +71,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
   bool _usernameEdited = false;
   bool _saving = false;
   bool _showReferrer = false;
+
+  /// Profil rasmi: provayder rasmi yoki shu yerda yuklangani (data: URL).
+  late String? _photo = (widget.initialPhoto?.isNotEmpty ?? false) ? widget.initialPhoto : null;
+  bool _photoUploaded = false;
+  bool _photoBusy = false;
+  String? _photoError;
   String? _usernameServerError;
   String? _referrerError;
   String? _error;
@@ -174,7 +189,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   String? _problemFor(int step) => switch (step) {
     0 => _nameProblem(),
-    1 => _ageProblem(),
+    _photoStep => null, // rasm ixtiyoriy — keyin Profilda ham qo'shsa bo'ladi
+    _ageStep => _ageProblem(),
     _ => _usernameProblem(),
   };
 
@@ -183,10 +199,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
     if (!mounted) return;
     final f = switch (_step) {
       0 => _nameFocus,
-      1 => _ageFocus,
+      _photoStep => null,
+      _ageStep => _ageFocus,
       _ => _usernameFocus,
     };
-    f.requestFocus();
+    f == null ? FocusManager.instance.primaryFocus?.unfocus() : f.requestFocus();
   }
 
   void _goTo(int step) {
@@ -194,7 +211,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
       _step = step;
       _error = null;
     });
-    if (step == 2 && !_usernameEdited) {
+    if (step == _usernameStep && !_usernameEdited) {
       final s = suggestUsername(_name.text);
       if (s != _username.text) _setUsername(s, edited: false);
     }
@@ -219,6 +236,58 @@ class _OnboardingPageState extends State<OnboardingPage> {
     if (_step > 0) _goTo(_step - 1);
   }
 
+  // ── Profil rasmi ───────────────────────────────────────
+  Future<void> _choosePhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(LucideIcons.image),
+              title: Text(context.tr("Galereyadan tanlash")),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(LucideIcons.camera),
+              title: Text(context.tr("Suratga olish")),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+    setState(() => _photoError = null);
+    try {
+      final file = await ImagePicker().pickImage(source: source, maxWidth: 512, maxHeight: 512, imageQuality: 80);
+      if (file == null || !mounted) return;
+      final dataUrl = 'data:image/jpeg;base64,${base64Encode(await file.readAsBytes())}';
+      if (dataUrl.length > 1000000) {
+        setState(() => _photoError = context.tr("Rasm juda katta. Boshqasini tanlang."));
+        return;
+      }
+      setState(() => _photoBusy = true);
+      // Profil hali to'ldirilmagan bo'lsa ham rasm saqlanadi (PUT /profile).
+      await widget.api.updateProfile(customPhotoUrl: dataUrl);
+      if (!mounted) return;
+      successFeedback();
+      setState(() {
+        _photo = dataUrl;
+        _photoUploaded = true;
+      });
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _photoError = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _photoError = context.tr("Rasmni yuklab bo'lmadi. Qayta urinib ko'ring."));
+    } finally {
+      if (mounted) setState(() => _photoBusy = false);
+    }
+  }
+
   Future<void> _submit() async {
     if (_checking) return; // natija kelgach tugma qayta faollashadi
     setState(() {
@@ -240,7 +309,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
       setState(() {
         if (e.statusCode == 409) {
           _usernameServerError = e.message;
-          _tried.add(2);
+          _tried.add(_usernameStep);
           _scheduleCheck(immediate: true); // bo'sh variantlarni olish uchun
         } else if (e.statusCode == 404 && _showReferrer) {
           _referrerError = e.message;
@@ -261,6 +330,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     final scheme = Theme.of(context).colorScheme;
     final last = _step == _steps - 1;
     final usernameBlocked = last && (_checking || (_check != null && !_check!.available));
+    final askPhoto = _step == _photoStep && _photo == null;
     return PopScope(
       canPop: _step == 0,
       onPopInvokedWithResult: (didPop, _) {
@@ -296,8 +366,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           key: ValueKey(_step),
                           child: switch (_step) {
                             0 => _nameStep(scheme),
-                            1 => _ageStep(scheme),
-                            _ => _usernameStep(scheme),
+                            _photoStep => _photoStepView(scheme),
+                            _ageStep => _ageStepView(scheme),
+                            _ => _usernameStepView(scheme),
                           },
                         ),
                       ),
@@ -313,13 +384,30 @@ class _OnboardingPageState extends State<OnboardingPage> {
                             padding: const EdgeInsets.only(bottom: 10),
                             child: Text(_error!, textAlign: TextAlign.center, style: AppType.label.copyWith(color: scheme.error)),
                           ),
-                        FilledButton(
-                          onPressed: _saving || usernameBlocked ? null : _next,
-                          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
-                          child: _saving
-                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                              : Text(last ? context.tr("Boshlash") : context.tr("Davom etish")),
-                        ),
+                        if (askPhoto)
+                          FilledButton.icon(
+                            onPressed: _photoBusy ? null : _choosePhoto,
+                            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
+                            icon: const Icon(LucideIcons.camera, size: 20),
+                            label: Text(context.tr("Rasm qo'shish")),
+                          )
+                        else
+                          FilledButton(
+                            onPressed: _saving || _photoBusy || usernameBlocked ? null : _next,
+                            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
+                            child: _saving
+                                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                                : Text(last ? context.tr("Boshlash") : context.tr("Davom etish")),
+                          ),
+                        if (askPhoto)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: TextButton(
+                              onPressed: _photoBusy ? null : _next,
+                              style: TextButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+                              child: Text(context.tr("Keyinroq qo'shaman")),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -440,7 +528,102 @@ class _OnboardingPageState extends State<OnboardingPage> {
     );
   }
 
-  Widget _ageStep(ColorScheme scheme) {
+  Widget _photoStepView(ColorScheme scheme) {
+    final first = _name.text.trim().split(RegExp(r'\s+')).first;
+    final name = _name.text.trim();
+    final hasPhoto = _photo != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _heading(
+          scheme,
+          LucideIcons.camera,
+          first.isEmpty ? context.tr("Profil rasmingizni qo'shing") : context.tr("{v0}, profil rasmingizni qo'shing", {'v0': first}),
+          context.tr("Guruhdagi do'stlaringiz va reytingdagilar sizni rasmingizdan tanib olishadi."),
+        ),
+        Center(
+          child: Semantics(
+            button: true,
+            label: context.tr("Profil rasmini tanlash"),
+            child: GestureDetector(
+              onTap: _photoBusy ? null : _choosePhoto,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: hasPhoto ? scheme.primary : scheme.outlineVariant, width: 2),
+                    ),
+                    child: hasPhoto
+                        ? ProfileAvatar(url: _photo, name: name, size: 128)
+                        : Container(
+                            width: 128,
+                            height: 128,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(color: scheme.surfaceContainerLow, shape: BoxShape.circle),
+                            child: Icon(LucideIcons.userRound, size: 56, color: scheme.outline),
+                          ),
+                  ),
+                  if (_photoBusy)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(color: scheme.surface.withValues(alpha: .6), shape: BoxShape.circle),
+                        alignment: Alignment.center,
+                        child: const SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 2.5)),
+                      ),
+                    ),
+                  Positioned(
+                    right: 4,
+                    bottom: 4,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: scheme.surface, width: 3),
+                      ),
+                      child: Icon(hasPhoto ? LucideIcons.pencil : LucideIcons.plus, size: 18, color: scheme.onPrimary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpace.lg),
+        if (_photoError != null)
+          Text(_photoError!, textAlign: TextAlign.center, style: AppType.label.copyWith(color: scheme.error))
+        else if (hasPhoto)
+          Column(
+            children: [
+              Text(
+                _photoUploaded ? context.tr("Rasm saqlandi") : context.tr("Hisobingizdagi rasm"),
+                textAlign: TextAlign.center,
+                style: AppType.label.copyWith(
+                  color: _photoUploaded ? AppPalette.success : scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              TextButton(
+                onPressed: _photoBusy ? null : _choosePhoto,
+                child: Text(context.tr("Boshqa rasm tanlash")),
+              ),
+            ],
+          )
+        else
+          Text(
+            context.tr("Galereyadan tanlang yoki suratga oling. Keyin Profilda o'zgartirsa bo'ladi."),
+            textAlign: TextAlign.center,
+            style: AppType.caption.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w400),
+          ),
+      ],
+    );
+  }
+
+  Widget _ageStepView(ColorScheme scheme) {
     final first = _name.text.trim().split(RegExp(r'\s+')).first;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -462,7 +645,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           decoration: _bigField(
             hint: '18',
             suffixText: context.tr("yosh"),
-            error: _tried.contains(1) ? _ageProblem() : null,
+            error: _tried.contains(_ageStep) ? _ageProblem() : null,
           ),
           onChanged: (_) => setState(() {}),
           onSubmitted: (_) => _next(),
@@ -471,12 +654,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
     );
   }
 
-  Widget _usernameStep(ColorScheme scheme) {
+  Widget _usernameStepView(ColorScheme scheme) {
     final u = _username.text.trim();
     final check = _check;
     final localProblem = _usernameProblem();
     final ok = localProblem == null && check != null && check.username == u && check.available && !_checking;
-    final showError = localProblem != null && (_tried.contains(2) || u.length >= 3 || _usernameServerError != null);
+    final showError = localProblem != null && (_tried.contains(_usernameStep) || u.length >= 3 || _usernameServerError != null);
 
     Widget? suffix;
     if (_checking) {
@@ -614,19 +797,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
   /// Profil kartasi qanday ko'rinishi — ism + username jonli.
   Widget _preview(ColorScheme scheme, String u, bool ok) {
     final name = _name.text.trim().replaceAll(RegExp(r'\s+'), ' ');
-    final initial = name.isEmpty ? '?' : name.characters.first.toUpperCase();
     return Container(
       decoration: surfaceDecoration(context, color: scheme.surfaceContainerLow),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Row(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: scheme.primaryContainer, shape: BoxShape.circle),
-            child: Text(initial, style: AppType.heading.copyWith(color: scheme.onPrimaryContainer)),
-          ),
+          ProfileAvatar(url: _photo, name: name, size: 44),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
