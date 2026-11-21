@@ -505,4 +505,7 @@ const interfaceTranslations = <String, (String, String)>{
   "Ustoz": ("Мастер", "Master"),
   "Afsona": ("Легенда", "Legend"),
   "Mifik": ("Мифический", "Mythic"),
+  "Google kirishni tasdiqlamadi. Google Cloud'dagi Android client (paket nomi va SHA-1) hamda Web client bitta loyihada ekanini tekshiring. ({v0})": ("Google не подтвердил вход. Проверьте, что Android-клиент (пакет и SHA-1) и Web-клиент находятся в одном проекте Google Cloud. ({v0})", "Google rejected the sign-in. Check that the Android client (package name and SHA-1) and the Web client are in the same Google Cloud project. ({v0})"),
+  "Davom etish orqali maxfiylik siyosatiga rozilik bildirasiz.": ("Продолжая, вы принимаете политику конфиденциальности.", "By continuing you accept the privacy policy."),
+  "Sahifani ochib bo'lmadi: {v0}": ("Не удалось открыть страницу: {v0}", "Couldn't open the page: {v0}"),
 };

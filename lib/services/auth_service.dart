@@ -23,6 +23,16 @@ class AuthCancelled implements Exception {
   const AuthCancelled();
 }
 
+/// Google kirishni rad etdi (odatda Google Cloud sozlamasi: paket nomi, SHA-1 yoki client ID).
+class GoogleConfigError implements Exception {
+  const GoogleConfigError({required this.code, this.details = ''});
+  final String code;
+  final String details;
+
+  @override
+  String toString() => details.isEmpty ? code : '$code: $details';
+}
+
 /// Kirish: iOS — Apple yoki Google, Android — faqat Google.
 ///
 /// Provayder bergan ID tokenni ilova backend'iga yuboramiz; server uni
@@ -54,12 +64,15 @@ class AuthService {
     try {
       account = await GoogleSignIn.instance.authenticate(scopeHint: const ['email', 'profile']);
     } on GoogleSignInException catch (e) {
-      if (e.code == GoogleSignInExceptionCode.canceled ||
-          e.code == GoogleSignInExceptionCode.interrupted ||
-          e.code == GoogleSignInExceptionCode.uiUnavailable) {
-        throw const AuthCancelled();
-      }
-      throw ApiException(e.description ?? 'Google: ${e.code.name}');
+      debugPrint('Google Sign-In xato: ${e.code.name} — ${e.description}');
+      final desc = (e.description ?? '').trim();
+      // Android Credential Manager sozlama xatosini ham "canceled" deb qaytaradi
+      // (masalan "[16] Account reauth failed" — SHA-1 yoki client ID mos emas).
+      // Faqat haqiqiy bekor qilish jim o'tadi, qolgani foydalanuvchiga ko'rsatiladi.
+      final userCancelled = e.code == GoogleSignInExceptionCode.canceled &&
+          (desc.isEmpty || desc.toLowerCase().contains('cancel'));
+      if (userCancelled) throw const AuthCancelled();
+      throw GoogleConfigError(code: e.code.name, details: desc);
     }
     final idToken = account.authentication.idToken;
     if (idToken == null || idToken.isEmpty) {
