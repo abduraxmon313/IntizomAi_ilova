@@ -407,7 +407,20 @@ class _StatsPageState extends State<StatsPage> {
                 ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const _PremiumMark(),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  context.tr("— Premium foydalanuvchi"),
+                  style: AppType.caption.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           if (_lb == null)
             const LoadingView()
           else ...[
@@ -701,6 +714,29 @@ class _Heatmap extends StatelessWidget {
   }
 }
 
+/// Reytingda Premium foydalanuvchi belgisi: binafsha doirachada toj.
+class _PremiumMark extends StatelessWidget {
+  const _PremiumMark();
+
+  @override
+  Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+    return Tooltip(
+      message: 'Premium',
+      child: Semantics(
+        label: 'Premium',
+        child: Container(
+          width: 18,
+          height: 18,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: AppPalette.premiumFill(b), shape: BoxShape.circle),
+          child: Icon(LucideIcons.crown, size: 11, color: AppPalette.onPremium(b)),
+        ),
+      ),
+    );
+  }
+}
+
 /// Reyting qatori: o'rin, avatar, ism, natija. Birinchi uchtalik — chegarali avatar.
 class _LeaderTile extends StatelessWidget {
   const _LeaderTile({required this.row, required this.unit});
@@ -769,6 +805,7 @@ class _LeaderTile extends StatelessWidget {
                     style: AppType.body.copyWith(fontWeight: row.isMe ? FontWeight.w600 : FontWeight.w500),
                   ),
                 ),
+                if (row.isPremium) ...[const SizedBox(width: 6), const _PremiumMark()],
                 if (row.isMe) ...[const SizedBox(width: 6),  Pill(context.tr("Siz"))],
               ],
             ),

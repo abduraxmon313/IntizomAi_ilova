@@ -16,8 +16,15 @@ abstract final class AppPalette {
   static const brandTint = Color(0xFFE2F4F9); // tanlangan holat foni
   static const brandOnDark = Color(0xFF2CC4E4); // qorong'i rejimdagi brend
   static const onBrandDark = Color(0xFF04222B);
-  static const gold = Color(0xFFB7791F); // faqat Premium
+  static const gold = Color(0xFFB7791F); // reytingda 1-o'rin, afsonaviy yutuq
   static const bronze = Color(0xFFA9714B); // reytingda 3-o'rin
+
+  // ── Premium (binafsha) ───────────────────────────────
+  static const premium = Color(0xFF7C3AED); // faqat Premium belgisi/yuzasi
+  static const premiumInk = Color(0xFF6D28D9); // yorug' fonda: tugma (oq matn bilan AA), kichik matn
+  static const premiumBright = Color(0xFFA78BFA); // qorong'i fonda: tugma, matn
+  static const premiumDeep = Color(0xFF2E1065); // premiumBright ustidagi matn
+  static const premiumTint = Color(0xFFF3EEFF); // yorug' yuzalar foni
 
   // ── Neytral (yorug') ─────────────────────────────────
   static const ink = Color(0xFF0B1720);
@@ -53,14 +60,19 @@ abstract final class AppPalette {
   static const goldInk = Color(0xFF8A5A12);
   static const bronzeInk = Color(0xFF8F5A34);
 
-  /// Ma'no rangidagi kichik matn: yorug' rejimda olov/oltin to'qroq tonda.
+  /// Ma'no rangidagi kichik matn: yorug' rejimda olov/oltin/Premium to'qroq tonda.
   static Color textTone(Color c, Brightness b) {
-    if (b == Brightness.dark) return c;
+    if (b == Brightness.dark) return c == premium ? premiumBright : c;
     if (c == ember) return emberInk;
     if (c == gold) return goldInk;
     if (c == bronze) return bronzeInk;
+    if (c == premium) return premiumInk;
     return c;
   }
+
+  /// Premium tugma/plita to'ldirish rangi va uning ustidagi matn rangi.
+  static Color premiumFill(Brightness b) => b == Brightness.dark ? premiumBright : premiumInk;
+  static Color onPremium(Brightness b) => b == Brightness.dark ? premiumDeep : paper;
 }
 
 abstract final class AppRadius {

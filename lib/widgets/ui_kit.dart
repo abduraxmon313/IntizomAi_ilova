@@ -597,7 +597,7 @@ class PremiumGate extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
       child: Column(
         children: [
-          AppIconTile(icon: icon, tone: AppPalette.gold, size: 48),
+          AppIconTile(icon: icon, tone: AppPalette.premium, size: 48),
           const SizedBox(height: 14),
           Text(title, textAlign: TextAlign.center, style: AppType.heading),
           const SizedBox(height: 6),

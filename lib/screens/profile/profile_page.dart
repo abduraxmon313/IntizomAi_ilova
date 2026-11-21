@@ -455,7 +455,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                       ),
                                       const SizedBox(width: 8),
                                     ],
-                                    if (st.isPremium)  Pill(context.tr("Premium"), color: AppPalette.gold),
+                                    if (st.isPremium)  Pill(context.tr("Premium"), color: AppPalette.premium),
                                   ],
                                 ),
                               ],
@@ -627,7 +627,7 @@ class _SubscriptionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              AppIconTile(icon: LucideIcons.crown, tone: AppPalette.gold, size: 40),
+              AppIconTile(icon: LucideIcons.crown, tone: AppPalette.premium, size: 40),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -662,7 +662,7 @@ class _SubscriptionCard extends StatelessWidget {
           ),
           if (premium && days > 0) ...[
             const SizedBox(height: 14),
-            AppProgressBar(value: (days / 30).clamp(0, 1).toDouble(), color: AppPalette.gold),
+            AppProgressBar(value: (days / 30).clamp(0, 1).toDouble(), color: AppPalette.premium),
           ],
         ],
       ),

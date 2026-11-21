@@ -669,7 +669,8 @@ class FriendsPageState extends State<FriendsPage> {
 
   // ── 2. Guruh ichi ──────────────────────────────────
   Widget _groupView(GroupDetail g) {
-    final scheme = Theme.of(context).colorScheme;
+    final members = _sortedMembers(g);
+    final alone = g.members.length <= 1;
     return RefreshIndicator(
       onRefresh: _reloadGroup,
       child: ListView(
@@ -688,41 +689,18 @@ class FriendsPageState extends State<FriendsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                LayoutBuilder(
-                  builder: (_, box) {
-                    const pad = EdgeInsets.symmetric(horizontal: 12);
-                    final perms = OutlinedButton.icon(
-                      onPressed: () => _permissions(g),
-                      style: OutlinedButton.styleFrom(padding: pad, minimumSize: const Size(0, 48)),
-                      icon: const Icon(LucideIcons.shield, size: 18),
-                      label:  Text(context.tr("Ruxsatlar"), maxLines: 1),
-                    );
-                    // Taklifni faqat ega yuboradi.
-                    if (!g.isOwner) return perms;
-                    final invite = FilledButton.icon(
-                      onPressed: () => _invite(g),
-                      style: FilledButton.styleFrom(padding: pad, minimumSize: const Size(0, 48)),
-                      icon: const Icon(LucideIcons.userPlus, size: 18),
-                      label:  Text(context.tr("Taklif qilish"), maxLines: 1),
-                    );
-                    // Ikki tugma yonma-yon sig'masa — ustma-ust.
-                    if (box.maxWidth < 300) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [invite, const SizedBox(height: 8), perms],
-                      );
-                    }
-                    return Row(
-                      children: [
-                        Expanded(child: invite),
-                        const SizedBox(width: 10),
-                        Expanded(child: perms),
-                      ],
-                    );
-                  },
+                _GroupHero(group: g),
+                const SizedBox(height: 12),
+                _groupActions(g),
+                if (alone && g.isOwner)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: _SheetNote(context.tr("Hozircha guruhda faqat siz. Do'stlaringizni username orqali taklif qiling — bir-biringizning kunini ko'rib, birga intizomli bo'lasiz.")),
+                  ),
+                SectionBar(
+                  title: context.tr("Bugungi natijalar"),
+                  count: '${g.members.length}',
                 ),
-                _GroupTodaySummary(members: g.members),
-                SectionBar(title: context.tr("A'zolar"), count: '${g.members.length}'),
                 if (g.members.length > 5)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
@@ -735,84 +713,15 @@ class FriendsPageState extends State<FriendsPage> {
                       ),
                     ),
                   ),
-                GroupCard(
-                  indent: 66,
-                  children: [
-                    for (final m in _sortedMembers(g))
-                      InkWell(
-                        onTap: () => _openMember(m.userId),
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 14, 12),
-                          child: Row(
-                            children: [
-                              ProfileAvatar(url: m.photoUrl, name: m.name, size: 38),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            m.name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: AppType.bodyStrong,
-                                          ),
-                                        ),
-                                        if (m.isMe) ...[const SizedBox(width: 6),  Pill(context.tr("Siz"))],
-                                        if (m.isOwner) ...[const SizedBox(width: 6),  Pill(context.tr("Ega"))],
-                                        if (!m.isActive) ...[const SizedBox(width: 6),  Pill(context.tr("Pauza"), muted: true)],
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Wrap(
-                                      spacing: 12,
-                                      children: m.isMe || m.visible
-                                          ? [
-                                              MetaTag(icon: LucideIcons.calendarCheck, text: context.tr("Reja {v0}/{v1}", {'v0': m.plansDone, 'v1': m.plansTotal})),
-                                              MetaTag(icon: LucideIcons.repeat, text: context.tr("Odat {v0}/{v1}", {'v0': m.habitsDone, 'v1': m.habitsTotal})),
-                                              MetaTag(icon: LucideIcons.flame, text: context.tr("{v0} kun", {'v0': m.streak}), color: AppPalette.ember),
-                                            ]
-                                          : [
-                                               MetaTag(icon: LucideIcons.lock, text: context.tr("Yashirin")),
-                                              MetaTag(icon: LucideIcons.flame, text: context.tr("{v0} kun", {'v0': m.streak}), color: AppPalette.ember),
-                                            ],
-                                    ),
-                                    if ((m.isMe || m.visible) && _memberTotal(m) > 0) ...[
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: ClipRRect(
-                                              borderRadius: BorderRadius.circular(4),
-                                              child: LinearProgressIndicator(
-                                                value: _memberRatio(m),
-                                                minHeight: 5,
-                                                backgroundColor: scheme.surfaceContainerHighest,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '${(_memberRatio(m) * 100).round()}%',
-                                            style: AppType.caption.copyWith(fontFeatures: tabularFigures, color: scheme.onSurfaceVariant),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Icon(LucideIcons.chevronRight, size: 18, color: scheme.outline),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+                if (members.isEmpty)
+                  EmptyView(icon: LucideIcons.search, title: context.tr("Hech kim topilmadi"))
+                else
+                  GroupCard(
+                    indent: 78,
+                    children: [
+                      for (final m in members) _GroupMemberRow(member: m, onTap: () => _openMember(m.userId)),
+                    ],
+                  ),
                 if (g.isOwner && g.pendingInvites.isNotEmpty) ...[
                   SectionBar(title: context.tr("Javob kutilmoqda"), count: '${g.pendingInvites.length}'),
                   GroupCard(
@@ -836,6 +745,41 @@ class FriendsPageState extends State<FriendsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Taklif qilish (faqat ega) va ruxsatlar. Yonma-yon sig'masa — ustma-ust.
+  Widget _groupActions(GroupDetail g) {
+    return LayoutBuilder(
+      builder: (_, box) {
+        const pad = EdgeInsets.symmetric(horizontal: 12);
+        final perms = OutlinedButton.icon(
+          onPressed: () => _permissions(g),
+          style: OutlinedButton.styleFrom(padding: pad, minimumSize: const Size(0, 46)),
+          icon: const Icon(LucideIcons.shield, size: 18),
+          label: Text(context.tr("Ruxsatlar"), maxLines: 1),
+        );
+        if (!g.isOwner) return perms;
+        final invite = FilledButton.icon(
+          onPressed: () => _invite(g),
+          style: FilledButton.styleFrom(padding: pad, minimumSize: const Size(0, 46)),
+          icon: const Icon(LucideIcons.userPlus, size: 18),
+          label: Text(context.tr("Taklif qilish"), maxLines: 1),
+        );
+        if (box.maxWidth < 300) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [invite, const SizedBox(height: 8), perms],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: invite),
+            const SizedBox(width: 10),
+            Expanded(child: perms),
+          ],
+        );
+      },
     );
   }
 
@@ -1222,68 +1166,272 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
   }
 }
 
-/// Varaq ichidagi izoh yoki bo'sh holat matni.
-class _GroupTodaySummary extends StatelessWidget {
-  const _GroupTodaySummary({required this.members});
+/// Bugungi bajarilish ulushi (0..1); reja/odat bo'lmasa — null.
+double? _todayRatio(GroupMember m) {
+  final total = m.plansTotal + m.habitsTotal;
+  return total == 0 ? null : (m.plansDone + m.habitsDone) / total;
+}
 
-  final List<GroupMember> members;
+/// Guruh sahifasining bosh kartasi: tavsif, bugungi umumiy natija halqasi,
+/// kunni yakunlaganlar, bugun oldindagi a'zo, eng uzun seriya va a'zolar yuzlari.
+class _GroupHero extends StatelessWidget {
+  const _GroupHero({required this.group});
+
+  final GroupDetail group;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final members = group.members;
     final visible = members.where((m) => m.isMe || m.visible).toList();
     var done = 0, total = 0, finished = 0;
+    GroupMember? leader;
+    var leaderRatio = 0.0;
     for (final m in visible) {
       final t = m.plansTotal + m.habitsTotal;
       final d = m.plansDone + m.habitsDone;
       done += d;
       total += t;
       if (t > 0 && d >= t) finished++;
+      final r = _todayRatio(m) ?? 0;
+      final l = leader;
+      if (r > leaderRatio || (r > 0 && r == leaderRatio && l != null && m.streak > l.streak)) {
+        leader = m;
+        leaderRatio = r;
+      }
     }
     final ratio = total == 0 ? 0.0 : done / total;
-    final bestStreak = members.fold<int>(0, (a, m) => m.streak > a ? m.streak : a);
-    Widget stat(String value, String label) => Expanded(
-          child: Column(
+    final pct = (ratio * 100).round();
+    final best = members.fold<GroupMember?>(null, (a, m) => a == null || m.streak > a.streak ? m : a);
+    final desc = group.description?.trim();
+    final ringColor = total > 0 && done >= total ? AppPalette.success : scheme.primary;
+    final top = leader;
+
+    Widget line(IconData icon, Color color, String text) => Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Row(
             children: [
-              Text(value, style: AppType.bodyStrong.copyWith(fontFeatures: tabularFigures)),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
+              Icon(icon, size: 15, color: color),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppType.label.copyWith(fontWeight: FontWeight.w500, color: scheme.onSurface),
+                ),
               ),
             ],
           ),
         );
-    return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(context.tr("Bugun guruhda"), style: AppType.bodyStrong),
-            const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: surfaceDecoration(context, color: scheme.surfaceContainerLowest),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (desc != null && desc.isNotEmpty) ...[
+            Text(desc, style: AppType.label.copyWith(fontWeight: FontWeight.w400, height: 1.45, color: scheme.onSurfaceVariant)),
+            const SizedBox(height: 14),
+          ],
+          Row(
+            children: [
+              ProgressRing(
                 value: ratio,
-                minHeight: 8,
-                backgroundColor: scheme.surfaceContainerHighest,
+                size: 92,
+                stroke: 9,
+                color: ringColor,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('$pct%', style: AppType.title.copyWith(fontSize: 22, fontFeatures: tabularFigures)),
+                    Text(context.tr("bugun"), style: AppType.caption.copyWith(color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(context.tr("Bugun guruhda"), style: AppType.bodyStrong),
+                    line(
+                      LucideIcons.circleCheck,
+                      AppPalette.success,
+                      context.tr("{v0} / {v1} a'zo kunni yakunladi", {'v0': finished, 'v1': visible.length}),
+                    ),
+                    if (top != null && visible.length > 1)
+                      line(
+                        LucideIcons.trophy,
+                        AppPalette.textTone(AppPalette.gold, theme.brightness),
+                        context.tr("Oldinda: {v0} · {v1}%", {'v0': top.isMe ? context.tr("Siz") : top.name, 'v1': (leaderRatio * 100).round()}),
+                      ),
+                    if (best != null && best.streak > 0)
+                      line(
+                        LucideIcons.flame,
+                        AppPalette.textTone(AppPalette.ember, theme.brightness),
+                        context.tr("Eng uzun seriya: {v0} kun", {'v0': best.streak}),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (members.length > 1) ...[
+            const SizedBox(height: 14),
+            _AvatarStack(members: members),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A'zolar yuzlari bir qatorda (5 tagacha) va "+N".
+class _AvatarStack extends StatelessWidget {
+  const _AvatarStack({required this.members});
+
+  final List<GroupMember> members;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    const size = 28.0, step = 20.0, maxShown = 5;
+    final shown = members.take(maxShown).toList();
+    final extra = members.length - shown.length;
+    final count = shown.length + (extra > 0 ? 1 : 0);
+    Widget ring(Widget child) => Container(
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(color: scheme.surfaceContainerLowest, shape: BoxShape.circle),
+          child: child,
+        );
+    return Row(
+      children: [
+        SizedBox(
+          width: step * (count - 1) + size + 4,
+          height: size + 4,
+          child: Stack(
+            children: [
+              for (var i = 0; i < shown.length; i++)
+                Positioned(left: step * i, child: ring(ProfileAvatar(url: shown[i].photoUrl, name: shown[i].name, size: size))),
+              if (extra > 0)
+                Positioned(
+                  left: step * shown.length,
+                  child: ring(
+                    Container(
+                      width: size,
+                      height: size,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: scheme.surfaceContainerHigh, shape: BoxShape.circle),
+                      child: Text('+$extra', style: AppType.micro.copyWith(fontWeight: FontWeight.w700, color: scheme.onSurfaceVariant)),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            context.tr("{v0} a'zo", {'v0': members.length}),
+            style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Guruhdagi a'zo qatori: avatar atrofida bugungi progress halqasi, ism va
+/// belgilar, reja/odat soni, o'ngda foiz (yoki yakunlandi belgisi) va seriya.
+class _GroupMemberRow extends StatelessWidget {
+  const _GroupMemberRow({required this.member, required this.onTap});
+
+  final GroupMember member;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final m = member;
+    final open = m.isMe || m.visible;
+    final ratio = open ? _todayRatio(m) : null;
+    final complete = ratio != null && ratio >= 1;
+    final ringColor = complete ? AppPalette.success : scheme.primary;
+    final details = !open
+        ? context.tr("Ma'lumotlari yashirin")
+        : (m.plansTotal + m.habitsTotal == 0)
+        ? context.tr("Bugunga reja yo'q")
+        : context.tr("Reja {v0}/{v1} · Odat {v2}/{v3}", {'v0': m.plansDone, 'v1': m.plansTotal, 'v2': m.habitsDone, 'v3': m.habitsTotal});
+
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        color: m.isMe ? scheme.primaryContainer.withValues(alpha: theme.brightness == Brightness.dark ? .35 : .45) : null,
+        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+        child: Row(
+          children: [
+            ProgressRing(
+              value: ratio ?? 0,
+              size: 50,
+              stroke: 3.5,
+              color: ringColor,
+              child: Opacity(
+                opacity: m.isActive ? 1 : .55,
+                child: ProfileAvatar(url: m.photoUrl, name: m.name, size: 40),
               ),
             ),
-            const SizedBox(height: 14),
-            Row(
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(m.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.bodyStrong),
+                      ),
+                      if (m.isMe) ...[const SizedBox(width: 6), Pill(context.tr("Siz"))],
+                      if (m.isOwner) ...[const SizedBox(width: 6), Pill(context.tr("Ega"), muted: true)],
+                      if (!m.isActive) ...[const SizedBox(width: 6), Pill(context.tr("Pauza"), muted: true)],
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      if (!open) ...[Icon(LucideIcons.lock, size: 12, color: scheme.onSurfaceVariant), const SizedBox(width: 4)],
+                      Flexible(
+                        child: Text(
+                          details,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppType.label.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant, fontFeatures: tabularFigures),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                stat('${(ratio * 100).round()}%', context.tr("Umumiy bajarilish")),
-                stat('$finished/${visible.length}', context.tr("Kunni yakunlagan")),
-                stat('$bestStreak', context.tr("Eng uzun seriya")),
+                if (complete)
+                  const Icon(LucideIcons.circleCheck, size: 20, color: AppPalette.success)
+                else
+                  Text(
+                    ratio == null ? '—' : '${(ratio * 100).round()}%',
+                    style: AppType.bodyStrong.copyWith(
+                      fontFeatures: tabularFigures,
+                      color: ratio == null ? scheme.outline : scheme.onSurface,
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                MetaTag(icon: LucideIcons.flame, text: '${m.streak}', color: m.streak > 0 ? AppPalette.ember : scheme.outline),
               ],
             ),
           ],
@@ -1293,6 +1441,7 @@ class _GroupTodaySummary extends StatelessWidget {
   }
 }
 
+/// Varaq ichidagi izoh yoki bo'sh holat matni.
 class _SheetNote extends StatelessWidget {
   const _SheetNote(this.text, {this.boxed = true});
   final String text;

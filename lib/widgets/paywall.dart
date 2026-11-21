@@ -28,9 +28,16 @@ Future<void> showPaywall(BuildContext context, {String? message, String? promo})
 
 enum _Stage { choose, waiting, success }
 
-/// Premium oltin rangi: yorug' rejimda to'qroq ton (oq matn bilan AA).
-Color _goldFill(Brightness b) => b == Brightness.dark ? AppPalette.gold : AppPalette.goldInk;
-Color _onGold(Brightness b) => b == Brightness.dark ? const Color(0xFF1F1405) : Colors.white;
+/// Premium rangi (binafsha): tugma va tanlangan holat. Yorug' rejimda to'q ton (oq matn bilan AA).
+Color _premiumFill(Brightness b) => AppPalette.premiumFill(b);
+Color _onPremium(Brightness b) => AppPalette.onPremium(b);
+
+/// Toj plitasi: ikkala rejimda ham bir xil binafsha gradient, oq ikonka.
+const _crownGradient = LinearGradient(
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+  colors: [Color(0xFF8B5CF6), AppPalette.premiumInk],
+);
 
 class _PaywallSheet extends StatefulWidget {
   const _PaywallSheet({this.message, this.initialPromo});
@@ -325,7 +332,7 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
-    final gold = AppPalette.textTone(AppPalette.gold, theme.brightness);
+    final accent = AppPalette.textTone(AppPalette.premium, theme.brightness);
     final reason = widget.message;
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 14, 8, 18),
@@ -335,10 +342,10 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: dark
-              ? const [Color(0xFF2B2213), Color(0xFF17130C)]
-              : const [Color(0xFFFFF7E8), Color(0xFFFBE7C3)],
+              ? const [Color(0xFF251A40), Color(0xFF15111F)]
+              : const [AppPalette.premiumTint, Color(0xFFE6DCFF)],
         ),
-        border: Border.all(color: AppPalette.gold.withValues(alpha: dark ? .35 : .25)),
+        border: Border.all(color: AppPalette.premium.withValues(alpha: dark ? .35 : .25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -351,10 +358,10 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
                 height: 52,
                 margin: const EdgeInsets.only(top: 4),
                 decoration: BoxDecoration(
-                  color: _goldFill(theme.brightness),
+                  gradient: _crownGradient,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(LucideIcons.crown, size: 26, color: _onGold(theme.brightness)),
+                child: const Icon(LucideIcons.crown, size: 26, color: Colors.white),
               ),
               const Spacer(),
               _closeButton(),
@@ -374,12 +381,12 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(LucideIcons.badgeCheck, size: 16, color: gold),
+                Icon(LucideIcons.badgeCheck, size: 16, color: accent),
                 const SizedBox(width: 6),
                 Flexible(
                   child: Text(
                     context.tr("Premium faol · {v0} kun qoldi", {'v0': s!.daysLeft}),
-                    style: AppType.label.copyWith(color: gold, fontWeight: FontWeight.w600),
+                    style: AppType.label.copyWith(color: accent, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -397,7 +404,7 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(padding: const EdgeInsets.only(top: 2), child: Icon(LucideIcons.lock, size: 15, color: gold)),
+                  Padding(padding: const EdgeInsets.only(top: 2), child: Icon(LucideIcons.lock, size: 15, color: accent)),
                   const SizedBox(width: 8),
                   Expanded(child: Text(reason, style: AppType.label.copyWith(fontWeight: FontWeight.w500, height: 1.4))),
                 ],
@@ -413,7 +420,7 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
   Widget _comparison(FreeLimits f) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final gold = AppPalette.textTone(AppPalette.gold, theme.brightness);
+    final accent = AppPalette.textTone(AppPalette.premium, theme.brightness);
     final unlimited = context.tr("Cheksiz");
     final rows = <(IconData, String, String?, String)>[
       (LucideIcons.listChecks, context.tr("Kunlik rejalar"), context.tr("{v0} ta", {'v0': f.plansPerDay}), unlimited),
@@ -421,19 +428,18 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
       (LucideIcons.target, context.tr("Maqsadlar"), context.tr("{v0} ta", {'v0': f.goals}), unlimited),
       (LucideIcons.sparkles, context.tr("AI murabbiy"), context.tr("Kuniga {v0} ta", {'v0': f.aiPerDay}), unlimited),
       (LucideIcons.users, context.tr("Guruh yaratish"), null, ''),
-      (LucideIcons.trophy, context.tr("Umumiy reyting"), null, ''),
     ];
     final head = AppType.micro.copyWith(fontWeight: FontWeight.w600, letterSpacing: .3);
     Widget cell(String? text, {required bool premium}) {
       if (text == null) return Icon(LucideIcons.minus, size: 16, color: scheme.outline);
-      if (text.isEmpty) return Icon(LucideIcons.check, size: 18, color: gold);
+      if (text.isEmpty) return Icon(LucideIcons.check, size: 18, color: accent);
       return Text(
         text,
         textAlign: TextAlign.center,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: AppType.label.copyWith(
-          color: premium ? gold : scheme.onSurfaceVariant,
+          color: premium ? accent : scheme.onSurfaceVariant,
           fontWeight: premium ? FontWeight.w600 : FontWeight.w500,
           fontFeatures: tabularFigures,
         ),
@@ -449,7 +455,7 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
             children: [
               const Expanded(child: SizedBox()),
               SizedBox(width: 82, child: Text(context.tr("Bepul"), textAlign: TextAlign.center, style: head.copyWith(color: scheme.onSurfaceVariant))),
-              SizedBox(width: 82, child: Text(context.tr("Premium"), textAlign: TextAlign.center, style: head.copyWith(color: gold))),
+              SizedBox(width: 82, child: Text(context.tr("Premium"), textAlign: TextAlign.center, style: head.copyWith(color: accent))),
             ],
           ),
           for (final (icon, label, free, prem) in rows)
@@ -488,7 +494,7 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final on = _plan == p.key;
-    final gold = AppPalette.textTone(AppPalette.gold, theme.brightness);
+    final accent = AppPalette.textTone(AppPalette.premium, theme.brightness);
     final badge = (p.tag != null && p.tag!.isNotEmpty)
         ? p.tag!
         : (savingPct >= 5 ? context.tr("{v0}% tejaysiz", {'v0': savingPct}) : null);
@@ -501,7 +507,7 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
         selected: on,
         button: true,
         child: Material(
-          color: on ? AppPalette.gold.withValues(alpha: theme.brightness == Brightness.dark ? .12 : .07) : scheme.surfaceContainerLowest,
+          color: on ? AppPalette.premium.withValues(alpha: theme.brightness == Brightness.dark ? .12 : .07) : scheme.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           child: InkWell(
             borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -514,7 +520,7 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
               padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(color: on ? _goldFill(theme.brightness) : scheme.outlineVariant, width: on ? 2 : 1),
+                border: Border.all(color: on ? _premiumFill(theme.brightness) : scheme.outlineVariant, width: on ? 2 : 1),
               ),
               child: Row(
                 children: [
@@ -524,10 +530,10 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
                     height: 22,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: on ? _goldFill(theme.brightness) : Colors.transparent,
-                      border: Border.all(color: on ? _goldFill(theme.brightness) : scheme.outline, width: 1.6),
+                      color: on ? _premiumFill(theme.brightness) : Colors.transparent,
+                      border: Border.all(color: on ? _premiumFill(theme.brightness) : scheme.outline, width: 1.6),
                     ),
-                    child: on ? Icon(LucideIcons.check, size: 14, color: _onGold(theme.brightness)) : null,
+                    child: on ? Icon(LucideIcons.check, size: 14, color: _onPremium(theme.brightness)) : null,
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -540,14 +546,14 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text(context.tr(p.title), style: AppType.heading),
-                            if (bestValue) Pill(context.tr("Eng foydali"), color: AppPalette.gold),
+                            if (bestValue) Pill(context.tr("Eng foydali"), color: AppPalette.premium),
                           ],
                         ),
                         const SizedBox(height: 3),
                         Text(
                           badge == null ? sub : '$sub · $badge',
                           style: AppType.caption.copyWith(
-                            color: badge == null ? scheme.onSurfaceVariant : gold,
+                            color: badge == null ? scheme.onSurfaceVariant : accent,
                             fontWeight: badge == null ? FontWeight.w400 : FontWeight.w600,
                             fontFeatures: tabularFigures,
                           ),
@@ -712,14 +718,14 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
     final freePromo = s.promo?.valid == true && s.promo!.isFree;
     final style = FilledButton.styleFrom(
       minimumSize: const Size.fromHeight(54),
-      backgroundColor: _goldFill(theme.brightness),
-      foregroundColor: _onGold(theme.brightness),
+      backgroundColor: _premiumFill(theme.brightness),
+      foregroundColor: _onPremium(theme.brightness),
       textStyle: AppType.bodyStrong.copyWith(fontSize: 16, fontFamily: AppTheme.fontFamily),
     );
     final spinner = SizedBox(
       width: 20,
       height: 20,
-      child: CircularProgressIndicator(strokeWidth: 2, color: _onGold(theme.brightness)),
+      child: CircularProgressIndicator(strokeWidth: 2, color: _onPremium(theme.brightness)),
     );
 
     Widget button;
@@ -853,8 +859,8 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
           child: Container(
             width: 72,
             height: 72,
-            decoration: BoxDecoration(color: _goldFill(theme.brightness), borderRadius: BorderRadius.circular(22)),
-            child: Icon(LucideIcons.crown, size: 34, color: _onGold(theme.brightness)),
+            decoration: BoxDecoration(gradient: _crownGradient, borderRadius: BorderRadius.circular(22)),
+            child: const Icon(LucideIcons.crown, size: 34, color: Colors.white),
           ),
         ),
         const SizedBox(height: 18),
@@ -872,8 +878,8 @@ class _PaywallSheetState extends State<_PaywallSheet> with WidgetsBindingObserve
           onPressed: () => Navigator.pop(context),
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(52),
-            backgroundColor: _goldFill(theme.brightness),
-            foregroundColor: _onGold(theme.brightness),
+            backgroundColor: _premiumFill(theme.brightness),
+            foregroundColor: _onPremium(theme.brightness),
           ),
           child: Text(context.tr("Davom etish")),
         ),
