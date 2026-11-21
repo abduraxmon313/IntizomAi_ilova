@@ -573,11 +573,10 @@ class _ProfilePageState extends State<ProfilePage> {
                           subtitle: '@intizomai.uz',
                           onTap: () => _open(kInstagramUrl),
                         ),
-                        if (kApiBaseUrl.isNotEmpty)
-                          SettingTile(
+                        SettingTile(
                             icon: LucideIcons.shield,
                             title: context.tr("Maxfiylik siyosati"),
-                            onTap: () => _open('$kApiBaseUrl/privacy'),
+                            onTap: () => _open(kPrivacyUrl),
                           ),
                       ],
                     ),

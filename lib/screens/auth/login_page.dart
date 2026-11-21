@@ -62,7 +62,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _openPrivacy() async {
-    final uri = Uri.parse('${kApiBaseUrl.trim().replaceAll(RegExp(r'/+$'), '')}/privacy');
+    final uri = Uri.parse(kPrivacyUrl);
     for (final mode in [LaunchMode.externalApplication, LaunchMode.inAppBrowserView, LaunchMode.platformDefault]) {
       try {
         if (await launchUrl(uri, mode: mode)) return;
@@ -186,8 +186,7 @@ class _LoginPageState extends State<LoginPage> {
                         textAlign: TextAlign.center,
                         style: AppType.caption.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
                       ),
-                      if (kApiBaseUrl.isNotEmpty)
-                        Center(
+                      Center(
                           child: TextButton(
                             onPressed: _openPrivacy,
                             style: TextButton.styleFrom(minimumSize: const Size(0, 40)),
