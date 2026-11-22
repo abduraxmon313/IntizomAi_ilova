@@ -63,8 +63,14 @@ workflows:
           APKSIGNER=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | sort -V | tail -1)
           "$APKSIGNER" verify --print-certs build/app/outputs/flutter-apk/app-release.apk | grep -E "SHA-1 digest|SHA-256 digest"
           rm -f android/key.properties
+      - name: APK nomini o'zgartirish (IntizomAI.apk)
+        script: |
+          set -euo pipefail
+          mkdir -p build/dist
+          cp build/app/outputs/flutter-apk/app-release.apk build/dist/IntizomAI.apk
+          ls -lh build/dist/IntizomAI.apk
     artifacts:
-      - build/app/outputs/flutter-apk/*.apk
+      - build/dist/IntizomAI.apk
     publishing:
       email:
         recipients:
