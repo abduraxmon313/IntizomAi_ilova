@@ -73,6 +73,69 @@ workflows:
           success: true
           failure: true
 
+  # Google Play uchun AAB (Android App Bundle). Faqat qo'lda ishga tushiriladi:
+  # Codemagic → IntizomAi_ilova → Start new build → "Android AAB (Google Play)".
+  # AAB APK bilan bir xil doimiy kalit (intizomai-upload.p12) bilan imzolanadi —
+  # Play Console'da u "upload key" bo'ladi, ilovani Google o'z kaliti bilan qayta imzolaydi.
+  # versionCode = Codemagic build raqami ($BUILD_NUMBER): har yangi build kattaroq bo'ladi,
+  # Play esa bir xil versionCode'ni ikkinchi marta qabul qilmaydi.
+  android-aab:
+    name: Android AAB (Google Play)
+    instance_type: mac_mini_m2
+    max_build_duration: 40
+    environment:
+      flutter: stable
+      java: 21
+      groups:
+        - IntizomAi
+    scripts:
+      - name: Sozlamalarni tekshirish
+        script: |
+          for v in API_BASE_URL GOOGLE_SERVER_CLIENT_ID ANDROID_KEYSTORE_PASSWORD; do
+            if [ -z "${!v}" ]; then
+              echo "XATO: 'IntizomAi' guruhida $v yo'q."
+              exit 1
+            fi
+          done
+      - name: Paketlarni yuklash
+        script: flutter pub get
+      - name: Kod tahlili
+        script: flutter analyze
+      - name: Imzo kalitini ulash
+        script: |
+          umask 077
+          printf 'storeFile=intizomai-upload.p12\nstoreType=pkcs12\nkeyAlias=intizomai\nstorePassword=%s\nkeyPassword=%s\n' \
+            "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEYSTORE_PASSWORD" > android/key.properties
+      - name: AAB yig'ish
+        script: |
+          flutter build appbundle --release \
+            --build-number=$BUILD_NUMBER \
+            --dart-define=API_BASE_URL=$API_BASE_URL \
+            --dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID
+      - name: Imzoni tekshirish
+        script: |
+          set -euo pipefail
+          AAB=build/app/outputs/bundle/release/app-release.aab
+          ls -lh "$AAB"
+          # Debug kalit bilan imzolangan AAB'ni Play qabul qilmaydi — shu yerda to'xtatamiz.
+          CERT=$(keytool -printcert -jarfile "$AAB")
+          echo "$CERT" | grep -E "Owner:|SHA1:|SHA256:"
+          if echo "$CERT" | grep -q "CN=Android Debug"; then
+            echo "XATO: AAB debug kalit bilan imzolangan."
+            exit 1
+          fi
+          rm -f android/key.properties
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
+      - build/app/outputs/mapping/release/mapping.txt
+    publishing:
+      email:
+        recipients:
+          - a.xakimjonov@student.pdp.university
+        notify:
+          success: true
+          failure: true
+
   # iPhone'ga Sideloadly orqali o'rnatish uchun IMZOSIZ IPA (faqat qo'lda ishga tushiriladi).
   # Apple Developer obunasi, sertifikat, provisioning profile, App Store Connect yoki
   # TestFlight kerak emas: IPA'ni Sideloadly sizning bepul Apple ID'ingiz bilan imzolaydi.
