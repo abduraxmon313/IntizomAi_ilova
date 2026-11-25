@@ -258,3 +258,83 @@ workflows:
         notify:
           success: true
           failure: true
+
+  # App Store uchun imzolangan IPA. Faqat qo'lda ishga tushiriladi:
+  # Codemagic → IntizomAi_ilova → Start new build → "iOS App Store".
+  # Build App Store Connect'ga yuklanadi; Review'ga App Store Connect sahifasidan
+  # qo'lda yuboriladi (birinchi versiyada skrinshot/tavsif u yerda to'ldiriladi).
+  #
+  # Kerak (bir marta sozlanadi):
+  #   - Team settings → Integrations → Developer Portal: App Store Connect API kaliti,
+  #     nomi `integrations.app_store_connect` dagi qiymat bilan bir xil bo'lsin.
+  #   - Team settings → codemagic.yaml settings → Code signing identities:
+  #     Apple Distribution sertifikati va uz.intizomai.intizomAi uchun App Store profili.
+  #
+  # HIDE_PURCHASES=true: Apple raqamli obunani tashqi to'lov (Paylov) orqali sotishga
+  # ruxsat bermaydi (Guideline 3.1.1), shuning uchun iOS build'da sotuv tugmalari yashiriladi.
+  ios-appstore:
+    name: iOS App Store
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: IntizomAi
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      groups:
+        - IntizomAi
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: uz.intizomai.intizomAi
+    scripts:
+      - name: Sozlamalarni tekshirish
+        script: |
+          for v in API_BASE_URL GOOGLE_SERVER_CLIENT_ID GOOGLE_IOS_CLIENT_ID; do
+            if [ -z "${!v}" ]; then
+              echo "XATO: 'IntizomAi' guruhida $v yo'q."
+              exit 1
+            fi
+          done
+      - name: Paketlarni yuklash
+        script: flutter pub get
+      - name: Google Sign-In URL sxemasini qo'shish (Info.plist)
+        script: |
+          set -euo pipefail
+          REVERSED=$(echo "$GOOGLE_IOS_CLIENT_ID" | awk -F. '{for(i=NF;i>0;i--) printf "%s%s",$i,(i>1?".":"")}')
+          PLIST=ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:1 string $REVERSED" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :GIDClientID string $GOOGLE_IOS_CLIENT_ID" "$PLIST"
+      - name: iOS loyihasini tayyorlash (Podfile, Swift Package'lar)
+        script: |
+          flutter build ios --config-only --release \
+            --build-number=$BUILD_NUMBER \
+            --dart-define=API_BASE_URL=$API_BASE_URL \
+            --dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID \
+            --dart-define=GOOGLE_IOS_CLIENT_ID=$GOOGLE_IOS_CLIENT_ID \
+            --dart-define=HIDE_PURCHASES=true
+      - name: Imzo profillarini Xcode loyihasiga ulash
+        script: xcode-project use-profiles
+      - name: IPA yig'ish (App Store)
+        script: |
+          flutter build ipa --release \
+            --build-number=$BUILD_NUMBER \
+            --export-options-plist=/Users/builder/export_options.plist \
+            --dart-define=API_BASE_URL=$API_BASE_URL \
+            --dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID \
+            --dart-define=GOOGLE_IOS_CLIENT_ID=$GOOGLE_IOS_CLIENT_ID \
+            --dart-define=HIDE_PURCHASES=true
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false
+      email:
+        recipients:
+          - a.xakimjonov@student.pdp.university
+        notify:
+          success: true
+          failure: true
