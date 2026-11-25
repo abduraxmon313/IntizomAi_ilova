@@ -307,7 +307,11 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :GIDClientID string $GOOGLE_IOS_CLIENT_ID" "$PLIST"
       - name: iOS loyihasini tayyorlash (Podfile, Swift Package'lar)
         script: |
-          flutter build ios --config-only --release \
+          # --no-codesign: bu bosqichda imzo hali ulanmagan (u keyingi qadamda
+          # `xcode-project use-profiles` bilan ulanadi). Busiz Flutter
+          # "No valid code signing certificates were found" deb to'xtaydi.
+          # Haqiqiy imzolash `flutter build ipa` qadamida bo'ladi.
+          flutter build ios --config-only --release --no-codesign \
             --build-number=$BUILD_NUMBER \
             --dart-define=API_BASE_URL=$API_BASE_URL \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID \
