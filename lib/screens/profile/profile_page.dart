@@ -452,7 +452,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                       ),
                                       const SizedBox(width: 8),
                                     ],
-                                    if (st.isPremium)  Pill(context.tr("Premium"), color: AppPalette.premium),
+                                    if (st.isPremium && StorePolicy.purchasesVisible)  Pill(context.tr("Premium"), color: AppPalette.premium),
                                   ],
                                 ),
                               ],
@@ -461,7 +461,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ],
                       ),
                     ),
-                    _SubscriptionCard(sub: _sub, isPremium: st.isPremium),
+                    if (StorePolicy.purchasesVisible) _SubscriptionCard(sub: _sub, isPremium: st.isPremium),
 
                     // ── Hisob ──────────────────────────────
                      SectionBar(title: context.tr("Hisob")),

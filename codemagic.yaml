@@ -270,8 +270,8 @@ workflows:
   #   - Team settings → codemagic.yaml settings → Code signing identities:
   #     Apple Distribution sertifikati va uz.intizomai.intizomAi uchun App Store profili.
   #
-  # HIDE_PURCHASES=true: Apple raqamli obunani tashqi to'lov (Paylov) orqali sotishga
-  # ruxsat bermaydi (Guideline 3.1.1), shuning uchun iOS build'da sotuv tugmalari yashiriladi.
+  # Premium sotuvi iOS'da serverdagi APPLE_PREMIUM bilan boshqariladi (GET /profile →
+  # purchases_visible): false bo'lsa narx/obuna ko'rinmaydi va limitlar yo'q.
   ios-appstore:
     name: iOS App Store
     instance_type: mac_mini_m2
@@ -315,8 +315,7 @@ workflows:
             --build-number=$BUILD_NUMBER \
             --dart-define=API_BASE_URL=$API_BASE_URL \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID \
-            --dart-define=GOOGLE_IOS_CLIENT_ID=$GOOGLE_IOS_CLIENT_ID \
-            --dart-define=HIDE_PURCHASES=true
+            --dart-define=GOOGLE_IOS_CLIENT_ID=$GOOGLE_IOS_CLIENT_ID
       - name: Imzo profillarini Xcode loyihasiga ulash
         script: xcode-project use-profiles
       - name: IPA yig'ish (App Store)
@@ -326,8 +325,7 @@ workflows:
             --export-options-plist=/Users/builder/export_options.plist \
             --dart-define=API_BASE_URL=$API_BASE_URL \
             --dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID \
-            --dart-define=GOOGLE_IOS_CLIENT_ID=$GOOGLE_IOS_CLIENT_ID \
-            --dart-define=HIDE_PURCHASES=true
+            --dart-define=GOOGLE_IOS_CLIENT_ID=$GOOGLE_IOS_CLIENT_ID
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log

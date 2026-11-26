@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../config/store_policy.dart';
 import '../models/goal.dart';
 import '../models/habit.dart';
 import '../models/profile.dart';
@@ -45,6 +46,7 @@ class AppState extends ChangeNotifier {
     try {
       final r = await Future.wait([api.profile(), api.stats(), api.habits(), api.goals()]);
       profile = r[0] as Profile;
+      StorePolicy.updateFromServer(profile!.purchasesVisible);
       stats = r[1] as UserStats;
       habits = r[2] as List<Habit>;
       goals = r[3] as List<Goal>;
@@ -65,6 +67,7 @@ class AppState extends ChangeNotifier {
   Future<void> refreshProfile() async {
     try {
       profile = await api.profile();
+      StorePolicy.updateFromServer(profile!.purchasesVisible);
       notifyListeners();
     } catch (_) {}
   }
