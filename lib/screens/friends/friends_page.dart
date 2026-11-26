@@ -12,6 +12,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/dates.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/feedback.dart';
+import '../../widgets/report_sheet.dart';
 import '../../widgets/ui_kit.dart';
 import '../forms.dart';
 import '../profile/profile_page.dart' show LowerCaseFormatter, ProfileAvatar;
@@ -192,14 +193,36 @@ class FriendsPageState extends State<FriendsPage> {
               subtitle: Text(context.tr("U sizga boshqa taklif yubora olmaydi")),
               onTap: () => Navigator.pop(ctx, 'block'),
             ),
+            ListTile(
+              leading: Icon(LucideIcons.flag, color: Theme.of(ctx).colorScheme.error),
+              title: Text(
+                context.tr("Shikoyat qilish"),
+                style: AppType.body.copyWith(color: Theme.of(ctx).colorScheme.error),
+              ),
+              subtitle: Text(context.tr("Nomaqbul ism, rasm yoki guruh haqida xabar bering")),
+              onTap: () => Navigator.pop(ctx, 'report'),
+            ),
             const SizedBox(height: 8),
           ],
         ),
       ),
     );
     if (choice == null) return;
+    var block = choice == 'block';
+    if (choice == 'report') {
+      if (!mounted) return;
+      final r = await showReportSheet(
+        context,
+        api: s.api,
+        targetType: 'user',
+        targetId: inv.inviter.userId,
+        targetName: inv.inviter.username == null ? inv.inviter.name : '@${inv.inviter.username}',
+      );
+      if (r == null) return;
+      block = r.blocked;
+    }
     try {
-      await s.api.declineInvite(inv.id, block: choice == 'block');
+      await s.api.declineInvite(inv.id, block: block);
     } catch (e) {
       if (mounted) showApiError(context, e);
     }
@@ -681,6 +704,12 @@ class FriendsPageState extends State<FriendsPage> {
             title: g.name,
             subtitle: context.tr("{v0} a'zo", {'v0': g.members.length}),
             actions: [
+              if (!g.isOwner)
+                HeaderIconButton(
+                  icon: LucideIcons.flag,
+                  tooltip: context.tr("Guruh ustidan shikoyat"),
+                  onTap: () => showReportSheet(context, api: s.api, targetType: 'group', targetId: g.id, targetName: g.name),
+                ),
               HeaderIconButton(icon: LucideIcons.settings, tooltip: context.tr("Guruh sozlamalari"), onTap: () => _groupSettings(g)),
             ],
           ),
@@ -802,6 +831,14 @@ class FriendsPageState extends State<FriendsPage> {
             title: m.name,
             subtitle: context.tr("{v0} kunlik seriya · {v1} ball", {'v0': m.streak, 'v1': m.totalScore}),
             onBack: handleBack,
+            actions: [
+              if (!m.isMe)
+                HeaderIconButton(
+                  icon: LucideIcons.flag,
+                  tooltip: context.tr("Shikoyat qilish"),
+                  onTap: () => showReportSheet(context, api: s.api, targetType: 'user', targetId: m.userId, targetName: m.name),
+                ),
+            ],
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),

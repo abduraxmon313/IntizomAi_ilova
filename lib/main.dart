@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'config/store_policy.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/auth/login_page.dart';
 import 'screens/auth/language_page.dart';
@@ -120,6 +121,7 @@ class _IntizomAiAppState extends State<IntizomAiApp> {
   Future<void> _resolveOnboarding() async {
     try {
       final p = await _api.profile();
+      StorePolicy.updateFromServer(p.purchasesVisible);
       if (!mounted) return;
       if (p.onboarded) {
         await widget.authStore.setOnboarded(true);

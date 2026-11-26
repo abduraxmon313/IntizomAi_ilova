@@ -15,6 +15,7 @@ class Profile {
     this.customPhotoUrl,
     this.providers = const [],
     this.isPremium = false,
+    this.purchasesVisible,
   });
 
   final int id;
@@ -38,6 +39,9 @@ class Profile {
   final List<String> providers;
   final bool isPremium;
 
+  /// Server: shu qurilmada Premium sotuvi ko'rsatiladimi (iOS'da APPLE_PREMIUM). Eski serverda null.
+  final bool? purchasesVisible;
+
   String? get avatar => photoUrl;
 
   factory Profile.fromJson(Map<String, dynamic> j) => Profile(
@@ -55,6 +59,7 @@ class Profile {
     customPhotoUrl: j['custom_photo_url'] as String?,
     providers: (j['providers'] as List? ?? const []).map((e) => '$e').toList(),
     isPremium: j['is_premium'] as bool? ?? false,
+    purchasesVisible: j['purchases_visible'] as bool?,
   );
 }
 

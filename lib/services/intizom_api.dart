@@ -313,6 +313,29 @@ class IntizomApi {
 
   Future<void> unblockUser(int userId) => _c.delete('/blocks/$userId');
 
+  /// Shikoyat: `targetType` — `user` yoki `group`. Foydalanuvchi bloklangan bo'lsa true.
+  Future<bool> report({
+    required String targetType,
+    required int targetId,
+    required String reason,
+    String? details,
+    bool block = false,
+  }) async {
+    final r = _map(
+      await _c.post(
+        '/reports',
+        body: {
+          'target_type': targetType,
+          'target_id': targetId,
+          'reason': reason,
+          if (details != null && details.trim().isNotEmpty) 'details': details.trim(),
+          'block': block,
+        },
+      ),
+    );
+    return r['blocked'] as bool? ?? false;
+  }
+
   Future<MemberView> member(int groupId, int userId, DateTime day) async => MemberView.fromJson(
     _map(await _c.get('/groups/$groupId/members/$userId', query: {'date': ymd(day)})),
   );
